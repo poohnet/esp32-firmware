@@ -36,7 +36,7 @@
 #if defined(MODULE_ESP32_ETHERNET_BRICK_AVAILABLE)
 #define MAX_ACTIVE_USERS 16
 #else
-#define MAX_ACTIVE_USERS 8
+#define MAX_ACTIVE_USERS 10
 #endif
 
 extern TaskScheduler task_scheduler;
@@ -179,7 +179,16 @@ Users::Users()
 {
     user_config = Config::Object({
         {"users", Config::Array(
-            {},
+            {
+                Config::Object({
+                    {"id", Config::Uint8(0)},
+                    {"roles", Config::Uint32(0xFFFFFFFF)},
+                    {"current", Config::Uint16(32000)},
+                    {"display_name", Config::Str("Anonymous", 0, USERNAME_LENGTH)},
+                    {"username", Config::Str("anonymous", 0, USERNAME_LENGTH)},
+                    {"digest_hash", Config::Str("", 0, 32)}
+                })
+            },
             new Config(Config::Object({
                 {"id", Config::Uint8(0)},
                 {"roles", Config::Uint32(0)},
@@ -191,7 +200,7 @@ Users::Users()
             0, MAX_ACTIVE_USERS,
             Config::type_id<Config::ConfObject>()
         )},
-        {"next_user_id", Config::Uint8(0)},
+        {"next_user_id", Config::Uint8(1)},
         {"http_auth_enabled", Config::Bool(false)}
     });
 
@@ -258,22 +267,7 @@ void create_username_file() {
 
 void Users::setup()
 {
-    if (!api.restorePersistentConfig("users/config", &user_config)) {
-        user_config.get("users")->add();
-        Config *user = user_config.get("users")->get(user_config.get("users")->count() - 1);
-
-        user->get("id")->updateUint(0);
-        user->get("roles")->updateUint(0xFFFF);
-        user->get("display_name")->updateString("Anonymous");
-        user->get("username")->updateString("anonymous");
-        user->get("digest_hash")->updateString("");
-
-        uint8_t user_id = user_config.get("next_user_id")->asUint();
-        ++user_id;
-        user_config.get("next_user_id")->updateUint(user_id);
-
-        API::writeConfig("users/config", &user_config);
-    }
+    api.restorePersistentConfig("users/config", &user_config);
 
     if (!LittleFS.exists(USERNAME_FILE)) {
         logger.printfln("Username list does not exist! Recreating now.");
@@ -295,7 +289,7 @@ void Users::setup()
         // If the user slot is enabled, this can not happen, as we first write into the ESPs RAM
         // and then set the user current so that the EVSE can start charging.
         // In the user slot is disabled, we just start tracking a charge here.
-        this->start_charging(0, 32000);
+        this->start_charging(0, 32000, CHARGE_TRACKER_AUTH_TYPE_NONE, nullptr);
     }
 
     if (charging) {
@@ -323,7 +317,7 @@ void Users::setup()
 
         if ((last_iec_state == IEC_STATE_A && iec_state == IEC_STATE_B) || iec_state == IEC_STATE_C) {
             if (!user_enabled)
-                this->start_charging(0, 32000);
+                this->start_charging(0, 32000, CHARGE_TRACKER_AUTH_TYPE_NONE, nullptr);
         } else if (iec_state == IEC_STATE_A) {
             this->stop_charging(0, true);
         }
@@ -518,7 +512,7 @@ void Users::rename_user(uint8_t user_id, const char *username, const char *displ
 }
 
 // Only returns true if the triggered action was a charge start.
-bool Users::trigger_charge_action(uint8_t user_id)
+bool Users::trigger_charge_action(uint8_t user_id, uint8_t auth_type, Config::ConfVariant auth_info)
 {
     bool user_enabled = get_user_slot()->get("active")->asBool();
     if (!user_enabled)
@@ -545,7 +539,7 @@ bool Users::trigger_charge_action(uint8_t user_id)
 
     switch (iec_state) {
         case IEC_STATE_B: // State B: The user wants to start charging.
-            return this->start_charging(user_id, current_limit);
+            return this->start_charging(user_id, current_limit, auth_type, auth_info);
         case IEC_STATE_C: // State C: The user wants to stop charging.
             // Debounce here a bit, an impatient user can otherwise accidentially trigger a stop if a start_charging takes too long.
             if (tscs > 3000)
@@ -565,7 +559,7 @@ uint32_t timestamp_minutes() {
     return tv_now.tv_sec / 60;
 }
 
-bool Users::start_charging(uint8_t user_id, uint16_t current_limit)
+bool Users::start_charging(uint8_t user_id, uint16_t current_limit, uint8_t auth_type, Config::ConfVariant auth_info)
 {
     if (charge_tracker.currentlyCharging())
         return false;
@@ -575,7 +569,7 @@ bool Users::start_charging(uint8_t user_id, uint16_t current_limit)
     uint32_t timestamp = timestamp_minutes();
 
     write_user_slot_info(user_id, evse_uptime, timestamp, meter_start);
-    charge_tracker.startCharge(timestamp, meter_start, user_id, evse_uptime);
+    charge_tracker.startCharge(timestamp, meter_start, user_id, evse_uptime, auth_type, auth_info);
 
     set_user_current(current_limit);
 

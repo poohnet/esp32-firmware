@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2020-2021 Erik Fleckstein <erik@tinkerforge.com>
+ * Copyright (C) 2022 Erik Fleckstein <erik@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,28 +19,4 @@
 
 #pragma once
 
-#include "config.h"
-
-class Users {
-public:
-    Users();
-    void setup();
-    void register_urls();
-    void loop();
-
-    uint8_t next_user_id();
-    void rename_user(uint8_t user_id, const char *username, const char *display_name);
-
-    bool trigger_charge_action(uint8_t user_id, uint8_t auth_type, Config::ConfVariant auth_info);
-
-    bool initialized = false;
-
-    ConfigRoot user_config;
-    ConfigRoot add;
-    ConfigRoot remove;
-    ConfigRoot http_auth;
-    ConfigRoot http_auth_update;
-
-    bool start_charging(uint8_t user_id, uint16_t current_limit, uint8_t auth_type, Config::ConfVariant auth_info);
-    bool stop_charging(uint8_t user_id, bool force);
-};
+void migrate_config();

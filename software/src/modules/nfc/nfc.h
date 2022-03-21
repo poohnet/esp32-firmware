@@ -53,7 +53,7 @@ public:
     };
 
     void update_seen_tags();
-    void handle_event(tag_info_t *tag, bool lost_or_found);
+    void handle_event(tag_info_t *tag, bool lost_or_found, bool injected);
     void handle_evse();
     void setup_nfc();
     void check_nfc_state();
@@ -63,7 +63,6 @@ public:
     ConfigRoot config_in_use;
     ConfigRoot seen_tags;
     ConfigRoot state;
-    ConfigRoot last_tag;
     ConfigRoot inject_tag;
     uint32_t last_tag_injection = 0;
 
