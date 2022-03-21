@@ -101,7 +101,10 @@ void set_user_current(uint16_t current) {
 }
 
 float get_energy() {
-#if defined(MODULE_EVSE_AVAILABLE)
+#if defined(MODULE_SDM630_MQTT_AVAILABLE)
+    bool meter_avail = sdm630_mqtt.state.get("state")->asUint() == 2;
+    return !meter_avail ? NAN : sdm630_mqtt.values.get("energy_abs")->asFloat();
+#elif defined(MODULE_EVSE_AVAILABLE)
     bool meter_avail = sdm72dm.state.get("state")->asUint() == 2;
     return !meter_avail ? NAN : sdm72dm.values.get("energy_abs")->asFloat();
 #elif defined(MODULE_EVSE_V2_AVAILABLE)
