@@ -38,7 +38,7 @@ function update_version() {
     }
 
     $('#current_firmware').val(version.firmware);
-    $('#current_spiffs').val(version.spiffs);
+    $('#current_spiffs').val(version.config);
 }
 
 function check_upload(type: string) {
@@ -166,11 +166,10 @@ export function init() {
     bsCustomFileInput.init();
 }
 
-export function addEventListeners(source: API.ApiEventTarget) {
+export function add_event_listeners(source: API.APIEventTarget) {
     source.addEventListener('info/version', update_version);
 }
 
-export function updateLockState(module_init: any) {
+export function update_sidebar_state(module_init: any) {
     $('#sidebar-flash').prop('hidden', !module_init.firmware_update);
-    $('#sidebar-system').prop('hidden',  $('#sidebar-system').prop('hidden') && !module_init.firmware_update);
 }

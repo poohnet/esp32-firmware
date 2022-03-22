@@ -40,7 +40,7 @@ function update_config() {
     $('#display_name').val(config.display_name);
     $('#display_name').parent().removeClass("input-group");
     $('#device_name_form_submit').prop('hidden', true);
-    document.title = config.display_name + ' - ' + __('main.title');
+    document.title = config.display_name + ' - ' + __("main.title");
 }
 
 function update_state() {
@@ -51,13 +51,11 @@ function save_config() {
     API.save('info/display_name',{
             display_name: $('#display_name').val().toString()
         },
-        __("device_name.script.config_failed"),
-        __("device_name.script.reboot_content_changed"));
+        __("device_name.script.config_failed"));
 }
 
-export function addEventListeners(source: API.ApiEventTarget) {
+export function add_event_listeners(source: API.APIEventTarget) {
     source.addEventListener('info/name', update_state);
-
     source.addEventListener('info/display_name', update_config);
 }
 
@@ -85,6 +83,6 @@ export function init() {
     });
 }
 
-export function updateLockState(module_init: any) {
+export function update_sidebar_state(module_init: any) {
 
 }
