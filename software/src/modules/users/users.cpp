@@ -44,7 +44,8 @@ extern TaskScheduler task_scheduler;
 // We have to do access the evse/evse_v2 configs manually
 // because a lot of the code runs in setup(), i.e. before APIs
 // are registered.
-void set_data_storage(uint8_t *buf) {
+void set_data_storage(uint8_t *buf)
+{
 #if defined(MODULE_EVSE_AVAILABLE)
     tf_evse_set_data_storage(&evse.device, 0, buf);
 #elif defined(MODULE_EVSE_V2_AVAILABLE)
@@ -52,7 +53,8 @@ void set_data_storage(uint8_t *buf) {
 #endif
 }
 
-void get_data_storage(uint8_t *buf) {
+void get_data_storage(uint8_t *buf)
+{
 #if defined(MODULE_EVSE_AVAILABLE)
     tf_evse_get_data_storage(&evse.device, 0, buf);
 #elif defined(MODULE_EVSE_V2_AVAILABLE)
@@ -60,12 +62,14 @@ void get_data_storage(uint8_t *buf) {
 #endif
 }
 
-void zero_user_slot_info() {
+void zero_user_slot_info()
+{
     uint8_t buf[63] = {0};
     set_data_storage(buf);
 }
 
-uint8_t get_iec_state() {
+uint8_t get_iec_state()
+{
 #if defined(MODULE_EVSE_AVAILABLE)
     return evse.evse_state.get("iec61851_state")->asUint();
 #elif defined(MODULE_EVSE_V2_AVAILABLE)
@@ -74,7 +78,8 @@ uint8_t get_iec_state() {
     return 0;
 }
 
-Config *get_user_slot() {
+Config *get_user_slot()
+{
 #if defined(MODULE_EVSE_AVAILABLE)
     return evse.evse_slots.get(CHARGING_SLOT_USER);
 #elif defined(MODULE_EVSE_V2_AVAILABLE)
@@ -83,7 +88,8 @@ Config *get_user_slot() {
     return nullptr;
 }
 
-Config *get_low_level_state() {
+Config *get_low_level_state()
+{
 #if defined(MODULE_EVSE_AVAILABLE)
     return &evse.evse_low_level_state;
 #elif defined(MODULE_EVSE_V2_AVAILABLE)
@@ -92,7 +98,8 @@ Config *get_low_level_state() {
     return nullptr;
 }
 
-void set_user_current(uint16_t current) {
+void set_user_current(uint16_t current)
+{
 #if defined(MODULE_EVSE_AVAILABLE)
     evse.set_user_current(current);
 #elif defined(MODULE_EVSE_V2_AVAILABLE)
@@ -100,7 +107,8 @@ void set_user_current(uint16_t current) {
 #endif
 }
 
-float get_energy() {
+float get_energy()
+{
 #if defined(MODULE_SDM630_MQTT_AVAILABLE)
     bool meter_avail = sdm630_mqtt.state.get("state")->asUint() == 2;
     return !meter_avail ? NAN : sdm630_mqtt.values.get("energy_abs")->asFloat();
@@ -124,7 +132,8 @@ struct UserSlotInfo {
     float meter_start;
 };
 
-uint16_t calc_checksum(UserSlotInfo info) {
+uint16_t calc_checksum(UserSlotInfo info)
+{
     uint32_t float_buf = 0;
     memcpy(&float_buf, &info.meter_start, sizeof(float_buf));
 
@@ -143,7 +152,8 @@ uint16_t calc_checksum(UserSlotInfo info) {
     return checksum;
 }
 
-void write_user_slot_info(uint8_t user_id, uint32_t evse_uptime, uint32_t timestamp_minutes, float meter_start) {
+void write_user_slot_info(uint8_t user_id, uint32_t evse_uptime, uint32_t timestamp_minutes, float meter_start)
+{
     UserSlotInfo info;
     info.checksum = 0;
     info.version = USER_SLOT_INFO_VERSION;
@@ -159,7 +169,8 @@ void write_user_slot_info(uint8_t user_id, uint32_t evse_uptime, uint32_t timest
     set_data_storage(buf);
 }
 
-bool read_user_slot_info(UserSlotInfo *result) {
+bool read_user_slot_info(UserSlotInfo *result)
+{
     uint8_t buf[63] = {0};
     get_data_storage(buf);
 
@@ -232,7 +243,7 @@ Users::Users()
         if (remove.get("id")->asUint() == 0)
             return "The anonymous user can't be removed.";
 
-        for(int i = 0; i < user_config.get("users")->count(); ++i) {
+        for (int i = 0; i < user_config.get("users")->count(); ++i) {
             if (user_config.get("users")->get(i)->get("id")->asUint() == remove.get("id")->asUint()) {
                 return "";
             }
@@ -247,7 +258,7 @@ Users::Users()
         if (!update.get("enabled")->asBool())
             return String("");
 
-        for(int i = 0; i < user_config.get("users")->count(); ++i) {
+        for (int i = 0; i < user_config.get("users")->count(); ++i) {
             if (user_config.get("users")->get(i)->get("digest_hash")->asString() != "")
                 return String("");
         }
@@ -256,12 +267,13 @@ Users::Users()
     });
 }
 
-void create_username_file() {
+void create_username_file()
+{
     logger.printfln("Recreating users file");
     File f = LittleFS.open(USERNAME_FILE, "w", true);
     const uint8_t buf[512] = {};
 
-    for(int i = 0; i < MAX_PASSIVE_USERS * USERNAME_ENTRY_LENGTH; i += sizeof(buf))
+    for (int i = 0; i < MAX_PASSIVE_USERS * USERNAME_ENTRY_LENGTH; i += sizeof(buf))
         f.write(buf, sizeof(buf));
 }
 
@@ -300,8 +312,7 @@ void Users::setup()
                 charge_tracker.current_charge.get("timestamp_minutes")->updateUint(info.timestamp_minutes);
                 charge_tracker.current_charge.get("authorization_type")->updateUint(CHARGE_TRACKER_AUTH_TYPE_LOST);
             }
-        }
-        else if (!charge_start_tracked)
+        } else if (!charge_start_tracked)
             this->start_charging(0, 32000, CHARGE_TRACKER_AUTH_TYPE_NONE, nullptr);
     }
 
@@ -340,7 +351,7 @@ void Users::setup()
             auth = auth.substring(7);
             AuthFields fields = parseDigestAuth(auth.c_str());
 
-            for(int i = 0; i < user_config.get("users")->count(); ++i) {
+            for (int i = 0; i < user_config.get("users")->count(); ++i) {
                 if (user_config.get("users")->get(i)->get("username")->asString().equals(fields.username))
                     return checkDigestAuthentication(fields, req.methodString(), fields.username.c_str(), user_config.get("users")->get(i)->get("digest_hash")->asCStr(), nullptr, true, nullptr, nullptr, nullptr);
             }
@@ -472,7 +483,7 @@ void Users::register_urls()
     server.on("/users/all_usernames", HTTP_GET, [this](WebServerRequest request) {
         //std::lock_guard<std::mutex> lock{records_mutex};
         size_t len = MAX_PASSIVE_USERS * USERNAME_ENTRY_LENGTH;
-        char *buf = (char*)malloc(len);
+        char *buf = (char *)malloc(len);
         if (buf == nullptr) {
             request.send(507);
             return;
@@ -489,7 +500,6 @@ void Users::register_urls()
 
 void Users::loop()
 {
-
 }
 
 uint8_t Users::next_user_id()
@@ -551,7 +561,8 @@ bool Users::trigger_charge_action(uint8_t user_id, uint8_t auth_type, Config::Co
     return false;
 }
 
-uint32_t timestamp_minutes() {
+uint32_t timestamp_minutes()
+{
     struct timeval tv_now;
 
     if (!clock_synced(&tv_now))

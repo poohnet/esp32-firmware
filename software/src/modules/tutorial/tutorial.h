@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2020-2021 Erik Fleckstein <erik@tinkerforge.com>
+ * Copyright (C) 2022 Matthias Bolte <matthias@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,46 +19,21 @@
 
 #pragma once
 
-#include <Arduino.h>
+#include "config.h"
 
-#include <vector>
-#include <queue>
-#include <functional>
-#include <mutex>
+#include "bindings/bricklet_rgb_led_button.h"
 
-#include <time.h>
-#include <iostream>
-
-#include "tools.h"
-
-#include "ArduinoJson.h"
-
-struct Task {
-    std::function<void(void)> fn;
-    uint32_t next_deadline_ms;
-    uint32_t delay_ms;
-    bool once;
-
-    Task(std::function<void(void)> fn, uint32_t first_run_delay_ms, uint32_t delay_ms, bool once);
-};
-
-bool compare(const Task &a, const Task &b);
-
-class TaskScheduler {
+class Tutorial {
 public:
-    TaskScheduler() : tasks(&compare)
-    {
-    }
+    Tutorial();
     void setup();
     void register_urls();
     void loop();
+    void update_config();
 
     bool initialized = false;
-
-    void scheduleOnce(std::function<void(void)> &&fn, uint32_t delay);
-    void scheduleWithFixedDelay(std::function<void(void)> &&fn, uint32_t first_delay, uint32_t delay);
-
-private:
-    std::mutex task_mutex;
-    std::priority_queue<Task, std::vector<Task>, decltype(&compare)> tasks;
+    ConfigRoot tutorial_config;
+    ConfigRoot tutorial_config_update;
+    ConfigRoot tutorial_state;
+    TF_RGBLEDButton rgb_led_button;
 };
