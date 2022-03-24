@@ -226,6 +226,7 @@ def main():
     display_name = env.GetProjectOption("display_name")
     manual_url = env.GetProjectOption("manual_url")
     apidoc_url = env.GetProjectOption("apidoc_url")
+    firmware_url = env.GetProjectOption("firmware_url")
     require_firmware_info = env.GetProjectOption("require_firmware_info")
     src_filter = env.GetProjectOption("src_filter")
     oldest_version, version = get_changelog_version(name)
@@ -412,6 +413,7 @@ def main():
             data = data.replace('{{{display_name}}}', display_name)
             data = data.replace('{{{manual_url}}}', manual_url)
             data = data.replace('{{{apidoc_url}}}', apidoc_url)
+            data = data.replace('{{{firmware_url}}}', firmware_url)
 
             f.write('export const translation_{0}: {{[index: string]:any}} = '.format(language))
             f.write(data + ';\n')
@@ -459,6 +461,12 @@ def main():
 
     with ChangedDirectory('web'):
         subprocess.check_call([env.subst('$PYTHONEXE'), "-u", "check_translation_completeness.py"] + [x.under for x in frontend_modules])
+
+    # Check translation override completeness
+    print('Checking translation override completeness')
+
+    with ChangedDirectory('web'):
+        subprocess.check_call([env.subst('$PYTHONEXE'), "-u", "check_override_completeness.py"] + [x.under for x in frontend_modules])
 
     # Generate web interface
     print('Checking web interface dependencies')
