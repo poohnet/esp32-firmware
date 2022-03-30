@@ -41,12 +41,21 @@ function save_authentication_config() {
         __("users.script.reboot_content_changed"));
 }
 
+// This is a bit hacky: the user modification API can take some time because it writes the changed user/display name to flash
+// The API will block up to five seconds, but just to be sure we try this twice.
+function retry_once<T>(fn: () => Promise<T>, topic: string) {
+    return fn().catch(() => {
+        util.remove_alert(topic);
+        return fn();
+    });
+}
+
 function remove_user(id: number) {
-    return API.call("users/remove", {"id": id}, __("users.script.save_failed"));
+    return retry_once(() => API.call("users/remove", {"id": id}, __("users.script.save_failed")), "users_remove_failed");
 }
 
 function modify_user(user: User) {
-    return API.call("users/modify", user, __("users.script.save_failed"));
+    return retry_once(() => API.call("users/modify", user, __("users.script.save_failed")), "users_modify_failed");
 }
 
 let next_user_id = 0;
@@ -54,7 +63,7 @@ let next_user_id = 0;
 function add_user(user: User) {
     user.id = next_user_id;
     ++next_user_id;
-    return API.call("users/add", user, __("users.script.save_failed"));
+    return retry_once(() => API.call("users/add", user, __("users.script.save_failed")), "users_add_failed");
 }
 
 let authorized_users_count = -1;
@@ -366,25 +375,42 @@ export function init() {
 
         $('#users_save_spinner').prop('hidden', false);
         await save_users_config()
+            .then(() => $('#users_save_button').prop("disabled", true))
             .then(util.getShowRebootModalFn(__("users.script.reboot_content_changed")))
             .finally(() => $('#users_save_spinner').prop('hidden', true));
     });
 
+    $('#users_add_user_form').on("input", () => {
+        let username = $('#users_config_user_new_username').val().toString();
+
+        if (API.get("users/config").users.some(u => u.username == username))
+            $('#users_config_user_new_username').addClass("is-invalid");
+        else
+            $('#users_config_user_new_username').removeClass("is-invalid");
+    })
+
     $('#users_add_user_form').on("submit", (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if ($('#users_config_user_new_username').hasClass("is-invalid"))
+            return;
 
         let form = <HTMLFormElement>$('#users_add_user_form')[0];
         form.classList.add('was-validated');
-        event.preventDefault();
-        event.stopPropagation();
 
         if (form.checkValidity() === false) {
             return;
         }
 
+        let current = $('#users_config_user_new_current').val();
+        if (current == "")
+            current = 32;
+
         generate_user_ui({
             id: -1,
             username: $('#users_config_user_new_username').val().toString(),
-            current: Math.round(<number>$('#users_config_user_new_current').val() * 1000),
+            current: Math.round(<number>current * 1000),
             display_name: $('#users_config_user_new_display_name').val().toString(),
             roles: 0xFFFF,
             digest_hash: ""

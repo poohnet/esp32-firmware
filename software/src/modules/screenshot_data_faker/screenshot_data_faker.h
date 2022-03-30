@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2022 Matthias Bolte <matthias@tinkerforge.com>
+ * Copyright (C) 2022 Erik Fleckstein <erik@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,21 +19,12 @@
 
 #pragma once
 
-#include "config.h"
-
-#include "bindings/bricklet_rgb_led_button.h"
-
-class Tutorial {
+class ScreenshotDataFaker {
 public:
-    Tutorial();
+    ScreenshotDataFaker();
     void setup();
     void register_urls();
     void loop();
-    void update_config();
 
-    bool initialized = false;
-    ConfigRoot tutorial_config;
-    ConfigRoot tutorial_config_update;
-    ConfigRoot tutorial_state;
-    TF_RGBLEDButton rgb_led_button;
+    bool initialized;
 };

@@ -21,7 +21,6 @@
         },
         "content": {
             "evse": "Ladecontroller (EVSE)",
-            "state": "Zustand",
             "iec_state": "IEC-61851-Zustand",
             "iec_state_a": "A (getrennt)",
             "iec_state_b": "B (verbunden)",
@@ -151,7 +150,12 @@
             "slot_5": "Konfiguration",
             "slot_6": "Benutzer",
             "slot_7": "Lastmanagement",
-            "slot_8": "externe Steuerung"
+            "slot_8": "externe Steuerung",
+
+            "meter_type_0": "Kein Stromzähler angeschlossen",
+            "meter_type_1": "SDM72",
+            "meter_type_2": "SDM630",
+            "meter_type_3": "SDM72V2"
         }
     }
 }
