@@ -245,6 +245,17 @@ Users::Users()
             if (user_config.get("users")->get(i)->get("username")->asString() == add.get("username")->asString())
                 return "Can't add user. A user with this username already exists.";
 
+        {
+            char username[33] = {0};
+            File f = LittleFS.open(USERNAME_FILE, "r");
+            for(size_t i = 0; i < f.size(); i += USERNAME_ENTRY_LENGTH) {
+                f.seek(i);
+                f.read((uint8_t *) username, USERNAME_LENGTH);
+                if (add.get("username")->asString() == username)
+                    return "Can't add user. A user with this username already has tracked charges.";
+            }
+        }
+
         user_api_blocked = true;
         return "";
     });
@@ -508,6 +519,10 @@ void Users::register_urls()
                 tags->get(i)->get("user_id")->updateUint(0);
         }
         API::writeConfig("nfc/config", &nfc.config);
+
+        if (!charge_tracker.is_user_tracked(remove.get("id")->asUint()))
+            this->rename_user(remove.get("id")->asUint(), "", "");
+
         user_api_blocked = false;
     }, true);
 
@@ -553,6 +568,17 @@ void Users::rename_user(uint8_t user_id, const char *username, const char *displ
     File f = LittleFS.open(USERNAME_FILE, "r+");
     f.seek(user_id * USERNAME_ENTRY_LENGTH, SeekMode::SeekSet);
     f.write((const uint8_t *)buf, USERNAME_ENTRY_LENGTH);
+}
+
+void Users::remove_from_username_file(uint8_t user_id) {
+    Config *users = user_config.get("users");
+    for (int i = 0; i < users->count(); ++i) {
+        if (users->get(i)->get("id")->asUint() == user_id) {
+            return;
+        }
+    }
+
+    this->rename_user(user_id, "", "");
 }
 
 // Only returns true if the triggered action was a charge start.
