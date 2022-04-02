@@ -45,11 +45,7 @@ void ntp_sync_cb(struct timeval *t)
         logger.printfln("NTP synchronized at %lu,%03lu!", secs, ms);
     }
 
-    char buf[INET6_ADDRSTRLEN] = {0};
-    ipaddr_ntoa_r(sntp_getserver(0), buf, sizeof(buf));
-
     ntp_state->get("synced")->updateBool(true);
-    ntp_state->get("server")->updateString(buf);
 }
 
 NTP::NTP()
@@ -58,7 +54,8 @@ NTP::NTP()
         {"enable", Config::Bool(true)},
         {"use_dhcp", Config::Bool(true)},
         {"timezone", Config::Str("Europe/Berlin", 0, 32)}, // Longest is America/Argentina/ComodRivadavia = 32 chars
-        {"server", Config::Str("pool.ntp.org", 0, 64)}, // We've applied for a vendor zone, however this seems to take quite a while. Use the pool for now.
+        {"server", Config::Str("ptbtime1.ptb.de", 0, 64)}, // We've applied for a vendor zone @ pool.ntp.org, however this seems to take quite a while. Use the ptb servers for now.
+        {"server2", Config::Str("ptbtime2.ptb.de", 0, 64)},
     }), [](Config &conf) -> String {
         if (lookup_timezone(conf.get("timezone")->asCStr()) == nullptr)
             return "Can't update config: Failed to look up timezone.";
@@ -66,8 +63,7 @@ NTP::NTP()
     }};
 
     state = Config::Object({
-        {"synced", Config::Bool(false)},
-        {"server", Config::Str("", 0, INET6_ADDRSTRLEN)}
+        {"synced", Config::Bool(false)}
     });
 }
 
@@ -83,15 +79,21 @@ void NTP::setup()
     ntp_state = &state;
     sntp_set_time_sync_notification_cb(ntp_sync_cb);
 
-    sntp_servermode_dhcp(config.get("use_dhcp")->asBool() ? 1 : 0);
+    bool dhcp = config.get("use_dhcp")->asBool();
+    sntp_servermode_dhcp(dhcp ? 1 : 0);
 
     esp_netif_init();
     if (sntp_enabled()) {
         sntp_stop();
     }
+
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
+
     if (config.get("server")->asString() != "")
-        sntp_setservername(0, config.get("server")->asCStr());
+        sntp_setservername(dhcp ? 1 : 0, config.get("server")->asCStr());
+    if (config.get("server2")->asString() != "")
+        sntp_setservername(dhcp ? 2 : 1, config.get("server2")->asCStr());
 
     sntp_init();
     const char *tzstring = lookup_timezone(config.get("timezone")->asCStr());
