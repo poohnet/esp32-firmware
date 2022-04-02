@@ -34,12 +34,44 @@ class OLED : public DeviceModule<TF_OLED128x64V2,
                                 tf_oled_128x64_v2_destroy> {
 public:
     OLED();
+    ~OLED();
+
     void setup();
     void register_urls();
     void loop();
 
+protected:
+    int16_t width() const { return _width; }
+    int16_t height() const { return _height; }
+
+    void setRotation(uint8_t rotation);
+
+protected:
+    void startWrite();
+    void endWrite();
+
+    void clearDisplay();
+    void invertDisplay();
+    void drawPixel(int16_t x, int16_t y, uint16_t color);
+    void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+    void drawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
+    void fillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
+    void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+    void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+    void drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[], int16_t w, int16_t h, uint16_t color);
+
+    void drawLineHelper(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+    void drawVLineHelper(int16_t x, int16_t y, int16_t h, uint16_t color);
+    void drawHLineHelper(int16_t x, int16_t y, int16_t w, uint16_t color);
+    void fillCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t corners, int16_t delta, uint16_t color);
+
 private:
     void setup_oled();
 
-    char uid[7] = {0};
+    bool* _buffer;
+    int16_t _width;
+    int16_t _height;
+    int16_t _physicalWidth;
+    int16_t _physicalHeight;
+    uint8_t _rotation;
 };
