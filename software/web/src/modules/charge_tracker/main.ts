@@ -122,10 +122,8 @@ export function getAllUsernames() {
                 view = new DataView(buffer, i * 64 + 32, 32);
                 let display_name = decoder.decode(view).replace(/\0/g, "");
 
-                if (username != "" || display_name != "") {
-                    usernames.push(username);
-                    display_names.push(username);
-                }
+                usernames.push(username);
+                display_names.push(display_name);
             }
             return [usernames, display_names];
         });
@@ -221,10 +219,18 @@ async function downloadChargeLog() {
                         username = usernames[user_id];
                     }
 
+                    let charged = (Number.isNaN(meter_start) || Number.isNaN(meter_end)) ? NaN : (meter_end - meter_start);
+                    let charged_string;
+                    if (charged == NaN || charged < 0) {
+                        charged_string = 'N/A';
+                    } else {
+                        charged_string = util.toLocaleFixed(charged, 3);
+                    }
+
                     let line = [
                         timestamp_min_to_date(timestamp_minutes),
                         display_name,
-                        (Number.isNaN(meter_start) || Number.isNaN(meter_end)) ? 'N/A' : util.toLocaleFixed(meter_end - meter_start, 3),
+                        charged_string,
                         charge_duration.toString(),
                         "",
                         Number.isNaN(meter_start) ? 'N/A' : util.toLocaleFixed(meter_start, 3),
@@ -239,7 +245,7 @@ async function downloadChargeLog() {
             let t = (new Date()).toISOString().replace(/:/gi, "-").replace(/\./gi, "-");
             util.downloadToFile(result, "charge-log", "csv", "text/csv; charset=utf-8; header=present");
         })
-        .catch(err => util.add_alert("download-charge-log", "danger", __("charge_tracker.script.download_charge_log_failed"), err));
+        .catch(err => util.add_alert("download-charge-log", "alert-danger", __("charge_tracker.script.download_charge_log_failed"), err));
 }
 
 function update_current_charge() {
@@ -292,7 +298,7 @@ export function init() {
             util.postReboot(__("charge_tracker.script.remove_init"), __("util.reboot_text"));
         })
         .finally(() => {
-            $('#config_reset_modal').modal('hide');
+            $('#charge_tracker_remove_modal').modal('hide');
         })
     );
 }

@@ -78,6 +78,16 @@ uint8_t get_iec_state()
     return 0;
 }
 
+uint8_t get_charger_state()
+{
+#if defined(MODULE_EVSE_AVAILABLE)
+    return evse.evse_state.get("charger_state")->asUint();
+#elif defined(MODULE_EVSE_V2_AVAILABLE)
+    return evse_v2.evse_state.get("charger_state")->asUint();
+#endif
+    return 0;
+}
+
 Config *get_user_slot()
 {
 #if defined(MODULE_EVSE_AVAILABLE)
@@ -265,7 +275,7 @@ Users::Users()
         {"id", Config::Uint8(0)}
     }), [this](Config &remove) -> String {
         if (user_api_blocked) {
-            for(int i = 0; i < 50; ++i) {
+            for (int i = 0; i < 50; ++i) {
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 if (!user_api_blocked)
                     break;
@@ -326,7 +336,7 @@ void Users::setup()
     }
 
     bool charge_start_tracked = charge_tracker.currentlyCharging();
-    bool charging = get_iec_state() == IEC_STATE_C;
+    bool charging = get_charger_state() == 2 || get_charger_state() == 3;
 
     if (charge_start_tracked && !charging) {
         this->stop_charging(0, true);
@@ -352,24 +362,32 @@ void Users::setup()
     }
 
     task_scheduler.scheduleWithFixedDelay([this](){
-        static uint8_t last_iec_state = 0;
+        static uint8_t last_charger_state = get_charger_state();
 
-        uint8_t iec_state = get_iec_state();
-        if (iec_state == last_iec_state)
+        uint8_t charger_state = get_charger_state();
+        if (charger_state == last_charger_state)
             return;
 
-        bool user_enabled = get_user_slot()->get("active")->asBool();
+        logger.printfln("Charger state changed from %u to %u", last_charger_state, charger_state);
+        last_charger_state = charger_state;
 
-        logger.printfln("IEC state changed from %u to %u", last_iec_state, iec_state);
-
-        if ((last_iec_state == IEC_STATE_A && iec_state == IEC_STATE_B) || iec_state == IEC_STATE_C) {
-            if (!user_enabled)
-                this->start_charging(0, 32000, CHARGE_TRACKER_AUTH_TYPE_NONE, nullptr);
-        } else if (iec_state == IEC_STATE_A) {
-            this->stop_charging(0, true);
+        // stop_charging and start_charging will check
+        // if a start/stop was already tracked, so it is safe
+        // to call those methods more often than needed.
+        switch(charger_state) {
+            case CHARGER_STATE_NOT_PLUGGED_IN:
+                this->stop_charging(0, true);
+                break;
+            case CHARGER_STATE_WAITING_FOR_RELEASE:
+                break;
+            case CHARGER_STATE_READY_TO_CHARGE:
+            case CHARGER_STATE_CHARGING:
+                if (!get_user_slot()->get("active")->asBool())
+                    this->start_charging(0, 32000, CHARGE_TRACKER_AUTH_TYPE_NONE, nullptr);
+                break;
+            case CHARGER_STATE_ERROR:
+                break;
         }
-
-        last_iec_state = iec_state;
     }, 1000, 1000);
 
     if (user_config.get("http_auth_enabled")->asBool()) {
@@ -588,7 +606,8 @@ void Users::rename_user(uint8_t user_id, const char *username, const char *displ
     f.write((const uint8_t *)buf, USERNAME_ENTRY_LENGTH);
 }
 
-void Users::remove_from_username_file(uint8_t user_id) {
+void Users::remove_from_username_file(uint8_t user_id)
+{
     Config *users = user_config.get("users");
     for (int i = 0; i < users->count(); ++i) {
         if (users->get(i)->get("id")->asUint() == user_id) {
@@ -626,7 +645,11 @@ bool Users::trigger_charge_action(uint8_t user_id, uint8_t auth_type, Config::Co
     uint32_t tscs = get_low_level_state()->get("time_since_state_change")->asUint();
 
     switch (iec_state) {
-        case IEC_STATE_B: // State B: The user wants to start charging.
+        case IEC_STATE_B: // State B: The user wants to start charging. If we already have a tracked charge, stop charging to allow switching to another user.
+            if (charge_tracker.currentlyCharging()) {
+                this->stop_charging(user_id, false);
+                return false;
+            }
             return this->start_charging(user_id, current_limit, auth_type, auth_info);
         case IEC_STATE_C: // State C: The user wants to stop charging.
             // Debounce here a bit, an impatient user can otherwise accidentially trigger a stop if a start_charging takes too long.
@@ -681,7 +704,7 @@ bool Users::stop_charging(uint8_t user_id, bool force)
         // should be aborted. It is safe to allow tracking a charge end in this case for any authorized card,
         // as this should never happen anyway.
         // Allow forcing the endCharge tracking. This is necessary in the case that the car was disconnected.
-        // The user is then autorized at the other end of the charging cable.
+        // The user is then authorized at the other end of the charging cable.
         if (!force && success && info.user_id != user_id)
             return false;
 

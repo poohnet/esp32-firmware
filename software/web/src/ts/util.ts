@@ -4,16 +4,6 @@ import * as API from "./api";
 
 declare function __(s: string): string;
 
-/* Helper interface to silence typescript error about the data member of server sent events not existing.
-   Use like this:
-   eventSource.addEventListener('eventName', function (e: SSE) {
-       console.log(e.data);
-   }, false);
-*/
-export interface SSE extends Event{
-    data: string;
-}
-
 export function reboot() {
     $.ajax({
         url: '/reboot',
@@ -238,7 +228,7 @@ export function postReboot(alert_title: string, alert_text: string) {
     ws.close();
     clearTimeout(wsReconnectTimeout);
     add_alert("reboot", "alert-success", alert_title, alert_text);
-    // Wait 3 seconds before starting the reload/reconnect logic, to make sure the reboot has actually started yet.
+    // Wait 5 seconds before starting the reload/reconnect logic, to make sure the reboot has actually started yet.
     // Else it sometimes happens, that we reconnect _before_ the reboot starts.
     window.setTimeout(() => whenLoggedInElseReload(() =>
         setupEventSource(true, true, (ws, eventSource) => {
@@ -251,7 +241,7 @@ export function postReboot(alert_title: string, alert_text: string) {
                     console.log("reloading");
                     window.location.reload();
                 }, false);})
-    ), 3000);
+    ), 5000);
 }
 
 let loginReconnectTimeout: number = null;
