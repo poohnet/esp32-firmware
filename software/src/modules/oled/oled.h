@@ -19,11 +19,12 @@
 
 #pragma once
 
-#include "bindings/bricklet_oled_128x64_v2.h"
-
 #include "config.h"
 #include "device_module.h"
+#include "gfx_core.h"
+
 #include "oled_128x64_v2_firmware.h"
+#include "bindings/bricklet_oled_128x64_v2.h"
 
 class OLED : public DeviceModule<TF_OLED128x64V2,
                                 oled_128x64_v2_bricklet_firmware_bin,
@@ -31,7 +32,8 @@ class OLED : public DeviceModule<TF_OLED128x64V2,
                                 tf_oled_128x64_v2_create,
                                 tf_oled_128x64_v2_get_bootloader_mode,
                                 tf_oled_128x64_v2_reset,
-                                tf_oled_128x64_v2_destroy> {
+                                tf_oled_128x64_v2_destroy>,
+             public GFXCore {
 public:
     OLED();
     ~OLED();
@@ -41,37 +43,13 @@ public:
     void loop();
 
 protected:
-    int16_t width() const { return _width; }
-    int16_t height() const { return _height; }
-
-    void setRotation(uint8_t rotation);
-
-protected:
-    void startWrite();
-    void endWrite();
-
-    void clearDisplay();
-    void invertDisplay();
-    void drawPixel(int16_t x, int16_t y, uint16_t color);
-    void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
-    void drawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
-    void fillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
-    void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
-    void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
-    void drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[], int16_t w, int16_t h, uint16_t color);
-
-    void drawLineHelper(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
-    void drawVLineHelper(int16_t x, int16_t y, int16_t h, uint16_t color);
-    void drawHLineHelper(int16_t x, int16_t y, int16_t w, uint16_t color);
-    void fillCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t corners, int16_t delta, uint16_t color);
+    virtual void startWrite();
+    virtual void endWrite();
 
 private:
     void setup_oled();
 
-    bool* _buffer;
-    int16_t _width;
-    int16_t _height;
-    int16_t _physicalWidth;
-    int16_t _physicalHeight;
-    uint8_t _rotation;
+    ConfigRoot _splash;
+    ConfigRoot _line;
+    ConfigRoot _circle;
 };
