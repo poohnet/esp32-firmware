@@ -229,7 +229,7 @@ Users::Users()
 
     add = ConfigRoot(Config::Object({
         {"id", Config::Uint8(0)},
-        {"roles", Config::Uint16(0)},
+        {"roles", Config::Uint32(0)},
         {"current", Config::Uint16(32000)},
         {"display_name", Config::Str("", 0, USERNAME_LENGTH)},
         {"username", Config::Str("", 0, USERNAME_LENGTH)},
@@ -443,7 +443,7 @@ void Users::register_urls()
         if (doc["id"] == nullptr)
             return String("Can't modify user. User ID is null or missing.");
 
-        uint8_t id = doc["id"];
+        uint8_t id = doc["id"].as<uint8_t>();
         if (id == 0) {
             return "Can't modify the anonymous user.";
         }
