@@ -23,12 +23,12 @@
 #include "device_module.h"
 #include "gfx_core.h"
 
-#include "oled_128x64_v2_firmware.h"
 #include "bindings/bricklet_oled_128x64_v2.h"
+#include "oled_128x64_v2_bricklet_firmware_bin.embedded.h"
 
 class OLED : public DeviceModule<TF_OLED128x64V2,
-                                oled_128x64_v2_bricklet_firmware_bin,
-                                oled_128x64_v2_bricklet_firmware_bin_len,
+                                oled_128x64_v2_bricklet_firmware_bin_data,
+                                oled_128x64_v2_bricklet_firmware_bin_length,
                                 tf_oled_128x64_v2_create,
                                 tf_oled_128x64_v2_get_bootloader_mode,
                                 tf_oled_128x64_v2_reset,
