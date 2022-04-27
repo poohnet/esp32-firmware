@@ -33,7 +33,7 @@
 #define MAX_PASSIVE_USERS 256
 #define USERNAME_FILE "/users/all_usernames"
 
-#if defined(MODULE_ESP32_ETHERNET_BRICK_AVAILABLE)
+#if MODULE_ESP32_ETHERNET_BRICK_AVAILABLE()
 #define MAX_ACTIVE_USERS 16
 #else
 #define MAX_ACTIVE_USERS 10
@@ -46,18 +46,18 @@ extern TaskScheduler task_scheduler;
 // are registered.
 void set_data_storage(uint8_t *buf)
 {
-#if defined(MODULE_EVSE_AVAILABLE)
+#if MODULE_EVSE_AVAILABLE()
     tf_evse_set_data_storage(&evse.device, 0, buf);
-#elif defined(MODULE_EVSE_V2_AVAILABLE)
+#elif MODULE_EVSE_V2_AVAILABLE()
     tf_evse_v2_set_data_storage(&evse_v2.device, 0, buf);
 #endif
 }
 
 void get_data_storage(uint8_t *buf)
 {
-#if defined(MODULE_EVSE_AVAILABLE)
+#if MODULE_EVSE_AVAILABLE()
     tf_evse_get_data_storage(&evse.device, 0, buf);
-#elif defined(MODULE_EVSE_V2_AVAILABLE)
+#elif MODULE_EVSE_V2_AVAILABLE()
     tf_evse_v2_get_data_storage(&evse_v2.device, 0, buf);
 #endif
 }
@@ -70,9 +70,9 @@ void zero_user_slot_info()
 
 uint8_t get_iec_state()
 {
-#if defined(MODULE_EVSE_AVAILABLE)
+#if MODULE_EVSE_AVAILABLE()
     return evse.evse_state.get("iec61851_state")->asUint();
-#elif defined(MODULE_EVSE_V2_AVAILABLE)
+#elif MODULE_EVSE_V2_AVAILABLE()
     return evse_v2.evse_state.get("iec61851_state")->asUint();
 #endif
     return 0;
@@ -80,9 +80,9 @@ uint8_t get_iec_state()
 
 uint8_t get_charger_state()
 {
-#if defined(MODULE_EVSE_AVAILABLE)
+#if MODULE_EVSE_AVAILABLE()
     return evse.evse_state.get("charger_state")->asUint();
-#elif defined(MODULE_EVSE_V2_AVAILABLE)
+#elif MODULE_EVSE_V2_AVAILABLE()
     return evse_v2.evse_state.get("charger_state")->asUint();
 #endif
     return 0;
@@ -90,9 +90,9 @@ uint8_t get_charger_state()
 
 Config *get_user_slot()
 {
-#if defined(MODULE_EVSE_AVAILABLE)
+#if MODULE_EVSE_AVAILABLE()
     return evse.evse_slots.get(CHARGING_SLOT_USER);
-#elif defined(MODULE_EVSE_V2_AVAILABLE)
+#elif MODULE_EVSE_V2_AVAILABLE()
     return evse_v2.evse_slots.get(CHARGING_SLOT_USER);
 #endif
     return nullptr;
@@ -100,9 +100,9 @@ Config *get_user_slot()
 
 Config *get_low_level_state()
 {
-#if defined(MODULE_EVSE_AVAILABLE)
+#if MODULE_EVSE_AVAILABLE()
     return &evse.evse_low_level_state;
-#elif defined(MODULE_EVSE_V2_AVAILABLE)
+#elif MODULE_EVSE_V2_AVAILABLE()
     return &evse_v2.evse_low_level_state;
 #endif
     return nullptr;
@@ -110,26 +110,17 @@ Config *get_low_level_state()
 
 void set_user_current(uint16_t current)
 {
-#if defined(MODULE_EVSE_AVAILABLE)
+#if MODULE_EVSE_AVAILABLE()
     evse.set_user_current(current);
-#elif defined(MODULE_EVSE_V2_AVAILABLE)
+#elif MODULE_EVSE_V2_AVAILABLE()
     evse_v2.set_user_current(current);
 #endif
 }
 
 float get_energy()
 {
-#if defined(MODULE_SDM630_MQTT_AVAILABLE)
-    bool meter_avail = sdm630_mqtt.state.get("state")->asUint() == 2;
-    return !meter_avail ? NAN : sdm630_mqtt.values.get("energy_abs")->asFloat();
-#elif defined(MODULE_EVSE_AVAILABLE)
-    bool meter_avail = sdm72dm.state.get("state")->asUint() == 2;
-    return !meter_avail ? NAN : sdm72dm.values.get("energy_abs")->asFloat();
-#elif defined(MODULE_EVSE_V2_AVAILABLE)
-    bool meter_avail = evse_v2_meter.state.get("state")->asUint() == 2;
-    return !meter_avail ? NAN : evse_v2_meter.values.get("energy_abs")->asFloat();
-#endif
-    return NAN;
+    bool meter_avail = energy_meter.state.get("state")->asUint() == 2;
+    return !meter_avail ? NAN : energy_meter.values.get("energy_abs")->asFloat();
 }
 
 #define USER_SLOT_INFO_VERSION 1
@@ -461,6 +452,9 @@ void Users::register_urls()
         }
 
         for(int i = 0; i < user_config.get("users")->count(); ++i) {
+            if (user_config.get("users")->get(i)->get("id")->asUint() == id)
+                continue;
+
             if (user_config.get("users")->get(i)->get("username")->asString() == doc["username"]) {
                 return "Can't modify user. Another user with the same username already exists.";
             }
@@ -469,7 +463,7 @@ void Users::register_urls()
         char username[33] = {0};
         File f = LittleFS.open(USERNAME_FILE, "r");
         for(size_t i = 0; i < f.size(); i += USERNAME_ENTRY_LENGTH) {
-            if (i == id)
+            if ((i / USERNAME_ENTRY_LENGTH) == id)
                 continue;
 
             f.seek(i);
@@ -619,7 +613,7 @@ void Users::remove_from_username_file(uint8_t user_id)
 }
 
 // Only returns true if the triggered action was a charge start.
-bool Users::trigger_charge_action(uint8_t user_id, uint8_t auth_type, Config::ConfVariant auth_info)
+bool Users::trigger_charge_action(uint8_t user_id, uint8_t auth_type, Config::ConfVariant auth_info, int action)
 {
     bool user_enabled = get_user_slot()->get("active")->asBool();
     if (!user_enabled)
@@ -647,14 +641,18 @@ bool Users::trigger_charge_action(uint8_t user_id, uint8_t auth_type, Config::Co
     switch (iec_state) {
         case IEC_STATE_B: // State B: The user wants to start charging. If we already have a tracked charge, stop charging to allow switching to another user.
             if (charge_tracker.currentlyCharging()) {
-                this->stop_charging(user_id, false);
+                if (action == TRIGGER_CHARGE_ANY || action == TRIGGER_CHARGE_STOP)
+                    this->stop_charging(user_id, false);
                 return false;
             }
-            return this->start_charging(user_id, current_limit, auth_type, auth_info);
+            if (action == TRIGGER_CHARGE_ANY || action == TRIGGER_CHARGE_START)
+                return this->start_charging(user_id, current_limit, auth_type, auth_info);
+            return false;
         case IEC_STATE_C: // State C: The user wants to stop charging.
             // Debounce here a bit, an impatient user can otherwise accidentially trigger a stop if a start_charging takes too long.
-            if (tscs > 3000)
+            if (tscs > 3000 && (action == TRIGGER_CHARGE_ANY || action == TRIGGER_CHARGE_STOP))
                 this->stop_charging(user_id, false);
+            return false;
         default: //Don't do anything in state A, D, and E/F
             break;
     }

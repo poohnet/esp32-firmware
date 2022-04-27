@@ -3,7 +3,7 @@ Import("env")
 import sys
 
 if sys.hexversion < 0x3060000:
-    print('Python >= 3.6 required')
+    print('Error: Python >= 3.6 required')
     sys.exit(1)
 
 from collections import namedtuple
@@ -302,9 +302,19 @@ def main():
         '{{{module_init_config}}}': ',\n        '.join('{{"{0}", Config::Bool({0}.initialized)}}'.format(x.under) for x in backend_modules if not x.under.startswith("hidden_"))
     })
 
+
+    all_mods = []
+    for existing_backend_module in os.listdir(os.path.join('src', 'modules')):
+        if not os.path.isdir(os.path.join('src', 'modules', existing_backend_module)):
+            continue
+
+        all_mods.append(existing_backend_module.upper())
+
+    backend_mods_upper = [x.upper for x in backend_modules]
+
     specialize_template("modules.h.template", os.path.join("src", "modules.h"), {
         '{{{module_includes}}}': '\n'.join(['#include "modules/{0}/{0}.h"'.format(x.under) for x in backend_modules]),
-        '{{{module_defines}}}': '\n'.join(['#define MODULE_{}_AVAILABLE'.format(x.upper) for x in backend_modules]),
+        '{{{module_defines}}}': '\n'.join(['#define MODULE_{}_AVAILABLE() {}'.format(x, "1" if x in backend_mods_upper else "0") for x in all_mods]),
         '{{{module_extern_decls}}}': '\n'.join(['extern {} {};'.format(x.camel, x.under) for x in backend_modules]),
     })
 
@@ -334,12 +344,12 @@ def main():
         mod_path = os.path.join('web', 'src', 'modules', frontend_module.under)
 
         if not os.path.exists(mod_path) or not os.path.isdir(mod_path):
-            print("Frontend module {} not found.".format(frontend_module.space, mod_path))
+            print("Error: Frontend module {} not found.".format(frontend_module.space, mod_path))
             sys.exit(1)
 
         if os.path.exists(os.path.join(mod_path, 'logo.png')):
             if logo_module != None:
-                print('Logo module collision ' + frontend_module.under + ' vs ' + logo_module)
+                print('Error: Logo module collision ' + frontend_module.under + ' vs ' + logo_module)
                 sys.exit(1)
 
             logo_module = frontend_module.under
@@ -348,7 +358,7 @@ def main():
 
         if os.path.exists(potential_favicon_path):
             if favicon_path != None:
-                print('Favicon path collision ' + potential_favicon_path + ' vs ' + favicon_path)
+                print('Error: Favicon path collision ' + potential_favicon_path + ' vs ' + favicon_path)
                 sys.exit(1)
 
             favicon_path = potential_favicon_path
@@ -403,7 +413,7 @@ def main():
         os.remove(path)
 
     if len(translation) == 0:
-        print('Translation missing')
+        print('Error: Translation missing')
         sys.exit(1)
 
     for language in sorted(translation):
@@ -419,11 +429,11 @@ def main():
             f.write(data + ';\n')
 
     if favicon_path == None:
-        print('Favison missing')
+        print('Error: Favison missing')
         sys.exit(1)
 
     if logo_module == None:
-        print('Logo missing')
+        print('Error: Logo missing')
         sys.exit(1)
 
     with open(favicon_path, 'rb') as f:
@@ -495,6 +505,18 @@ def main():
             pass
 
         with ChangedDirectory('web'):
+            npm_version = subprocess.check_output(['npm', '--version'], shell=sys.platform == 'win32', encoding='utf-8').strip()
+
+            m = re.fullmatch(r'(\d+)\.\d+\.\d+', npm_version)
+
+            if m == None:
+                print('Error: npm version has unexpected format: {0}'.format(npm_version))
+                sys.exit(1)
+
+            if int(m.group(1)) < 8:
+                print('Error: npm >= 8 required, found npm {0}'.format(npm_version))
+                sys.exit(1)
+
             subprocess.check_call(['npm', 'ci'], shell=sys.platform == 'win32')
 
         with open('web/node_modules/tinkerforge.marker', 'wb') as f:

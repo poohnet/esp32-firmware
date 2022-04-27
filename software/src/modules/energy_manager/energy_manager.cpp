@@ -286,12 +286,12 @@ String EnergyManager::get_energy_manager_debug_line()
              all_data.power,
              all_data.energy_relative,
              all_data.energy_absolute,
-             all_data.phases_active[0] ? '0' : '1',
-             all_data.phases_active[1] ? '0' : '1',
-             all_data.phases_active[2] ? '0' : '1',
-             all_data.phases_connected[0] ? '0' : '1',
-             all_data.phases_connected[1] ? '0' : '1',
-             all_data.phases_connected[2] ? '0' : '1',
+             all_data.phases_active[0] ? '1' : '0',
+             all_data.phases_active[1] ? '1' : '0',
+             all_data.phases_active[2] ? '1' : '0',
+             all_data.phases_connected[0] ? '1' : '0',
+             all_data.phases_connected[1] ? '1' : '0',
+             all_data.phases_connected[2] ? '1' : '0',
 
              all_data.energy_meter_type,
              all_data.error_count[0],
@@ -301,8 +301,8 @@ String EnergyManager::get_energy_manager_debug_line()
              all_data.error_count[4],
              all_data.error_count[5],
 
-             all_data.input[0] ? '0' : '1',
-             all_data.input[1] ? '0' : '1',
+             all_data.input[0] ? '1' : '0',
+             all_data.input[1] ? '1' : '0',
 
              all_data.input_configuration[0],
              all_data.input_configuration[1],
@@ -319,7 +319,7 @@ void EnergyManager::register_urls()
     if (!device_found)
         return;
 
-#if defined(MODULE_WS_AVAILABLE)
+#if MODULE_WS_AVAILABLE()
     server.on("/energy_manager/start_debug", HTTP_GET, [this](WebServerRequest request) {
         task_scheduler.scheduleOnce([this](){
             ws.pushRawStateUpdate(this->get_energy_manager_debug_header(), "energy_manager/debug_header");
@@ -346,7 +346,7 @@ void EnergyManager::loop()
 {
     this->DeviceModule::loop();
 
-#if defined(MODULE_WS_AVAILABLE)
+#if MODULE_WS_AVAILABLE()
     static uint32_t last_debug = 0;
     if (debug && deadline_elapsed(last_debug + 50)) {
         last_debug = millis();

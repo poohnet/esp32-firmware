@@ -27,14 +27,14 @@
 #include "task_scheduler.h"
 #include "modules.h"
 
-#if defined(MODULE_EVSE_AVAILABLE)
+#if MODULE_EVSE_AVAILABLE()
 #include "bindings/bricklet_evse.h"
 #endif
-#if defined(MODULE_EVSE_V2_AVAILABLE)
+#if MODULE_EVSE_V2_AVAILABLE()
 #include "bindings/bricklet_evse_v2.h"
 #endif
 
-#if defined(MODULE_ESP32_ETHERNET_BRICK_AVAILABLE)
+#if MODULE_ESP32_ETHERNET_BRICK_AVAILABLE()
 #define AUTHORIZED_TAG_LIST_LENGTH 16
 #else
 #define AUTHORIZED_TAG_LIST_LENGTH 8
@@ -206,10 +206,10 @@ void set_led(int16_t mode)
             break;
     }
 
-#if defined(MODULE_EVSE_AVAILABLE)
+#if MODULE_EVSE_AVAILABLE()
     tf_evse_set_indicator_led(&evse.device, mode, mode != IND_NACK ? 2620 : 3930, nullptr);
 #endif
-#if defined(MODULE_EVSE_V2_AVAILABLE)
+#if MODULE_EVSE_V2_AVAILABLE()
     tf_evse_v2_set_indicator_led(&evse_v2.device, mode, mode != IND_NACK ? 2620 : 3930, nullptr);
 #endif
 
@@ -230,7 +230,8 @@ void NFC::handle_event(tag_info_t *tag, bool found, bool injected)
             blink_state = IND_ACK;
             users.trigger_charge_action(user_id, injected ? CHARGE_TRACKER_AUTH_TYPE_NFC_INJECTION : CHARGE_TRACKER_AUTH_TYPE_NFC, Config::Object({
                     {"tag_type", Config::Uint8(tag->tag_type)},
-                    {"tag_id", Config::Str(tag->tag_id)}}).value);
+                    {"tag_id", Config::Str(tag->tag_id)}}).value,
+                    injected ? tag_injection_action : TRIGGER_CHARGE_ANY);
         } else if (auth_token == idx) {
             // Lost an authorized tag. If we still have it's auth token, extend the token's validity.
             //auth_token_seen = millis();
@@ -405,6 +406,25 @@ void NFC::register_urls()
     api.addPersistentConfig("nfc/config", &config, {}, 1000);
     api.addCommand("nfc/inject_tag", &inject_tag, {}, [this](){
         last_tag_injection = millis();
+        tag_injection_action = TRIGGER_CHARGE_ANY;
+        // 0 is the marker that no injection happened or the last one was handled.
+        // Fake that we were one ms faster.
+        if (last_tag_injection == 0)
+            last_tag_injection -= 1;
+    }, true);
+
+    api.addCommand("nfc/inject_tag_start", &inject_tag, {}, [this](){
+        last_tag_injection = millis();
+        tag_injection_action = TRIGGER_CHARGE_START;
+        // 0 is the marker that no injection happened or the last one was handled.
+        // Fake that we were one ms faster.
+        if (last_tag_injection == 0)
+            last_tag_injection -= 1;
+    }, true);
+
+    api.addCommand("nfc/inject_tag_stop", &inject_tag, {}, [this](){
+        last_tag_injection = millis();
+        tag_injection_action = TRIGGER_CHARGE_STOP;
         // 0 is the marker that no injection happened or the last one was handled.
         // Fake that we were one ms faster.
         if (last_tag_injection == 0)

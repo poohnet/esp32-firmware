@@ -29,6 +29,7 @@
 #include "task_scheduler.h"
 #include "tools.h"
 #include "build.h"
+#include "modules.h"
 
 #include "./crc32.h"
 #include "./recovery_html.embedded.h"
@@ -122,7 +123,6 @@ bool FirmwareUpdate::handle_firmware_info_chunk(size_t chunk_index, uint8_t *dat
         info_offset += to_write;
     }
 
-    logger.printfln("chunk index %u data %p len %u", chunk_index, data, chunk_length);
     crc32_ieee_802_3_recalculate(start, length, &calculated_checksum);
 
     const size_t checksum_start = FIRMWARE_INFO_OFFSET + FIRMWARE_INFO_LENGTH - 4;
@@ -378,6 +378,17 @@ void FirmwareUpdate::register_urls()
 
         task_scheduler.scheduleOnce([](){
             logger.printfln("Config reset requested");
+#if MODULE_USERS_AVAILABLE()
+            for(int i = 0; i < users.user_config.get("users")->count(); ++i) {
+                uint8_t id = users.user_config.get("users")->get(i)->get("id")->asUint();
+                if (id == 0) // skip anonymous user
+                    continue;
+                if (!charge_tracker.is_user_tracked(id)) {
+                    users.rename_user(id, "", "");
+                }
+            }
+#endif
+
             remove_directory("/config");
             ESP.restart();
         }, 3000);

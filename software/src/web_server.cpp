@@ -42,6 +42,7 @@ void WebServer::start()
     config.stack_size = 8192;
     config.max_uri_handlers = MAX_URI_HANDLERS;
     config.global_user_ctx = this;
+    config.max_open_sockets = 10;
     /*config.task_priority = tskIDLE_PRIORITY+7;
     config.core_id = 1;*/
 
@@ -129,7 +130,9 @@ static esp_err_t low_level_upload_handler(httpd_req_t *req)
         }
 
         if (received <= 0) {
-            logger.printfln("File reception failed (%d)!\n", received);
+            struct httpd_req_aux *ra = (struct httpd_req_aux *)req->aux;
+
+            logger.printfln("File reception failed (%d fd %d errno %d %s)!\n", received, ra->sd->fd, errno, strerror(errno));
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive file");
             return ESP_FAIL;
         }

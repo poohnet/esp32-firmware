@@ -24,23 +24,8 @@
 #include "bindings/bricklet_rs485.h"
 
 #include "config.h"
-#include "ringbuffer.h"
-#include "malloc_tools.h"
 #include "device_module.h"
 #include "rs485_bricklet_firmware_bin.embedded.h"
-
-// How many hours to keep the coarse history for
-#define HISTORY_HOURS 48
-// How many minutes to keep the fine history for.
-// This also controls the coarseness of the coarse history.
-// For example 4 means that we accumulate 4 minutes of samples
-// with the maximum rate i.e. ~ 3 samples per second (Querying the state
-// takes about 380 ms).
-// When we have 4 minutes worth of samples, we take the average
-// and add it to the coarse history.
-#define HISTORY_MINUTE_INTERVAL 4
-
-#define RING_BUF_SIZE (HISTORY_HOURS * (60 / HISTORY_MINUTE_INTERVAL) + 1)
 
 class SDM72DM : public DeviceModule<TF_RS485,
                                     rs485_bricklet_firmware_bin_data,
@@ -62,15 +47,11 @@ public:
     };
 
     struct UserData {
-        Config *value_to_write;
-        Config *state;
+        float *value_to_write;
         uint8_t expected_request_id;
         UserDataDone done;
     };
 
-    ConfigRoot state;
-    ConfigRoot values;
-    ConfigRoot reset;
     ConfigRoot error_counters;
 
 private:
@@ -80,15 +61,10 @@ private:
 
     TF_RS485 rs485;
     int modbus_read_state = 0;
-    int samples_last_interval = 0;
-    int samples_per_interval = -1;
-    uint32_t interval_end_ms = 1000 * 60 * HISTORY_MINUTE_INTERVAL;
-    TF_Ringbuffer<int16_t, 3 * 60 * HISTORY_MINUTE_INTERVAL, uint32_t, malloc_32bit_addressed, heap_caps_free> interval_samples;
 
     uint32_t next_modbus_read_deadline = 0;
     uint32_t next_power_history_entry = 0;
     UserData user_data;
-    TF_Ringbuffer<int16_t, HISTORY_HOURS * (60 / HISTORY_MINUTE_INTERVAL) + 1, uint32_t, malloc_32bit_addressed, heap_caps_free> power_history;
 
     bool reset_requested;
 
