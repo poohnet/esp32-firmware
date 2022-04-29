@@ -52,7 +52,7 @@ void ValueHistory::setup()
 }
 
 void ValueHistory::register_urls(String base_url)
- {
+{
     server.on(("/" + base_url + "history").c_str(), HTTP_GET, [this](WebServerRequest request) {
         /*if (!initialized) {
             request.send(400, "text/html", "not initialized");
@@ -115,7 +115,7 @@ void ValueHistory::register_urls(String base_url)
 }
 
 void ValueHistory::add_sample(float sample)
- {
+{
     int16_t val = (int16_t)min((float)INT16_MAX, sample);
     live.push(val);
     ++samples_last_interval;

@@ -37,7 +37,9 @@ public:
     void register_urls();
     void loop();
 
-    void updateMeterState(uint8_t state, uint8_t type);
+    void updateMeterState(uint8_t new_state, uint8_t new_type);
+    void updateMeterState(uint8_t new_state);
+    void updateMeterType(uint8_t new_type);
     void updateMeterValues(float power, float energy_rel, float energy_abs);
     void updateMeterPhases(bool phases_connected[3], bool phases_active[3]);
 
@@ -48,7 +50,7 @@ public:
     void setupMeter(uint8_t meter_type);
 
     bool initialized = false;
-    bool hardware_available = false;
+    bool meter_setup_done = false;
 
     ConfigRoot state;
     ConfigRoot values;

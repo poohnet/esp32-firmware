@@ -68,7 +68,8 @@ EnergyMeter::EnergyMeter()
     });
 }
 
-void EnergyMeter::updateMeterState(uint8_t new_state, uint8_t new_type) {
+void EnergyMeter::updateMeterState(uint8_t new_state, uint8_t new_type)
+{
     state.get("state")->updateUint(new_state);
     state.get("type")->updateUint(new_type);
 
@@ -77,8 +78,25 @@ void EnergyMeter::updateMeterState(uint8_t new_state, uint8_t new_type) {
     }
 }
 
+void EnergyMeter::updateMeterState(uint8_t new_state)
+{
+    state.get("state")->updateUint(new_state);
+
+    if (new_state == 2) {
+        this->setupMeter(state.get("type")->asUint());
+    }
+}
+
+void EnergyMeter::updateMeterType(uint8_t new_type)
+{
+    state.get("type")->updateUint(new_type);
+}
+
 void EnergyMeter::updateMeterValues(float power, float energy_rel, float energy_abs)
 {
+    if (!meter_setup_done)
+        return;
+
     values.get("power")->updateFloat(power);
     values.get("energy_rel")->updateFloat(energy_rel);
     values.get("energy_abs")->updateFloat(energy_abs);
@@ -88,6 +106,9 @@ void EnergyMeter::updateMeterValues(float power, float energy_rel, float energy_
 
 void EnergyMeter::updateMeterPhases(bool phases_connected[3], bool phases_active[3])
 {
+    if (!meter_setup_done)
+        return;
+
     for (int i = 0; i < 3; ++i)
         phases.get("phases_active")->get(i)->updateBool(phases_active[i]);
 
@@ -95,12 +116,20 @@ void EnergyMeter::updateMeterPhases(bool phases_connected[3], bool phases_active
         phases.get("phases_connected")->get(i)->updateBool(phases_connected[i]);
 }
 
-void EnergyMeter::updateMeterAllValues(int idx, float val) {
+void EnergyMeter::updateMeterAllValues(int idx, float val)
+{
+    if (!meter_setup_done)
+        return;
+
     all_values.get(idx)->updateFloat(val);
 }
 
-void EnergyMeter::updateMeterAllValues(float values[ALL_VALUES_COUNT]) {
-    for(int i = 0; i < ALL_VALUES_COUNT; ++i)
+void EnergyMeter::updateMeterAllValues(float values[ALL_VALUES_COUNT])
+{
+    if (!meter_setup_done)
+        return;
+
+    for (int i = 0; i < ALL_VALUES_COUNT; ++i)
         all_values.get(i)->updateFloat(values[i]);
 }
 
@@ -111,7 +140,8 @@ void EnergyMeter::registerResetCallback(std::function<void(void)> cb)
 
 void EnergyMeter::setupMeter(uint8_t meter_type)
 {
-    hardware_available = true;
+    if (meter_setup_done)
+        return;
 
     api.addFeature("meter");
     if (meter_type == 2 || meter_type == 3) {
@@ -124,6 +154,8 @@ void EnergyMeter::setupMeter(uint8_t meter_type)
     for (int i = all_values.count(); i < ALL_VALUES_COUNT; ++i) {
         all_values.add();
     }
+
+    meter_setup_done = true;
 }
 
 void EnergyMeter::setup()

@@ -29,6 +29,7 @@
 #include <deque>
 
 #define MAX_WEB_SOCKET_CLIENTS 5
+#define MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE 20
 
 class WebSockets;
 
@@ -98,7 +99,7 @@ public:
     // as every method can lock the mutex without considering that
     // it could be called by another method that locked the mutex.
     std::recursive_mutex keep_alive_mutex;
-    int keep_alive_fds[MAX_WEB_SOCKET_CLIENTS] = {-1,-1,-1,-1,-1};
+    int keep_alive_fds[MAX_WEB_SOCKET_CLIENTS] = {-1, -1, -1, -1, -1};
     uint32_t keep_alive_last_pong[MAX_WEB_SOCKET_CLIENTS];
 
     std::recursive_mutex work_queue_mutex;
