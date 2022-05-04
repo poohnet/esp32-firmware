@@ -28,6 +28,8 @@ extern TaskScheduler task_scheduler;
 extern WebServer server;
 extern EventLog logger;
 
+#define KEEP_ALIVE_TIMEOUT_MS 10000
+
 bool WebSockets::haveWork(ws_work_item *item)
 {
     std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
@@ -279,7 +281,7 @@ void WebSockets::checkActiveClients()
         if (keep_alive_fds[i] == -1)
             continue;
 
-        if (httpd_ws_get_fd_info(server.httpd, keep_alive_fds[i]) != HTTPD_WS_CLIENT_WEBSOCKET || deadline_elapsed(keep_alive_last_pong[i] + 10000)) {
+        if (httpd_ws_get_fd_info(server.httpd, keep_alive_fds[i]) != HTTPD_WS_CLIENT_WEBSOCKET || deadline_elapsed(keep_alive_last_pong[i] + KEEP_ALIVE_TIMEOUT_MS)) {
             this->keepAliveCloseDead(keep_alive_fds[i]);
         }
     }
@@ -393,15 +395,28 @@ void WebSockets::sendToAll(const char *payload, size_t payload_len)
 
 void WebSockets::triggerHttpThread()
 {
+    static uint32_t last_worker_run = 0;
+    if (worker_active) {
+        // Protect against lost UDP packet in httpd_queue_work control socket.
+        // If the packet that enqueues the worker is lost
+        // worker_active must be reset or web sockets will never send data again.
+        if (last_worker_run != 0 && deadline_elapsed(last_worker_run + KEEP_ALIVE_TIMEOUT_MS * 2)) {
+            last_worker_run = millis();
+            worker_active = false;
+
+            std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
+            work_queue.clear();
+        }
+        return;
+    }
+
+    last_worker_run = millis();
+
     {
         std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
         if (work_queue.empty()) {
             return;
         }
-    }
-
-    if (worker_active) {
-        return;
     }
 
     // If we don't set worker_active to true BEFORE enqueueing the worker,
@@ -443,7 +458,7 @@ void WebSockets::start(const char *uri)
     server.on("/info/ws", HTTP_GET, [this](WebServerRequest request) {
         std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
         std::lock_guard<std::recursive_mutex> lock2{keep_alive_mutex};
-        logger.printfln("");
+        logger.printfln("\n");
         logger.printfln("keep_alive_fds   %d %d %d %d %d", keep_alive_fds[0], keep_alive_fds[1], keep_alive_fds[2], keep_alive_fds[3], keep_alive_fds[4]);
         logger.printfln("keep_alive_pongs %u %u %u %u %u", keep_alive_last_pong[0], keep_alive_last_pong[1], keep_alive_last_pong[2], keep_alive_last_pong[3], keep_alive_last_pong[4]);
         logger.printfln("worker_active %s state %s", worker_active ? "yes" : "no", work_state);
