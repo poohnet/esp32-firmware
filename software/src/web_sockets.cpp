@@ -42,6 +42,37 @@ bool WebSockets::haveWork(ws_work_item *item)
     return true;
 }
 
+void WebSockets::cleanUpQueue() {
+    std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
+    while (!work_queue.empty()) {
+        ws_work_item &wi = work_queue.front();
+        for (int i = 0; i < MAX_WEB_SOCKET_CLIENTS; ++i) {
+            if (wi.fds[i] != -1) {
+                return;
+            }
+        }
+        // Every fd was -1.
+        work_queue.pop_front();
+    }
+}
+
+bool WebSockets::queueFull()
+{
+    std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
+    if (work_queue.size() < MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE) {
+        return false;
+    }
+
+    cleanUpQueue();
+
+    if (work_queue.size() >= MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE) {
+        return true;
+    }
+    logger.printfln("WebSocket work queue was full but %d items were cleaned.", MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE - work_queue.size());
+
+    return false;
+}
+
 const char *work_state = "";
 static void work(void *arg)
 {
@@ -268,7 +299,7 @@ void WebSockets::pingActiveClients()
     }
 
     std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
-    if (work_queue.size() >= MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE) {
+    if (queueFull()) {
         return;
     }
     work_queue.emplace_back(server.httpd, fds, nullptr, 0);
@@ -318,7 +349,7 @@ void WebSockets::sendToClient(const char *payload, size_t payload_len, int fd)
     int fds[MAX_WEB_SOCKET_CLIENTS] = {fd, -1, -1, -1, -1};
 
     std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
-    if (work_queue.size() >= MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE) {
+    if (queueFull()) {
         free(payload_copy);
         return;
     }
@@ -360,7 +391,7 @@ void WebSockets::sendToAllOwned(char *payload, size_t payload_len)
     }
 
     std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
-    if (work_queue.size() >= MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE) {
+    if (queueFull()) {
         free(payload);
         return;
     }
@@ -386,21 +417,22 @@ void WebSockets::sendToAll(const char *payload, size_t payload_len)
     }
 
     std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
-    if (work_queue.size() >= MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE) {
+    if (queueFull()) {
         free(payload_copy);
         return;
     }
     work_queue.emplace_back(server.httpd, fds, payload_copy, payload_len);
 }
 
+static uint32_t last_worker_run = 0;
 void WebSockets::triggerHttpThread()
 {
-    static uint32_t last_worker_run = 0;
     if (worker_active) {
         // Protect against lost UDP packet in httpd_queue_work control socket.
         // If the packet that enqueues the worker is lost
         // worker_active must be reset or web sockets will never send data again.
         if (last_worker_run != 0 && deadline_elapsed(last_worker_run + KEEP_ALIVE_TIMEOUT_MS * 2)) {
+            logger.printfln("WebSocket worker ran %u seconds. Control socket drop? Restarting worker.", (KEEP_ALIVE_TIMEOUT_MS * 2) / 1000);
             last_worker_run = millis();
             worker_active = false;
 
@@ -462,6 +494,7 @@ void WebSockets::start(const char *uri)
         logger.printfln("keep_alive_fds   %d %d %d %d %d", keep_alive_fds[0], keep_alive_fds[1], keep_alive_fds[2], keep_alive_fds[3], keep_alive_fds[4]);
         logger.printfln("keep_alive_pongs %u %u %u %u %u", keep_alive_last_pong[0], keep_alive_last_pong[1], keep_alive_last_pong[2], keep_alive_last_pong[3], keep_alive_last_pong[4]);
         logger.printfln("worker_active %s state %s", worker_active ? "yes" : "no", work_state);
+        logger.printfln("last_worker_run %u", last_worker_run);
         logger.printfln("queue_len %u", work_queue.size());
 
         for(int i = 0; i < work_queue.size(); ++i) {
