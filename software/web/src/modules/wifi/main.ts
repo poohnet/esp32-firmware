@@ -83,9 +83,15 @@ function update_wifi_scan_results(data: Readonly<WifiInfo[]>) {
 
 let scan_timeout: number = null;
 function scan_wifi() {
+    $("#wifi_config_scan_spinner").prop('hidden', false);
+    $("#wifi_scan_results").prop('hidden', true);
+
     API.call('wifi/scan', {}, __("wifi.script.scan_wifi_init_failed"))
        .catch(() => $('#scan_wifi_dropdown').dropdown('hide'))
        .then(() => {
+            if (scan_timeout != null)
+                window.clearTimeout(scan_timeout);
+
             scan_timeout = window.setTimeout(function () {
                     scan_timeout = null;
                     $.get("/wifi/scan_results").done(function (data: WifiInfo[]) {
@@ -94,7 +100,7 @@ function scan_wifi() {
                         util.add_alert("wifi_scan_failed", "alert-danger", __("wifi.script.scan_wifi_results_failed"), error + ": " + xhr.responseText);
                         $('#scan_wifi_dropdown').dropdown('hide');
                     });
-                }, 10000);
+                }, 12000);
         });
 }
 
