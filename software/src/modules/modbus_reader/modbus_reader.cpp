@@ -75,7 +75,7 @@ void read_meter_type_handler(struct TF_RS485 *rs485, uint8_t request_id, int8_t 
 
     if (exception_code != 0) {
         logger.printfln("Request %u: Exception code %d", request_id, exception_code);
-        //ud->done = ModbusReader::UserDataDone::ERROR;
+        ud->done = ModbusReader::UserDataDone::ERROR;
         return;
     }
 
@@ -91,7 +91,7 @@ void read_meter_type_handler(struct TF_RS485 *rs485, uint8_t request_id, int8_t 
 
     uint16_t meter_id = *ud->value_to_write;
 
-    for(size_t i = 0; i < sizeof(supported_meters) / sizeof(supported_meters[0]); ++i) {
+    for (size_t i = 0; i < sizeof(supported_meters) / sizeof(supported_meters[0]); ++i) {
         if (meter_id != supported_meters[i]->meter_id)
             continue;
 
@@ -107,7 +107,7 @@ void read_meter_type_handler(struct TF_RS485 *rs485, uint8_t request_id, int8_t 
 }
 
 void read_input_registers_handler(struct TF_RS485 *rs485, uint8_t request_id, int8_t exception_code, uint16_t *input_registers, uint16_t input_registers_length, void *user_data) {
-    ModbusReader::UserData *ud = (ModbusReader::UserData *) user_data;
+    ModbusReader::UserData *ud = (ModbusReader::UserData *)user_data;
 
     if (request_id != ud->expected_request_id || ud->expected_request_id == 0) {
         logger.printfln("Unexpected request id %u, expected %u", request_id, ud->expected_request_id);
@@ -148,7 +148,16 @@ void write_multiple_registers_handler(struct TF_RS485 *device, uint8_t request_i
         return;
     }
 
-    if (exception_code != 0) {
+    // Exclude timeout here:
+    // The SDM72DM has a bug in it's modbus implementation where it responds to
+    // "write multiple registers"-Requests that trigger a reset of the relative energy value
+    // with the wrong DeviceID. It sends ID 0 which is reserved for broadcasts
+    // and never to be used by slaves!
+    // This only happens when writing to 461457, i.e. the reset trigger register.
+    //
+    // In the future we should check that the reset worked by re-reading the energy value,
+    // making sure that it is a small enough value and retrying the reset if not.
+    if (exception_code != 0 && exception_code != TF_RS485_EXCEPTION_CODE_TIMEOUT) {
         logger.printfln("Exception code %d", exception_code);
         ud->done = ModbusReader::UserDataDone::ERROR;
         return;
@@ -237,7 +246,8 @@ void ModbusReader::register_urls()
     this->DeviceModule::register_urls();
 }
 
-const RegRead *ModbusReader::getNextRead(bool *trigger_fast_read_done, bool *trigger_slow_read_done) {
+const RegRead *ModbusReader::getNextRead(bool *trigger_fast_read_done, bool *trigger_slow_read_done)
+{
     *trigger_fast_read_done = false;
     *trigger_slow_read_done = false;
 
@@ -294,7 +304,7 @@ void ModbusReader::loop()
     if (reset_requested) {
         reset_requested = false;
 
-        if (meter_in_use->custom_reset_fn != nullptr){
+        if (meter_in_use->custom_reset_fn != nullptr) {
             meter_in_use->custom_reset_fn();
         } else {
             user_data.done = UserDataDone::NOT_DONE;

@@ -121,7 +121,8 @@ int check(int rc, const char *msg)
     return rc;
 }
 
-class LogSilencer {
+class LogSilencer
+{
 public:
     LogSilencer(const char *tag) : tag(tag), level_to_restore(ESP_LOG_NONE)
     {
@@ -495,7 +496,8 @@ static bool flash_firmware(TF_Unknown *bricklet, const uint8_t *firmware, size_t
 #define FIRMWARE_MINOR_OFFSET 11
 #define FIRMWARE_PATCH_OFFSET 12
 
-class TFPSwap {
+class TFPSwap
+{
 public:
     TFPSwap(TF_TFP *tfp) :
         tfp(tfp),
@@ -603,6 +605,16 @@ bool clock_synced(struct timeval *out_tv_now)
 {
     gettimeofday(out_tv_now, nullptr);
     return out_tv_now->tv_sec > ((2016 - 1970) * 365 * 24 * 60 * 60);
+}
+
+uint32_t timestamp_minutes()
+{
+    struct timeval tv_now;
+
+    if (!clock_synced(&tv_now))
+        return 0;
+
+    return tv_now.tv_sec / 60;
 }
 
 bool for_file_in(const char *dir, bool (*callback)(File *open_file), bool skip_directories)
