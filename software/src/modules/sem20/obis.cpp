@@ -20,8 +20,8 @@
               (((uint64_t)(x) & 0x00000000000000ffULL) << 56)))
 #endif
 
-obis::obis(String name, uint8_t kanal, uint8_t messgroesse, uint8_t messart, uint8_t tarifstufe, double faktor, uint8_t valueSize /*= 4*/)
-  : _name(name), _faktor(faktor), _valueSize(valueSize), _position(0)
+obis::obis(uint8_t kanal, uint8_t messgroesse, uint8_t messart, uint8_t tarifstufe, double faktor, uint8_t valueSize)
+  : _faktor(faktor), _valueSize(valueSize), _position(0)
 {
   _obis[0] = kanal;
   _obis[1] = messgroesse;
@@ -29,9 +29,12 @@ obis::obis(String name, uint8_t kanal, uint8_t messgroesse, uint8_t messart, uin
   _obis[3] = tarifstufe;
 }
 
-const char* obis::name() const
+String obis::name() const
 {
-  return _name.c_str();
+  char buf[32];
+  snprintf(buf, sizeof(buf)/sizeof(buf[0]), "%u.%u.%u", _obis[1], _obis[2], _obis[3]);
+
+  return buf;
 }
 
 double obis::value(uint8_t buf[], size_t bufSize)

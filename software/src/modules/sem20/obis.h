@@ -4,9 +4,9 @@
 
 class obis {
   public:
-    obis(String name, uint8_t kanal, uint8_t messgroesse, uint8_t messart, uint8_t tarifstufe, double faktor, uint8_t valueSize);
+    obis(uint8_t kanal, uint8_t messgroesse, uint8_t messart, uint8_t tarifstufe, double faktor, uint8_t valueSize);
 
-    const char* name() const;
+    String name() const;
     double value(uint8_t buf[], size_t bufSize);
 
   private:
@@ -15,9 +15,8 @@ class obis {
     static uint64_t convert_uint64(uint8_t buf[]);
 
   private:
-    String _name;
     uint8_t _obis[4];
-    double _faktor;
+    double  _faktor;
     uint8_t _valueSize;
-    size_t _position;
+    size_t  _position;
 };

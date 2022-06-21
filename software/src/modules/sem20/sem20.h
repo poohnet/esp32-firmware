@@ -1,5 +1,7 @@
 #pragma once
 
+#include "config.h"
+
 class SEM20 {
   public:
     SEM20();
@@ -8,4 +10,7 @@ class SEM20 {
     void loop();
 
     bool initialized = false;
+
+  private:
+    ConfigRoot values;
 };
