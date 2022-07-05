@@ -1,4 +1,4 @@
-/* esp32-firmware
+/* warp-charger
  * Copyright (C) 2020-2021 Erik Fleckstein <erik@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -17,28 +17,26 @@
  * Boston, MA 02111-1307, USA.
  */
 
-import $ from "../../ts/jq";
+#pragma once
 
-import * as util from "../../ts/util";
-import * as API from "../../ts/api";
+#include "bindings/bricklet_dual_button_v2.h"
+#include "bindings/bricklet_industrial_quad_relay_v2.h"
 
-function update_debug_state() {
-    let state = API.get('debug/state');
-    $('#debug_uptime').val(util.format_timespan(Math.round(state.uptime / 1000)));
-    $('#debug_heap_free').val(state.free_heap);
-    $('#debug_heap_block').val(state.largest_free_heap_block);
-    $('#debug_psram_free').val(state.free_psram);
-    $('#debug_psram_block').val(state.largest_free_psram_block);
-}
+#include "config.h"
 
-export function init() {
+class Kransteuerung {
+public:
+    Kransteuerung();
+    void setup();
+    void register_urls();
+    void loop();
 
-}
+    void button_pressed_handler(bool left, uint8_t button_l, uint8_t button_r, uint8_t led_l, uint8_t led_r);
 
-export function add_event_listeners(source: API.APIEventTarget) {
-    source.addEventListener('debug/state', update_debug_state);
-}
+    bool initialized = false;
 
-export function update_sidebar_state(module_init: any) {
-    $('#sidebar-debug').prop('hidden', !module_init.debug);
-}
+private:
+    TF_DualButtonV2 left, right; //ports: left - D, right - C
+    uint8_t last_button_states[4] = {TF_DUAL_BUTTON_V2_BUTTON_STATE_RELEASED,TF_DUAL_BUTTON_V2_BUTTON_STATE_RELEASED,TF_DUAL_BUTTON_V2_BUTTON_STATE_RELEASED,TF_DUAL_BUTTON_V2_BUTTON_STATE_RELEASED};
+    TF_IndustrialQuadRelayV2 relay; //port E
+};
