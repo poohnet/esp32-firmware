@@ -155,20 +155,22 @@ void SEM20::setup()
 
   task_scheduler.scheduleWithFixedDelay([this](){
     auto packetSize = udp.parsePacket();
-  
+
     if (packetSize > 0) {
       uint8_t buf[1024] = { 0 };
       auto len = udp.read(buf, 1023);
 
-      for (auto index = 0; index < sizeof(kennzahlen) / sizeof(kennzahlen[0]); index++) {
-        Config* value = values.get(kennzahlen[index].name());
+      if (len == 608) {
+        for (auto index = 0; index < sizeof(kennzahlen) / sizeof(kennzahlen[0]); index++) {
+          Config* value = values.get(kennzahlen[index].name());
 
-        if (value != nullptr) {
-          value->updateFloat(kennzahlen[index].value(buf, len));
+          if (value != nullptr) {
+            value->updateFloat(kennzahlen[index].value(buf, len));
+          }
         }
       }
     }
-  }, 1000, 10000);
+  }, 1000, 1000);
 
   initialized = true;
 }
