@@ -28,7 +28,11 @@ import YaMD5 from "../../ts/yamd5";
 
 import {getAllUsernames} from "../charge_tracker/main";
 
-declare function __(s: string): string;
+import { h, render } from "preact";
+import { __ } from "../../ts/translation";
+import { ConfigPageHeader } from "../../ts/config_page_header";
+
+render(<ConfigPageHeader prefix="users" title={__("users.content.users")} />, $('#users_header')[0]);
 
 const MAX_ACTIVE_USERS = 16;
 
@@ -58,6 +62,15 @@ function remove_user(id: number) {
 
 function modify_user(user: User) {
     return retry_once(() => API.call("users/modify", user, __("users.script.save_failed")), "users_modify_failed");
+}
+
+function modify_unknown_user(name: string) {
+    return retry_once(() => API.call("users/modify", {  "id": 0,
+                                                        "display_name": name,
+                                                        "username": null,
+                                                        "current": null,
+                                                        "digest_hash": null,
+                                                        "roles": null}, __("users.script.save_failed")), "users_modify_failed");
 }
 
 let next_user_id = 0;
@@ -97,6 +110,15 @@ async function save_users_config() {
         await save_authentication_config();
     }
 
+    let new_unknown_username = $('#users_unknown_username').val().toString();
+    if (new_unknown_username == __('charge_tracker.script.unknown_user'))
+        new_unknown_username = "Anonymous"
+
+    if (util.passwordUpdate('#users_unknown_username') === "")
+        await modify_unknown_user("Anonymous");
+    else if (new_unknown_username != users_config.users[0].display_name)
+        await modify_unknown_user(new_unknown_username);
+
     let have: User[] = [];
 
     let nums: number[] = $('.authorized-user-id').map(function() {return parseInt(this.id.replace("users_authorized_user_", "").replace("_id", ""));}).get();
@@ -107,7 +129,7 @@ async function save_users_config() {
         have.push({
             id: parseInt($(`#users_authorized_user_${i}_id`).val().toString()),
             roles: parseInt($(`#users_authorized_user_${i}_roles`).val().toString()),
-            current: Math.round(<number>$(`#users_authorized_user_${i}_current`).val() * 1000),
+            current: Math.round(($(`#users_authorized_user_${i}_current`).val() as number) * 1000),
             display_name: $(`#users_authorized_user_${i}_display_name`).val().toString(),
             username: username,
             digest_hash: digest
@@ -116,21 +138,21 @@ async function save_users_config() {
 
     let have_ids = have.map(x => x.id);
     let old_ids = users_config.users.map(x => x.id);
-    let to_remove = old_ids.filter(x => !have_ids.includes(x));
-    let to_add = have_ids.filter(x => !old_ids.includes(x));
-    let to_modify = old_ids.filter(x => have_ids.includes(x));
+    let to_remove = old_ids.filter(x => have_ids.indexOf(x) < 0);
+    let to_add = have_ids.filter(x => old_ids.indexOf(x) < 0);
+    let to_modify = old_ids.filter(x => have_ids.indexOf(x) >= 0);
 
     for(let i of to_remove) {
         await remove_user(i);
     }
 
     for(let i of have) {
-        if (to_modify.includes(i.id) && !user_unmodified(i))
+        if (to_modify.indexOf(i.id) >= 0 && !user_unmodified(i))
             await modify_user(i);
     }
 
     for(let i of have) {
-        if (to_add.includes(i.id)) {
+        if (to_add.indexOf(i.id) >= 0) {
             if (i.digest_hash == null)
                 i.digest_hash = "";
             await add_user(i);
@@ -212,7 +234,7 @@ function generate_user_ui(user: User, password: string) {
     feather.replace();
     $(`#users_authorized_user_${i}_remove`).on("click", () => {
         $(`#users_authorized_user_${i}_remove`).parent().parent().parent().remove();
-        $('#users_save_button').prop("disabled", false);
+        $('#users_config_save_button').prop("disabled", false);
         check_http_auth_allowed();
     });
 }
@@ -226,11 +248,12 @@ function update_users_config(force: boolean) {
     next_user_id = cfg.next_user_id;
 
     $('#users_authentication_enable').prop("checked", cfg.http_auth_enabled);
+    $('#users_unknown_username').val(cfg.users[0].display_name == "Anonymous" ? __("charge_tracker.script.unknown_user") : cfg.users[0].display_name);
 
-    if (!force && !$('#users_save_button').prop('disabled') && gui_created)
+    if (!force && !$('#users_config_save_button').prop('disabled') && gui_created)
         return;
 
-    $('#users_save_button').prop('disabled', true);
+    $('#users_config_save_button').prop('disabled', true);
     gui_created = true;
 
     if (cfg.users.length != authorized_users_count) {
@@ -302,7 +325,7 @@ function update_users_config(force: boolean) {
             </div>
             <div class="card-body">
                 <button id="users_add_user" type="button" class="btn btn-light btn-lg btn-block" style="height: 100%;" data-toggle="modal" data-target="#users_add_user_modal">${__("users.script.add_user")}</button>
-                <span id="users_add_user_disabled" hidden>${__("users.script.add_user_disabled_prefix") + (MAX_ACTIVE_USERS - 1 /* anonymous */) + __("users.script.add_user_disabled_suffix")}</span>
+                <span id="users_add_user_disabled" hidden></span>
             </div>
         </div>
     </div>`;
@@ -312,14 +335,18 @@ function update_users_config(force: boolean) {
         for (let i = 0; i < cfg.users.length; i++) {
             $(`#users_authorized_user_${i}_remove`).on("click", () => {
                 $(`#users_authorized_user_${i}_remove`).parent().parent().parent().remove();
-                $('#users_save_button').prop("disabled", false);
+                $('#users_config_save_button').prop("disabled", false);
                 check_http_auth_allowed();
             });
         }
     }
 
-    $('#users_add_user').prop("hidden", cfg.users.length >= MAX_ACTIVE_USERS);
-    $('#users_add_user_disabled').prop("hidden", cfg.users.length < MAX_ACTIVE_USERS);
+    $('#users_add_user').prop("hidden", cfg.users.length >= MAX_ACTIVE_USERS || next_user_id == 0);
+    $('#users_add_user_disabled').prop("hidden", cfg.users.length < MAX_ACTIVE_USERS && next_user_id != 0);
+    if (cfg.users.length >= MAX_ACTIVE_USERS)
+        $('#users_add_user_disabled').html(__("users.script.add_user_disabled_prefix") + (MAX_ACTIVE_USERS - 1 /* anonymous */) + __("users.script.add_user_disabled_suffix"));
+    else if (next_user_id == 0)
+        $('#users_add_user_disabled').html(__("users.script.add_user_disabled_user_ids_exhausted"));
 
     for (let i = 0; i < cfg.users.length; i++) {
         const s = cfg.users[i];
@@ -370,23 +397,27 @@ function check_http_auth_allowed() {
 }
 
 export function init() {
-    $('#users_config_form').on('input', () => $('#users_save_button').prop("disabled", false));
+    $('#users_config_form').on('input', () => $('#users_config_save_button').prop("disabled", false));
     $('#users_config_form').on('input', check_http_auth_allowed);
+
+    $('#users_clear_unknown_username').on("change", util.clear_password_fn("#users_unknown_username"));
 
     $('#users_config_form').on('submit', async function (event: Event) {
         this.classList.add('was-validated');
         event.preventDefault();
         event.stopPropagation();
 
-        if ((<HTMLFormElement>this).checkValidity() === false) {
+        if ((this as HTMLFormElement).checkValidity() === false) {
             return;
         }
 
-        $('#users_save_spinner').prop('hidden', false);
+        $('#users_config_save_spinner').prop('hidden', false);
+        let finally_fn = () => $('#users_config_save_spinner').prop('hidden', true);
+
         await save_users_config()
-            .then(() => $('#users_save_button').prop("disabled", true))
+            .then(() => $('#users_config_save_button').prop("disabled", true))
             .then(util.getShowRebootModalFn(__("users.script.reboot_content_changed")))
-            .finally(() => $('#users_save_spinner').prop('hidden', true));
+            .then(finally_fn, finally_fn);
     });
 
     $('#users_add_user_form').on("input", () => {
@@ -409,7 +440,7 @@ export function init() {
 
         const [usernames, _] = await getAllUsernames().catch(err => {
             util.add_alert("download-usernames", "danger", __("users.script.download_usernames_failed"), err);
-            return <[string[], string[]]>[null, null];
+            return [null, null] as [string[], string[]];
         });
 
         if (usernames == null)
@@ -423,7 +454,7 @@ export function init() {
             return;
         }
 
-        let form = <HTMLFormElement>$('#users_add_user_form')[0];
+        let form = $('#users_add_user_form')[0] as HTMLFormElement;
         if (!form.checkValidity()) {
             form.classList.add('was-validated');
             return;
@@ -438,19 +469,19 @@ export function init() {
         generate_user_ui({
             id: -1,
             username: username,
-            current: Math.round(<number>current * 1000),
+            current: Math.round((current as number) * 1000),
             display_name: $('#users_config_user_new_display_name').val().toString(),
             roles: 0xFFFF,
             digest_hash: ""
         }, $('#users_config_user_new_password').val().toString());
 
         $('#users_add_user_modal').modal('hide');
-        $('#users_save_button').prop("disabled", false);
+        $('#users_config_save_button').prop("disabled", false);
         check_http_auth_allowed();
     });
 
     $('#users_add_user_modal').on("hidden.bs.modal", () => {
-        let form = <HTMLFormElement>$('#users_add_user_form')[0];
+        let form = $('#users_add_user_form')[0] as HTMLFormElement;
         form.reset();
     })
 

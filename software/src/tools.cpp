@@ -27,6 +27,7 @@
 #include "esp_spiffs.h"
 #include "LittleFS.h"
 #include "esp_littlefs.h"
+#include "esp_system.h"
 
 #include <soc/efuse_reg.h>
 #include "bindings/base58.h"
@@ -35,7 +36,49 @@
 #include "esp_log.h"
 #include "build.h"
 
+#include <arpa/inet.h>
+
 extern EventLog logger;
+
+const char *tf_reset_reason()
+{
+    esp_reset_reason_t reason = esp_reset_reason();
+
+    switch (reason) {
+        case ESP_RST_POWERON:
+            return "Reset due to power-on.";
+
+        case ESP_RST_EXT:
+            return "Reset by external pin.";
+
+        case ESP_RST_SW:
+            return "Software reset via esp_restart.";
+
+        case ESP_RST_PANIC:
+            return "Software reset due to exception/panic.";
+
+        case ESP_RST_INT_WDT:
+            return "Reset due to interrupt watchdog.";
+
+        case ESP_RST_TASK_WDT:
+            return "Reset due to task watchdog.";
+
+        case ESP_RST_WDT:
+            return "Reset due to some watchdog.";
+
+        case ESP_RST_DEEPSLEEP:
+            return "Reset after exiting deep sleep mode.";
+
+        case ESP_RST_BROWNOUT:
+            return "Brownout reset.";
+
+        case ESP_RST_SDIO:
+            return "Reset over SDIO.";
+
+        default:
+            return "Reset reason unknown.";
+    }
+}
 
 bool deadline_elapsed(uint32_t deadline_ms)
 {
@@ -650,4 +693,54 @@ void remove_directory(const char *path)
         });
 
     ::rmdir((String("/spiffs/") + path).c_str());
+}
+
+
+bool is_in_subnet(IPAddress ip, IPAddress subnet, IPAddress to_check) {
+    return (((uint32_t)ip) & ((uint32_t)subnet)) == (((uint32_t)to_check) & ((uint32_t)subnet));
+}
+
+bool is_valid_subnet_mask(IPAddress subnet) {
+    bool zero_seen = false;
+    // IPAddress is in network byte order!
+    uint32_t addr = ntohl((uint32_t) subnet);
+    for (int i = 31; i >= 0; --i) {
+        bool bit_is_one = (addr & (1 << i));
+        if (zero_seen && bit_is_one) {
+            return false;
+        } else if (!zero_seen && !bit_is_one) {
+            zero_seen = true;
+        }
+    }
+    return true;
+}
+
+void led_blink(int8_t led_pin, int interval, int blinks_per_interval, int off_time_ms) {
+    int t_in_second = millis() % interval;
+    if (off_time_ms != 0 && (interval - t_in_second <= off_time_ms)) {
+        digitalWrite(led_pin, 1);
+        return;
+    }
+
+    // We want blinks_per_interval blinks and blinks_per_interval pauses between them. The off_time counts as pause.
+    int state_count = ((2 * blinks_per_interval) - (off_time_ms != 0 ? 1 : 0));
+    int state_interval = (interval - off_time_ms) / state_count;
+    bool led = (t_in_second / state_interval) % 2 != 0;
+
+    digitalWrite(led_pin, led);
+}
+
+uint16_t internet_checksum(const uint8_t* data, size_t length) {
+    uint32_t checksum=0xffff;
+
+    for (size_t i = 0; i < length - 1; i += 2) {
+        uint16_t buf;
+        memcpy(&buf, data + i, 2);
+        checksum += buf;
+    }
+
+    uint32_t carry = checksum >> 16;
+    checksum = (checksum & 0xFFFF) + carry;
+    checksum = ~checksum;
+    return checksum;
 }

@@ -25,11 +25,10 @@ import * as API from "../../ts/api";
 import feather from "../../ts/feather";
 
 import { h, render } from "preact";
-import { PageHeader } from "../../ts/page_header"
+import { __ } from "../../ts/translation";
+import { PageHeader } from "../../ts/page_header";
 
-render(<PageHeader page="charge_tracker" />, $('#charge_tracker_header')[0]);
-
-declare function __(s: string): string;
+render(<PageHeader title={__("charge_tracker.content.charge_tracker")} />, $('#charge_tracker_header')[0]);
 
 function update_last_charges() {
     let charges = API.get('charge_tracker/last_charges');
@@ -37,10 +36,11 @@ function update_last_charges() {
 
     let last_charges_html = charges.map((user) => {
         let display_name = __("charge_tracker.script.unknown_user")
+        
+        let filtered = users_config.users.filter(x => x.id == user.user_id);
 
-        if (user.user_id != 0) {
+        if (user.user_id != 0 || filtered[0].display_name != "Anonymous") {
             display_name = __("charge_tracker.script.deleted_user")
-            let filtered = users_config.users.filter(x => x.id == user.user_id);
             if (filtered.length == 1)
                 display_name = filtered[0].display_name
         }
@@ -49,7 +49,7 @@ function update_last_charges() {
         <div class="row">
             <div class="col">
                 <div class="mb-2"><span class="mr-1" data-feather="user"></span><span style="vertical-align: middle;">${display_name}</span></div>
-                <div><span class="mr-1" data-feather="calendar"></span><span style="vertical-align: middle;">${util.timestamp_min_to_date(user.timestamp_minutes)}</span></div>
+                <div><span class="mr-1" data-feather="calendar"></span><span style="vertical-align: middle;">${util.timestamp_min_to_date(user.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
             </div>
             <div class="col-auto">
                 <div class="mb-2"><span class="mr-1" data-feather="battery-charging"></span><span style="vertical-align: middle;">${user.energy_charged === null ? "N/A" : util.toLocaleFixed(user.energy_charged, 3)} kWh</span></div>
@@ -67,7 +67,7 @@ function update_last_charges() {
 function update_state() {
     let state = API.get('charge_tracker/state');
     $('#charge_tracker_tracked_charges').val(state.tracked_charges);
-    $('#charge_tracker_first_charge_timestamp').val(util.timestamp_min_to_date(state.first_charge_timestamp));
+    $('#charge_tracker_first_charge_timestamp').val(util.timestamp_min_to_date(state.first_charge_timestamp, __("charge_tracker.script.unknown_charge_start")));
 }
 
 function to_csv_line(vals: string[]) {
@@ -149,7 +149,7 @@ async function downloadChargeLog() {
                     case -2:
                         return false;
                     case -1:
-                        return !known_users.includes(x);
+                        return known_users.indexOf(x) < 0;
                     default:
                         return x != user_filter;
                 }
@@ -181,7 +181,10 @@ async function downloadChargeLog() {
                     let display_name = "";
                     let username = ""
                     if (user_id == 0) {
-                        display_name = __("charge_tracker.script.unknown_user");
+                        if (filtered[0].display_name == "Anonymous")
+                            display_name = __("charge_tracker.script.unknown_user");
+                        else
+                            display_name = filtered[0].display_name;
                         username = __("charge_tracker.script.unknown_user");
                     }
                     else if (filtered.length == 1) {
@@ -195,14 +198,14 @@ async function downloadChargeLog() {
 
                     let charged = (Number.isNaN(meter_start) || Number.isNaN(meter_end)) ? NaN : (meter_end - meter_start);
                     let charged_string;
-                    if (charged == NaN || charged < 0) {
+                    if (Number.isNaN(charged) || charged < 0) {
                         charged_string = 'N/A';
                     } else {
                         charged_string = util.toLocaleFixed(charged, 3);
                     }
 
                     let line = [
-                        util.timestamp_min_to_date(timestamp_minutes),
+                        util.timestamp_min_to_date(timestamp_minutes, __("charge_tracker.script.unknown_charge_start")),
                         display_name,
                         charged_string,
                         charge_duration.toString(),
@@ -236,7 +239,7 @@ function update_current_charge() {
 
     let filtered = uc.users.filter((x) => x.id == cc.user_id);
     let user_display_name = __("charge_tracker.script.unknown_user");
-    if (filtered.length > 0 && cc.user_id != 0)
+    if (filtered.length > 0 && (cc.user_id != 0 || filtered[0].display_name != "Anonymous"))
         user_display_name = filtered[0].display_name;
 
     let energy_charged = mv.energy_abs - cc.meter_start;
@@ -246,39 +249,44 @@ function update_current_charge() {
 
     time_charging = Math.floor(time_charging / 1000);
 
-    $('#users_status_charging_user').html(cc.user_id == 0 ? __("charge_tracker.script.unknown_user") : user_display_name);
+    if (filtered[0].display_name == "Anonymous" && cc.user_id == 0)
+        $('#users_status_charging_user').html(__("charge_tracker.script.unknown_user"));
+    else
+        $('#users_status_charging_user').html(user_display_name);
     $('#users_status_charging_time').html(util.format_timespan(time_charging));
     $('#users_status_charged_energy').html(cc.meter_start == null ? "N/A" : util.toLocaleFixed(energy_charged, 3) + " kWh");
-    $('#users_status_charging_start').html(util.timestamp_min_to_date(cc.timestamp_minutes));
+    $('#users_status_charging_start').html(util.timestamp_min_to_date(cc.timestamp_minutes, __("charge_tracker.script.unknown_charge_start")));
 }
 
 function update_user_filter_dropdown() {
     let uc = API.get('users/config');
 
-    let options = uc.users.map((x) => `<option value=${x.id}>${x.id == 0 ? __("charge_tracker.script.unknown_users") : x.display_name}</option>`);
+    let options = uc.users.map((x) => `<option value=${x.id}>${(x.display_name == "Anonymous" && x.id == 0) ? __("charge_tracker.script.unknown_users") : x.display_name}</option>`);
     options.unshift(`<option value=-2>${__("charge_tracker.script.all_users")}</option>`, `<option value=-1>${__("charge_tracker.script.deleted_users")}</option>`);
     $('#charge_tracker_user_filter').empty().append(options.join(""));
 }
 
 export function init() {
-    $('#charge_tracker_download').on("click", () =>{
+    $('#charge_tracker_download').on("click", () => {
         $('#charge_tracker_download_spinner').prop("hidden", false);
-        downloadChargeLog().finally(() => $('#charge_tracker_download_spinner').prop("hidden", true));
+        let finally_fn = () => $('#charge_tracker_download_spinner').prop("hidden", true);
+
+        downloadChargeLog().then(finally_fn, finally_fn);
     });
 
     $('#charge_tracker_remove').on("click", () => $('#charge_tracker_remove_modal').modal('show'));
 
-    $('#charge_tracker_remove_confirm').on("click", () =>
+    $('#charge_tracker_remove_confirm').on("click", () => {
+        let finally_fn = () => $('#charge_tracker_remove_modal').modal('hide');
+
         API.call('charge_tracker/remove_all_charges', {
             "do_i_know_what_i_am_doing": true
         }, __("charge_tracker.script.remove_failed"))
         .then(() => {
             util.postReboot(__("charge_tracker.script.remove_init"), __("util.reboot_text"));
         })
-        .finally(() => {
-            $('#charge_tracker_remove_modal').modal('hide');
-        })
-    );
+        .then(finally_fn, finally_fn);
+    });
 }
 
 export function add_event_listeners(source: API.APIEventTarget) {

@@ -17,24 +17,28 @@
  * Boston, MA 02111-1307, USA.
  */
 
-import { h, Component } from "preact";
+import { h, Component, JSX } from "preact";
+import { __ } from "./translation";
 
 export interface ConfigPageHeaderProps {
-    page: string
+    prefix: string,
+    title: string
 }
 
 export class ConfigPageHeader extends Component<ConfigPageHeaderProps, any> {
     render() {
-        let title_data_i18n = this.props.page + ".content." + this.props.page;
-        let save_button_id = this.props.page + "_config_save_button";
-        let save_button_form = this.props.page + "_config_form";
-        let save_button_data_i18n = this.props.page + ".content.save";
+        let button_id = this.props.prefix + "_config_save_button";
+        let spinner_id = this.props.prefix + "_config_save_spinner";
+        let config_form = this.props.prefix + "_config_form";
     
         return (
             <div class="row sticky-under-top mb-3 pt-3">
                 <div class="col-xl-8 d-flex justify-content-between pb-2 border-bottom tab-header-shadow">
-                    <h1 class="h2" data-i18n={title_data_i18n}></h1>
-                    <button id={save_button_id} type="submit" form={save_button_form} class="btn btn-primary mb-2" data-i18n={save_button_data_i18n} disabled></button>
+                    <h1 class="h2" dangerouslySetInnerHTML={{__html: this.props.title}}></h1>
+                    <button id={button_id} type="submit" form={config_form} class="btn btn-primary mb-2" disabled>
+                        {__("component.config_page_header.save")}
+                        <span id={spinner_id} class="ml-2 spinner-border spinner-border-sm" role="status" style="vertical-align: middle;" hidden></span>
+                    </button>
                 </div>
             </div>
         );

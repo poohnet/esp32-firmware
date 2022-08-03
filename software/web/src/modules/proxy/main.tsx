@@ -23,11 +23,10 @@ import * as util from "../../ts/util";
 import * as API from "../../ts/api";
 
 import { h, render } from "preact";
-import { PageHeader } from "../../ts/page_header"
+import { __ } from "../../ts/translation";
+import { PageHeader } from "../../ts/page_header";
 
-render(<PageHeader page="proxy" />, $('#proxy_header')[0]);
-
-declare function __(s: string): string;
+render(<PageHeader title={__("proxy.content.proxy")} />, $('#proxy_header')[0]);
 
 function update_devices() {
     let devices = API.get('proxy/devices');

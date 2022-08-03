@@ -23,9 +23,10 @@ import * as util from "../../ts/util";
 import * as API from "../../ts/api";
 
 import { h, render } from "preact";
-import { ConfigPageHeader } from "../../ts/config_page_header"
+import { __, translate_unchecked } from "../../ts/translation";
+import { ConfigPageHeader } from "../../ts/config_page_header";
 
-render(<ConfigPageHeader page="energy_manager" />, $('#energy_manager_header')[0]);
+render(<ConfigPageHeader prefix="energy_manager" title={__("energy_manager.content.energy_manager")} />, $('#energy_manager_header')[0]);
 
 function update_energy_manager_state() {
     let state = API.get('energy_manager/state');
@@ -73,7 +74,7 @@ function update_energy_manager_html_visibility() {
         let element_html = element.html();
         let found = true;
         for (let option of options) {
-            if(!element_html.includes(__("energy_manager.content." + option.name))) {
+            if(element_html.indexOf(translate_unchecked(`energy_manager.content.${option.name}`)) < 0) {
                 found = false;
                 break;
             }
@@ -83,7 +84,7 @@ function update_energy_manager_html_visibility() {
             element.empty();
             let new_element_html = "";
             for (let option of options) {
-                new_element_html += '<option value="' + option.value + '">' + __("energy_manager.content." + option.name) + '</option>';
+                new_element_html += '<option value="' + option.value + '">' + translate_unchecked(`energy_manager.content.${option.name}`) + '</option>';
             }
             element.html(new_element_html);
         }
@@ -101,7 +102,7 @@ function update_energy_manager_html_visibility() {
     if((relay_config_if == '0') || (relay_config_if == '1')) {
         update_options(relay_config_is_dd, [{"value": 0, name: "high"}, {"value": 1, name: "low"}]);
     } else if(relay_config_if == '2') {
-        update_options(relay_config_is_dd, [{"value": 2, name: "1phase"}, {"value": 3, name: "3phase"}]);
+        update_options(relay_config_is_dd, [{"value": 2, name: "one_phase"}, {"value": 3, name: "three_phase"}]);
     } else if(relay_config_if == '3') {
         update_options(relay_config_is_dd, [{"value": 4, name: "greater0"}, {"value": 5, name: "smaller0"}]);
     }

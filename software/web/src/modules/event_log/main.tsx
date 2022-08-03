@@ -23,11 +23,10 @@ import * as util from "../../ts/util";
 import * as API from "../../ts/api";
 
 import { h, render } from "preact";
-import { PageHeader } from "../../ts/page_header"
+import { __ } from "../../ts/translation";
+import { PageHeader } from "../../ts/page_header";
 
-render(<PageHeader page="event_log" />, $('#event_log_header')[0]);
-
-declare function __(s: string): string;
+render(<PageHeader title={__("event_log.content.event_log")} />, $('#event_log_header')[0]);
 
 function load_event_log() {
     $.get("/event_log")

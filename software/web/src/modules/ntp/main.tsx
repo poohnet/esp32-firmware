@@ -25,13 +25,12 @@ import * as util from "../../ts/util";
 import * as API from "../../ts/api";
 
 import { h, render } from "preact";
-import { ConfigPageHeader } from "../../ts/config_page_header"
+import { __ } from "../../ts/translation";
+import { ConfigPageHeader } from "../../ts/config_page_header";
 
-render(<ConfigPageHeader page="ntp" />, $('#ntp_header')[0]);
+render(<ConfigPageHeader prefix="ntp" title={__("ntp.content.ntp")} />, $('#ntp_header')[0]);
 
 import timezones from "./timezones";
-
-declare function __(s: string): string;
 
 function update_timezone(timezone: string) {
     let splt = timezone.split("/");
@@ -89,16 +88,18 @@ export function init() {
     $('#ntp_config_timezone_area').empty().append(options);
     $('#ntp_config_timezone_area').trigger('change');
 
-    API.register_config_form('ntp/config', () => {
-            let timezone = $('#ntp_config_timezone_area').val() +
-                            "/" + $('#ntp_config_timezone_location').val() +
-                            ($('#ntp_config_timezone_sublocation').prop("hidden") ? "" : ("/" + $('#ntp_config_timezone_sublocation').val()));
-            return {
-                timezone: timezone
-            };
-        }, undefined,
-        __("ntp.script.save_failed"),
-        __("ntp.script.reboot_content_changed")
+    API.register_config_form('ntp/config', {
+            overrides: () => {
+                    let timezone = $('#ntp_config_timezone_area').val() +
+                                    "/" + $('#ntp_config_timezone_location').val() +
+                                    ($('#ntp_config_timezone_sublocation').prop("hidden") ? "" : ("/" + $('#ntp_config_timezone_sublocation').val()));
+                    return {
+                        timezone: timezone
+                    };
+                },
+            error_string: __("ntp.script.save_failed"),
+            reboot_string: __("ntp.script.reboot_content_changed")
+        }
     );
 }
 
