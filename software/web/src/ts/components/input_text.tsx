@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2022 Olaf Lüke <olaf@tinkerforge.com>
+ * Copyright (C) 2022 Erik Fleckstein <erik@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,19 +17,22 @@
  * Boston, MA 02111-1307, USA.
  */
 
-import $ from "../../ts/jq";
+import { h, Context } from "preact";
+import {useContext} from "preact/hooks";
+import { JSXInternal } from "preact/src/jsx";
 
-import * as API from "../../ts/api";
-
-export function init() {
-    $('#equipment-config-group').on('hide.bs.collapse', () => $('#equipment-config-chevron').removeClass("rotated-chevron"));
-    $('#equipment-config-group').on('show.bs.collapse', () => $('#equipment-config-chevron').addClass("rotated-chevron"));
+interface InputTextProps extends Omit<JSXInternal.HTMLAttributes<HTMLInputElement>,  "class" | "id" | "type" | "onInput"> {
+    idContext?: Context<string>
+    onValue: (value: string) => void
 }
 
-export function add_event_listeners(source: API.APIEventTarget) {
-
-}
-
-export function update_sidebar_state(module_init: any) {
-    $('#sidebar-equipment-config-group').prop('hidden', false);
+export function InputText(props: InputTextProps) {
+    let id = useContext(props.idContext);
+    return (
+        <input class="form-control"
+               id={id}
+               type="text"
+               onInput={(e) => props.onValue((e.target as HTMLInputElement).value)}
+               {...props}/>
+    );
 }

@@ -300,11 +300,11 @@ void API::registerDebugUrl(WebServer *server)
 
         result += "}";
 
-        request.send(200, "application/json; charset=utf-8", result.c_str());
+        return request.send(200, "application/json; charset=utf-8", result.c_str());
     });
 
     this->addState("info/features", &features, {}, 1000);
-    this->addState("info/version", &version, {}, 10000);
+    this->addState("info/version", &version, {}, 1000);
 }
 
 void API::registerBackend(IAPIBackend *backend)

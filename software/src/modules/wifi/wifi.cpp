@@ -490,6 +490,7 @@ void Wifi::setup()
     if (enable_ap && !ap_fallback_only) {
         apply_soft_ap_config_and_start();
     } else {
+        LogSilencer ls;
         WiFi.softAPdisconnect(true);
     }
 
@@ -636,11 +637,11 @@ void Wifi::register_urls()
         String result = this->get_scan_results();
 
         if (network_count < 0) {
-            request.send(200, "text/plain; charset=utf-8", result.c_str());
+            return request.send(200, "text/plain; charset=utf-8", result.c_str());
         }
 
         logger.printfln("scan done");
-        request.send(200, "application/json; charset=utf-8", result.c_str());
+        return request.send(200, "application/json; charset=utf-8", result.c_str());
     });
 
     api.addPersistentConfig("wifi/sta_config", &wifi_sta_config, {"passphrase"}, 1000);

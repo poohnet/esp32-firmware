@@ -30,7 +30,7 @@ import {getAllUsernames} from "../charge_tracker/main";
 
 import { h, render } from "preact";
 import { __ } from "../../ts/translation";
-import { ConfigPageHeader } from "../../ts/config_page_header";
+import { ConfigPageHeader } from "../../ts/components/config_page_header";
 
 render(<ConfigPageHeader prefix="users" title={__("users.content.users")} />, $('#users_header')[0]);
 
@@ -111,7 +111,7 @@ async function save_users_config() {
     }
 
     let new_unknown_username = $('#users_unknown_username').val().toString();
-    if (new_unknown_username == __('charge_tracker.script.unknown_user'))
+    if (new_unknown_username == __("charge_tracker.script.unknown_user"))
         new_unknown_username = "Anonymous"
 
     if (util.passwordUpdate('#users_unknown_username') === "")
@@ -160,6 +160,9 @@ async function save_users_config() {
     }
 
     await save_authentication_config();
+
+    let nfc_auth_enable = $('#evse_user').is(":checked");
+    await API.save_maybe('evse/user_enabled', {"enabled": nfc_auth_enable}, __("evse.script.save_failed"));
 }
 
 function generate_user_ui(user: User, password: string) {
@@ -170,7 +173,7 @@ function generate_user_ui(user: User, password: string) {
                             <span data-feather="user"></span>
                             <button type="button" class="btn btn-sm btn-outline-dark"
                                 id="users_authorized_user_${i}_remove">
-                                <span data-feather="user-x" class="mr-2"></span><span style="font-size: 1rem; vertical-align: middle;" data-i18n="users.script.delete"></span>
+                                <span data-feather="user-x" class="mr-2"></span><span style="font-size: 1rem; vertical-align: middle;">${__("users.script.delete")}</span>
                             </button>
                         </div>
 
@@ -320,7 +323,7 @@ function update_users_config(force: boolean) {
                 <span data-feather="user-plus"></span>
                 <button type="button" class="btn btn-sm btn-outline-dark"
                                 id="blah" disabled style="visibility: hidden;">
-                                <span data-feather="user-x" class="mr-2"></span><span style="font-size: 1rem; vertical-align: middle;" data-i18n="users.script.delete"></span>
+                                <span data-feather="user-x" class="mr-2"></span><span style="font-size: 1rem; vertical-align: middle;">${__("users.script.delete")}</span>
                             </button>
             </div>
             <div class="card-body">
@@ -395,6 +398,13 @@ function check_http_auth_allowed() {
         $('#users_authentication_enable').prop("checked", API.get("users/config").http_auth_enabled);
     }
 }
+
+
+function update_evse_user() {
+    let x = API.get_maybe('evse/user_enabled');
+    $('#evse_user').prop("checked", x.enabled);
+}
+
 
 export function init() {
     $('#users_config_form').on('input', () => $('#users_config_save_button').prop("disabled", false));
@@ -490,6 +500,7 @@ export function init() {
 
 export function add_event_listeners(source: API.APIEventTarget) {
     source.addEventListener('users/config', () => update_users_config(false));
+    source.addEventListener("evse/user_enabled", update_evse_user);
 }
 
 export function update_sidebar_state(module_init: any) {

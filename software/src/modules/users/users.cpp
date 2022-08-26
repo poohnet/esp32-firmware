@@ -28,6 +28,8 @@
 #include "digest_auth.h"
 #include <cmath>
 
+#include <memory>
+
 #define USERNAME_LENGTH 32
 #define DISPLAY_NAME_LENGTH 32
 #define USERNAME_ENTRY_LENGTH (USERNAME_LENGTH + DISPLAY_NAME_LENGTH)
@@ -120,8 +122,8 @@ void set_user_current(uint16_t current)
 
 float get_energy()
 {
-    bool meter_avail = energy_meter.state.get("state")->asUint() == 2;
-    return !meter_avail ? NAN : energy_meter.values.get("energy_abs")->asFloat();
+    bool meter_avail = meter.state.get("state")->asUint() == 2;
+    return !meter_avail ? NAN : meter.values.get("energy_abs")->asFloat();
 }
 
 #define USER_SLOT_INFO_VERSION 1
@@ -238,7 +240,7 @@ Users::Users()
         }
 
         if (user_config.get("next_user_id")->asUint() == 0)
-            return "Cant add user. All user IDs in use.";
+            return "Can't add user. All user IDs in use.";
 
         if (add.get("id")->asUint() != user_config.get("next_user_id")->asUint())
             return "Can't add user. Wrong next user ID";
@@ -557,7 +559,7 @@ void Users::register_urls()
         return "";
     }, true);
 
-    api.addState("users/config", &user_config, {"digest_hash"}, 10000);
+    api.addState("users/config", &user_config, {"digest_hash"}, 1000);
     api.addCommand("users/add", &add, {"digest_hash"}, [this](){
         user_config.get("users")->add();
         Config *user = (Config *)user_config.get("users")->get(user_config.get("users")->count() - 1);
@@ -627,18 +629,15 @@ void Users::register_urls()
     server.on("/users/all_usernames", HTTP_GET, [this](WebServerRequest request) {
         //std::lock_guard<std::mutex> lock{records_mutex};
         size_t len = MAX_PASSIVE_USERS * USERNAME_ENTRY_LENGTH;
-        char *buf = (char *)malloc(len);
+        auto buf = std::unique_ptr<char[]>(new char[len]);
         if (buf == nullptr) {
-            request.send(507);
-            return;
+            return request.send(507);
         }
 
         File f = LittleFS.open(USERNAME_FILE, "r");
 
-        size_t read = f.read((uint8_t *)buf, len);
-        request.send(200, "application/octet-stream", buf, read);
-
-        free(buf);
+        size_t read = f.read((uint8_t *)buf.get(), len);
+        return request.send(200, "application/octet-stream", buf.get(), read);
     });
 }
 
