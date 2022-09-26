@@ -26,7 +26,7 @@ interface ConfigFormState {
 }
 
 interface ConfigFormProps {
-    children: VNode[]
+    children: VNode | VNode[]
     id: string
     title: string
     onSave: () => Promise<void>
@@ -52,6 +52,8 @@ export class ConfigForm extends Component<ConfigFormProps,ConfigFormState> {
         this.props.onSave().then(() => {
             this.setState({saveDisabled: true, wasValidated: false});
             this.props.onDirtyChange(false);
+        }).catch(() => {
+            this.setState({saveDisabled: false, wasValidated: false});
         });
     }
 

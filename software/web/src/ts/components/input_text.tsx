@@ -23,16 +23,17 @@ import { JSXInternal } from "preact/src/jsx";
 
 interface InputTextProps extends Omit<JSXInternal.HTMLAttributes<HTMLInputElement>,  "class" | "id" | "type" | "onInput"> {
     idContext?: Context<string>
-    onValue: (value: string) => void
+    onValue?: (value: string) => void
 }
 
 export function InputText(props: InputTextProps) {
-    let id = useContext(props.idContext);
+    let id = props.idContext === undefined ? "" : useContext(props.idContext);
     return (
         <input class="form-control"
                id={id}
                type="text"
-               onInput={(e) => props.onValue((e.target as HTMLInputElement).value)}
+               onInput={props.onValue ? (e) => props.onValue((e.target as HTMLInputElement).value) : undefined}
+               readonly={!props.onValue}
                {...props}/>
     );
 }

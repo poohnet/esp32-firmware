@@ -80,11 +80,14 @@ const char *tf_reset_reason()
     }
 }
 
+bool a_after_b(uint32_t a, uint32_t b)
+{
+    return ((uint32_t)(a - b)) < (UINT32_MAX / 2);
+}
+
 bool deadline_elapsed(uint32_t deadline_ms)
 {
-    uint32_t now = millis();
-
-    return ((uint32_t)(now - deadline_ms)) < (UINT32_MAX / 2);
+    return a_after_b(millis(), deadline_ms);
 }
 
 void read_efuses(uint32_t *ret_uid_num, char *ret_uid_str, char *ret_passphrase)
@@ -566,7 +569,7 @@ int ensure_matching_firmware(TF_TFP *tfp, const char *name, const char *purpose,
     int rc = tf_unknown_create(&bricklet, tfp);
 
     if (rc != TF_E_OK) {
-        logger->printfln("%s init failed (rc %d). Disabling %s support.", name, rc, purpose);
+        logger->printfln("%s init failed (rc %d).", name, rc);
         return -1;
     }
 
@@ -575,7 +578,7 @@ int ensure_matching_firmware(TF_TFP *tfp, const char *name, const char *purpose,
     rc = tf_unknown_get_identity(&bricklet, nullptr, nullptr, nullptr, nullptr, firmware_version, nullptr);
 
     if (rc != TF_E_OK) {
-        logger->printfln("%s get identity failed (rc %d). Disabling %s support.", name, rc, purpose);
+        logger->printfln("%s get identity failed (rc %d).", name, rc);
         return -1;
     }
 
@@ -610,7 +613,7 @@ int ensure_matching_firmware(TF_TFP *tfp, const char *name, const char *purpose,
         }
 
         if (!flash_firmware(&bricklet, firmware, firmware_len, logger)) {
-            logger->printfln("%s flashing failed. Disabling %s support.", name, purpose);
+            logger->printfln("%s flashing failed.", name);
             return -1;
         }
     }

@@ -39,7 +39,7 @@ const char* ENERGY_MANAGER_INPUT_CONFIG_STR[]      = {"input3_config",      "inp
 const char* ENERGY_MANAGER_INPUT_CONFIG_IF_STR[]   = {"input3_config_if",   "input4_config_if"};
 const char* ENERGY_MANAGER_INPUT_CONFIG_THEN_STR[] = {"input3_config_then", "input4_config_then"};
 
-EnergyManager::EnergyManager() : DeviceModule("energy_manager", "WARP Energy Manager", "Energy Manager", std::bind(&EnergyManager::setup_energy_manager, this))
+void EnergyManager::pre_setup()
 {
     // States
     energy_manager_state = Config::Object({
@@ -71,7 +71,7 @@ EnergyManager::EnergyManager() : DeviceModule("energy_manager", "WARP Energy Man
     // Config
     energy_manager_config = Config::Object({
         {"excess_charging_enable", Config::Bool(false)},
-        {"phase_switching", Config::Uint8(2)},
+        {"phase_switching", Config::Uint8(PHASE_SWITCHING_AUTOMATIC)},
         {"maximum_power_from_grid", Config::Int32(0)},
         {"maximum_available_current", Config::Uint32(0)}, // Keep in sync with charge_manager.cpp
         {"minimum_current", Config::Uint(6000, 6000, 32000)}, // Keep in sync with charge_manager.cpp

@@ -26,6 +26,8 @@ import * as util from "./ts/util";
 import * as API from "./ts/api";
 import { __, translate_data_i18n } from "./ts/translation";
 
+import { init_async_modal } from "./ts/components/async_modal";
+
 {{{module_imports}}}
 
 interface Module {
@@ -161,11 +163,9 @@ function setup_login() {
 $(window).on('pageshow', (ev) => {
     util.ifLoggedInElse(setup_normal, setup_login);
 
-    feather.replace();
+    init_async_modal();
 
-    $.ajaxSetup({
-        timeout: 5000
-    });
+    feather.replace();
 
     translate_data_i18n();
 
