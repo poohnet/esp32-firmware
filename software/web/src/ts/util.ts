@@ -479,3 +479,11 @@ export async function put(url: string, payload: any, timeout_ms: number = 5000) 
 }
 
 export const async_modal_ref: RefObject<AsyncModal> = createRef();
+
+export function range(i: number) {
+    return [...Array(i).keys()];
+}
+
+export async function wait(t: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, t));
+}

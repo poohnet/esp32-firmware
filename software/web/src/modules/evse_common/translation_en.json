@@ -75,7 +75,7 @@
             "adc_values": "ADC values",
             "voltages": "Voltages",
             "resistances": "Resistances",
-            "resistance_names": "PE-CP, PE-PP",
+            "resistance_names": "CP/PE, PP/PE",
             "gpios": "GPIOs",
             "gpio_low": "Low",
             "gpio_high": "High",
@@ -109,7 +109,10 @@
             "slot_5": "Configuration",
             "slot_6": "User",
             "slot_7": "Charge manager",
-            "slot_8": "External control"
+            "slot_8": "External control",
+            "slot_9": "Modbus TCP",
+            "slot_10": "Modbus TCP clearance",
+            "slot_11": "OCPP"
         },
         "script": {
             "error_code": "Error code",
