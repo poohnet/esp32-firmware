@@ -38,6 +38,7 @@ public:
     OLED();
     ~OLED();
 
+    void pre_setup();
     void setup();
     void register_urls();
     void loop();

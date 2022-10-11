@@ -84,6 +84,14 @@ obis kennzahlen[] = {
 
 SEM20::SEM20()
 {
+}
+
+SEM20::~SEM20()
+{
+}
+
+void SEM20::pre_setup()
+{
   values = Config::Object({
     {"1.4.0", Config::Float(0.0)},
     {"1.8.0", Config::Float(0.0)},
@@ -162,11 +170,7 @@ void SEM20::setup()
 
       if (len == 608) {
         for (auto index = 0; index < sizeof(kennzahlen) / sizeof(kennzahlen[0]); index++) {
-          Config* value = values.get(kennzahlen[index].name());
-
-          if (value != nullptr) {
-            value->updateFloat(kennzahlen[index].value(buf, len));
-          }
+          values.get(kennzahlen[index].name())->updateFloat(kennzahlen[index].value(buf, len));
         }
       }
     }

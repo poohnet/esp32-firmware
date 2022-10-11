@@ -40,6 +40,14 @@ OLED::OLED()
   : DeviceModule("oled", "OLED", "OLED", std::bind(&OLED::setup_oled, this))
   , GFXCore(128, 64)
 {
+}
+
+OLED::~OLED()
+{
+}
+
+void OLED::pre_setup()
+{
   _splash = Config::Object({
     {"no", Config::Int16(0)},
     {"color", Config::Int16(0)},
@@ -62,10 +70,6 @@ OLED::OLED()
     {"color", Config::Int16(0)},
     {"clearDisplay", Config::Bool(true)}
   });
-}
-
-OLED::~OLED()
-{
 }
 
 void OLED::setup_oled()
