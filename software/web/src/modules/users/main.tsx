@@ -163,7 +163,8 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
     }
 
     setUser (i: number, val: Partial<User>){
-        let users = this.state.users;
+        // We have to copy the users array here to make sure the change detection in sendSave works.
+        let users = this.state.users.slice(0);
         users[i] = {...users[i], ...val};
         this.setState({users: users});
     }
@@ -215,7 +216,7 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
 
                     <FormRow label={__("users.content.unknown_username")}>
                         <InputPassword maxLength={32}
-                                       value={state.users[0].display_name}
+                                       value={state.users[0].display_name == "Anonymous" ? __("charge_tracker.script.unknown_user") : state.users[0].display_name}
                                        onValue={(v) => this.setUser(0, {display_name: v})}
                                        showAlways
                                        />
