@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2022 Frederic Henrichs <frederic@tinkerforge.com>
+ * Copyright (C) 2022 Erik Fleckstein <erik@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,25 +19,31 @@
 
 #pragma once
 
-template<typename T>
-    void calloc_struct(T **out)
-    {
-        *out = (T *)calloc(1, sizeof(T));
-    }
+#include "config.h"
+#include "ocpp/ChargePoint.h"
 
-class ModbusTcp
-{
+class Ocpp {
 public:
-    ModbusTcp();
+    Ocpp(){}
     void pre_setup();
     void setup();
     void register_urls();
     void loop();
-    void update_regs();
-    void update_bender_regs();
+
+    void on_tag_seen(const char *tag_id) {
+        if (tag_seen_cb == nullptr)
+            return;
+        tag_seen_cb(1, tag_id, tag_seen_cb_user_data);
+    }
 
     bool initialized = false;
 
+    OcppChargePoint cp;
+
+    void(*tag_seen_cb)(int32_t, const char *, void *) = nullptr;
+    void *tag_seen_cb_user_data = nullptr;
 private:
     ConfigRoot config;
+    ConfigRoot config_in_use;
+    ConfigRoot state;
 };
