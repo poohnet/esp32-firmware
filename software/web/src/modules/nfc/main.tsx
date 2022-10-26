@@ -147,6 +147,7 @@ export class Nfc extends ConfigComponent<'nfc/config', {}, NfcState> {
                                                    onValue={(v) => this.setTag(i, {tag_id: v})}
                                                    minLength={8} maxLength={29}
                                                    pattern="^([0-9a-fA-F]{2}:?){3,9}[0-9a-fA-F]{2}$"
+                                                   invalidFeedback={__("nfc.content.tag_id_invalid_feedback")}
                                                    required/>
                                     </FormGroup>
                                     <FormGroup label={__("nfc.script.user_id")}>
@@ -196,7 +197,7 @@ export class Nfc extends ConfigComponent<'nfc/config', {}, NfcState> {
                             {unauth_seen_tags.length == 0
                                 ? <span>{__("nfc.content.add_tag_description")}</span>
                                 : <ListGroup>{
-                                    unauth_seen_tags.map(t => <ListGroupItem action onClick={() => this.setState({newTag: {...state.newTag, tag_id: t.tag_id, tag_type: t.tag_type}})}>
+                                    unauth_seen_tags.map(t => <ListGroupItem action type="button" onClick={() => this.setState({newTag: {...state.newTag, tag_id: t.tag_id, tag_type: t.tag_type}})}>
                                         <h5 class="mb-1 pr-2">{t.tag_id}</h5>
                                         <div class="d-flex w-100 justify-content-between">
                                             <span>{translate_unchecked(`nfc.content.type_${t.tag_type}`)}</span>
@@ -211,6 +212,7 @@ export class Nfc extends ConfigComponent<'nfc/config', {}, NfcState> {
                                        onValue={(v) => this.setState({newTag: {...state.newTag, tag_id: v}})}
                                        minLength={8} maxLength={29}
                                        pattern="^([0-9a-fA-F]{2}:?){3,9}[0-9a-fA-F]{2}$"
+                                       invalidFeedback={__("nfc.content.tag_id_invalid_feedback")}
                                        required/>
                         </FormGroup>
                         <FormGroup label={__("nfc.content.add_tag_modal_tag_type")}>
