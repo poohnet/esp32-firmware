@@ -21,20 +21,35 @@ import { h, Context } from "preact";
 import {useContext} from "preact/hooks";
 import { JSXInternal } from "preact/src/jsx";
 
-interface InputDateProps extends Omit<JSXInternal.HTMLAttributes<HTMLInputElement>, "value" | "class" | "id" | "type" | "onInput"> {
+interface OutputDatetimeProps extends Omit<JSXInternal.HTMLAttributes<HTMLInputElement>, "value" | "class" | "id" | "type" | "onInput" | "disabled"> {
     idContext?: Context<string>
     date: Date
-    onDate?: (value: Date) => void
 }
 
-export function InputDate(props: InputDateProps) {
+function toIsoString(date: Date) {
+    var tzo = -date.getTimezoneOffset();
+    const pad = function(num: number) {
+        return (num < 10 ? '0' : '') + num;
+    };
+
+    return date.getFullYear() +
+        '-' + pad(date.getMonth() + 1) +
+        '-' + pad(date.getDate()) +
+        'T' + pad(date.getHours()) +
+        ':' + pad(date.getMinutes()) +
+        ':' + pad(date.getSeconds());
+  }
+
+export function OutputDatetime(props: OutputDatetimeProps) {
     let id = props.idContext === undefined ? "" : useContext(props.idContext);
     return (
         <input class={"form-control " + props.className}
                id={id}
-               type="date"
-               onInput={props.onDate ? (e) => props.onDate(new Date((e.target as HTMLInputElement).value)) : undefined}
-               disabled={!props.onDate}
-               {...{valueAsDate: props.date}}/> //valueAsDate is not recognized for some reason? https://github.com/facebook/react/issues/11369 (no issue found for preact)
+               type="datetime-local"
+               step={1}
+               disabled={true}
+               value={toIsoString(props.date)}
+               required
+               />
     );
 }
