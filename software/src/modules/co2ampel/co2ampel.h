@@ -1,5 +1,5 @@
-/* esp32-firmware
- * Copyright (C) 2022 Erik Fleckstein <erik@tinkerforge.com>
+/* warp-charger
+ * Copyright (C) 2020-2021 Erik Fleckstein <erik@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,33 +19,32 @@
 
 #pragma once
 
-#include "config.h"
-#include "ocpp/ChargePoint.h"
+#include "bindings/bricklet_co2_v2.h"
+#include "bindings/bricklet_lcd_128x64.h"
+#include "bindings/bricklet_rgb_led_button.h"
+#include "bindings/bricklet_rgb_led_v2.h"
 
-class Ocpp {
+#include "config.h"
+
+class Co2Ampel {
 public:
-    Ocpp(){}
+    Co2Ampel(){}
     void pre_setup();
     void setup();
     void register_urls();
     void loop();
 
-    void on_tag_seen(const char *tag_id) {
-        if (tag_seen_cb == nullptr)
-            return;
-        tag_seen_cb(1, tag_id, tag_seen_cb_user_data);
-    }
-
     bool initialized = false;
 
-    OcppChargePoint cp;
+    void set_color(int c);
 
-    void(*tag_seen_cb)(int32_t, const char *, void *) = nullptr;
-    void *tag_seen_cb_user_data = nullptr;
-
-    ConfigRoot config;
-    ConfigRoot config_in_use;
     ConfigRoot state;
-    ConfigRoot configuration;
-    ConfigRoot reset;
+    ConfigRoot config;
+    ConfigRoot stop_blink;
+
+private:
+    TF_CO2V2 co2;
+    TF_LCD128x64 lcd;
+    TF_RGBLEDButton rlb;
+    TF_RGBLEDV2 rgb;
 };
