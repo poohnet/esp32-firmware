@@ -47,7 +47,7 @@ export class Mqtt extends ConfigComponent<'mqtt/config'> {
 
         return (
             <>
-                <ConfigForm id="mqtt_config_form" title={__("mqtt.content.mqtt")} onSave={() => this.save()} onReset={this.reset} onDirtyChange={(d) => this.ignore_updates = d}>
+                <ConfigForm id="mqtt_config_form" title={__("mqtt.content.mqtt")} isModified={this.isModified()} onSave={() => this.save()} onReset={this.reset} onDirtyChange={(d) => this.ignore_updates = d}>
                     <FormRow label={__("mqtt.content.enable_mqtt")}>
                         <Switch desc={__("mqtt.content.enable_mqtt_desc")}
                                 checked={state.enable_mqtt}
@@ -106,6 +106,22 @@ export class Mqtt extends ConfigComponent<'mqtt/config'> {
                                      value={state.interval}
                                      unit="s"
                                      onValue={this.set("interval")}/>
+                    </FormRow>
+
+                    <FormRow label={__("mqtt.content.enable_auto_discovery")}>
+                        <Switch desc={__("mqtt.content.enable_auto_discovery_desc")}
+                                checked={state.enable_auto_discovery}
+                                onClick={this.toggle('enable_auto_discovery')}/>
+                    </FormRow>
+
+                    <FormRow label={__("mqtt.content.auto_discovery_prefix")} label_muted={__("mqtt.content.auto_discovery_prefix_muted")}>
+                        <InputText required
+                                   maxLength={64}
+                                   pattern="^[^#+$][^#+]*"
+                                   value={state.auto_discovery_prefix}
+                                   onValue={this.set("auto_discovery_prefix")}
+                                   invalidFeedback={__("mqtt.content.auto_discovery_prefix_invalid")}
+                                   />
                     </FormRow>
                 </ConfigForm>
             </>

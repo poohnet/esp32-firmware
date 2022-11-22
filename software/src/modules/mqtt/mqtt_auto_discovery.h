@@ -19,24 +19,20 @@
 
 #pragma once
 
-#include "net_arduino_esp32/net_arduino_esp32.h"
 #include "config.h"
+#include "mqtt.h"
 
-class Proxy
+class MqttAutoDiscovery
 {
 public:
-    Proxy(){}
-    void pre_setup();
-    void setup();
-    void register_urls();
-    void loop();
-
-    bool initialized = false;
+    MqttAutoDiscovery(){}
+    void prepare_topics(const ConfigRoot &mqtt_config_in_use);
+    void subscribe_to_own();
+    void check_discovery_topic(const char *topic, size_t topic_len, size_t data_len);
+    void start_announcing();
 
 private:
-    TF_Net net;
-    ConfigRoot devices;
-    ConfigRoot error_counters;
-    ConfigRoot config;
-    String auth_secret;
+    void announce_next_topic(uint32_t next_topic);
 };
+
+extern MqttAutoDiscovery mqtt_auto_discovery;
