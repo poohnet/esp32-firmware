@@ -25,11 +25,9 @@
 #include "device_module.h"
 #include "warp_energy_manager_bricklet_firmware_bin.embedded.h"
 
-#define PHASE_SWITCHING_AUTOMATIC                         0
-#define PHASE_SWITCHING_ALWAYS_1PHASE_WITH_CONTACTOR      1
-#define PHASE_SWITCHING_ALWAYS_1PHASE_WITHOUT_CONTACTOR   2
-#define PHASE_SWITCHING_ALWAYS_3PHASE_WITH_CONTACTOR      3
-#define PHASE_SWITCHING_ALWAYS_3PHASE_WITHOUT_CONTACTOR   4
+#define PHASE_SWITCHING_AUTOMATIC       0
+#define PHASE_SWITCHING_ALWAYS_1PHASE   1
+#define PHASE_SWITCHING_ALWAYS_3PHASE   2
 
 #define RELAY_CONFIG_DEACTIVATED        0
 #define RELAY_CONFIG_RULE_BASED         1
@@ -78,7 +76,6 @@ typedef struct {
     uint32_t error_count[6];
 
     bool input[2];
-    uint8_t input_configuration[2];
     bool output;
     uint16_t voltage;
     uint8_t contactor_check_state;

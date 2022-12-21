@@ -31,15 +31,13 @@ render(<ConfigPageHeader prefix="energy_manager" title={__("energy_manager.conte
 function update_energy_manager_state() {
     let state = API.get('energy_manager/state');
 
-    $('#state_contactor').val(state.contactor ? "Drei Phasen aktiv (Schütz geschaltet)" : "Eine Phase aktiv (Schütz nicht geschaltet)");
+    $('#state_contactor').val(translate_unchecked(state.contactor ?  'energy_manager.content.three_phases_active' : 'energy_manager.content.one_phase_active'));
     $('#state_led_r').val(state.led_rgb[0]);
     $('#state_led_g').val(state.led_rgb[1]);
     $('#state_led_b').val(state.led_rgb[2]);
     util.update_button_group(`btn_group_gpio0`, state.gpio_input_state[0] ? 1 : 0);
     util.update_button_group(`btn_group_gpio1`, state.gpio_input_state[1] ? 1 : 0);
     util.update_button_group(`btn_group_gpio2`, state.gpio_output_state ? 1 : 0);
-    $('#state_input_configuration_0').val(state.gpio_input_configuration[0]);
-    $('#state_input_configuration_1').val(state.gpio_input_configuration[1]);
     $('#state_input_voltage').val(`${state.input_voltage} mV`);
     $('#state_contactor_check').val(state.contactor_check_state);
 }
@@ -74,6 +72,14 @@ function update_energy_manager_html_visibility() {
             }
             element.html(new_element_html);
         }
+    }
+
+    // Update contactor section
+    let phase_switching_config_is_dd = $('#energy_manager_config_phase_switching_mode')
+    if ($('#energy_manager_config_contactor_installed').is(':checked')) {
+        update_options(phase_switching_config_is_dd, [{"value": 0, name: "automatic"}, {"value": 1, name: "always_one_phase"}, {"value": 3, name: "always_three_phases"}]);
+    } else {
+        update_options(phase_switching_config_is_dd, [{"value": 1, name: "fixed_one_phase"}, {"value": 3, name: "fixed_three_phases"}]);
     }
 
     // Update relay section
@@ -210,7 +216,8 @@ export function init() {
             reboot_string: __("energy_manager.script.reboot_content_changed")
         });
 
-    $("#energy_manager_config_relay_config, \
+    $("#energy_manager_config_contactor_installed, \
+       #energy_manager_config_relay_config, \
        #energy_manager_config_relay_config_if, \
        #energy_manager_config_input3_config, \
        #energy_manager_config_input4_config"

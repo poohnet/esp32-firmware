@@ -3,7 +3,6 @@ export interface state {
     led_rgb: Uint8Array,
     gpio_input_state: boolean[],
     gpio_output_state: boolean,
-    gpio_input_configuration: Uint8Array,
     input_voltage: number,
     contactor_check_state: number,
     energy_meter_type: number,
@@ -16,7 +15,8 @@ export interface state {
 
 export interface config {
     excess_charging_enable: boolean,
-    phase_switching: number,
+    contactor_installed: boolean,
+    phase_switching_mode: number,
     maximum_power_from_grid: number,
     maximum_available_current: number,
     minimum_current: number,
