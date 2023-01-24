@@ -28,14 +28,6 @@
 #include "web_server.h"
 #include "modules.h"
 
-extern EventLog logger;
-
-extern WebServer server;
-extern TaskScheduler task_scheduler;
-extern Config modules;
-
-extern API api;
-
 void EMMeter::pre_setup()
 {
     errors = Config::Object({
@@ -51,10 +43,8 @@ void EMMeter::pre_setup()
 void EMMeter::updateMeterValues()
 {
     meter.updateMeterValues(energy_manager.all_data.power,
-                            energy_manager.all_data.energy_relative,
-                            energy_manager.all_data.energy_absolute);
-
-    meter.updateMeterPhases(energy_manager.all_data.phases_connected, energy_manager.all_data.phases_active);
+                            0,
+                            0);
 
     errors.get("local_timeout")->updateUint(energy_manager.all_data.error_count[0]);
     errors.get("global_timeout")->updateUint(energy_manager.all_data.error_count[1]);
@@ -89,9 +79,8 @@ void EMMeter::setupEM(bool update_module_initialized)
     }, 500, 500);
 
     task_scheduler.scheduleWithFixedDelay([this](){
-        uint16_t len;
         float result[METER_ALL_VALUES_COUNT] = {0};
-        if (tf_warp_energy_manager_get_energy_meter_detailed_values(&energy_manager.device, result, &len) != TF_E_OK)
+        if (energy_manager.get_energy_meter_detailed_values(result) != 0)
             return;
 
         meter.updateMeterAllValues(result);
@@ -119,14 +108,6 @@ void EMMeter::setup()
 void EMMeter::register_urls()
 {
     api.addState("meter/error_counters", &errors, {}, 1000);
-
-    meter.registerResetCallback([this]() {
-        if (!initialized) {
-            return;
-        }
-
-        tf_warp_energy_manager_reset_energy_meter_relative_energy(&energy_manager.device);
-    });
 }
 
 void EMMeter::loop()

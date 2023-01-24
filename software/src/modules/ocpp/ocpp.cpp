@@ -25,9 +25,7 @@
 #include "task_scheduler.h"
 
 #include <ctype.h>
-
-extern API api;
-extern TaskScheduler task_scheduler;
+#include <string.h>
 
 extern char local_uid_str[7];
 
@@ -147,9 +145,9 @@ void Ocpp::setup()
         for(size_t i = 0; i < ARRAY_SIZE(pass_bytes); ++i) {
             pass_bytes[i] = hex_digit_to_byte(pass[i]) << 4 | hex_digit_to_byte(pass[i]);
         }
-        cp.start(config.get("url")->asEphemeralCStr(), (String(BUILD_HOST_PREFIX) + '-' + local_uid_str).c_str(), pass_bytes.get());
+        cp.start(config.get("url")->asEphemeralCStr(), config_in_use.get("identity")->asEphemeralCStr(), pass_bytes.get());
     } else {
-        cp.start(config.get("url")->asEphemeralCStr(), (String(BUILD_HOST_PREFIX) + '-' + local_uid_str).c_str(), config_in_use.get("pass")->asEphemeralCStr());
+        cp.start(config.get("url")->asEphemeralCStr(), config_in_use.get("identity")->asEphemeralCStr(), config_in_use.get("pass")->asEphemeralCStr());
     }
 
     task_scheduler.scheduleWithFixedDelay([this](){
@@ -159,7 +157,7 @@ void Ocpp::setup()
 
 void Ocpp::register_urls()
 {
-    api.addPersistentConfig("ocpp/config", &config, {}, 1000);
+    api.addPersistentConfig("ocpp/config", &config, {"pass"}, 1000);
 #ifdef OCPP_STATE_CALLBACKS
     api.addState("ocpp/state", &state, {}, 1000);
     api.addState("ocpp/configuration", &configuration, {}, 1000);
@@ -172,4 +170,28 @@ void Ocpp::register_urls()
 void Ocpp::loop()
 {
 
+}
+
+static void remove_separator(const char * const in, char *out) {
+    int written = 0;
+    size_t s = strlen(in);
+    for(int i = 0; i < s; ++i) {
+        if (in[i] == ':')
+            continue;
+        out[written] = in[i];
+        ++written;
+    }
+    out[written] = '\0';
+}
+
+void Ocpp::on_tag_seen(const char *tag_id) {
+    if (tag_seen_cb == nullptr)
+        return;
+
+    // We have to remove the separating ':'s from the tag_id.
+    // OCPP expectes IDs that map to physical tag IDs to contain only the hex-bytes.
+    char buf[NFC_TAG_ID_STRING_LENGTH + 1] = {};
+    remove_separator(tag_id, buf);
+
+    tag_seen_cb(1, buf, tag_seen_cb_user_data);
 }

@@ -25,18 +25,11 @@
 #include "task_scheduler.h"
 #include "modules.h"
 
-extern EventLog logger;
-
-extern TaskScheduler task_scheduler;
-extern Config modules;
-
-extern API api;
-
 void Meter::pre_setup()
 {
     state = Config::Object({
         {"state", Config::Uint8(0)}, // 0 - no energy meter, 1 - initialization error, 2 - meter available
-        {"type", Config::Uint8(0)} // 0 - not available, 1 - sdm72, 2 - sdm630, 3 - sdm72v2
+        {"type", Config::Uint8(0)} // 0 - not available, 1 - sdm72, 2 - sdm630, 3 - sdm72v2, 4 - MQTT meter
     });
 
     values = Config::Object({
@@ -139,12 +132,15 @@ void Meter::setupMeter(uint8_t meter_type)
         return;
 
     api.addFeature("meter");
-    if (meter_type == 2 || meter_type == 3) {
-        api.addFeature("meter_phases");
-        api.addFeature("meter_all_values");
+    switch(meter_type) {
+        case METER_TYPE_SDM630:
+        case METER_TYPE_SDM72DMV2:
+            api.addFeature("meter_phases");
+            /* FALLTHROUGH*/
+        case METER_TYPE_SDM72CTM:
+            api.addFeature("meter_all_values");
+            break;
     }
-
-    power_hist.setup();
 
     for (int i = all_values.count(); i < METER_ALL_VALUES_COUNT; ++i) {
         all_values.add();
@@ -157,6 +153,7 @@ void Meter::setup()
 {
     initialized = true;
     api.restorePersistentConfig("meter/last_reset", &last_reset);
+    power_hist.setup();
 }
 
 void Meter::register_urls()

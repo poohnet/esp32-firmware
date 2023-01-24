@@ -26,9 +26,6 @@
 #include "task_scheduler.h"
 #include "web_server.h"
 
-extern TaskScheduler task_scheduler;
-extern WebServer server;
-
 // How many hours to keep the coarse history for
 #define HISTORY_HOURS 48
 // How many minutes to keep the fine history for.
@@ -52,6 +49,9 @@ public:
     void setup();
     void register_urls(String base_url);
     void add_sample(float sample);
+    size_t format_live(char *buf, size_t buf_size);
+    size_t format_history(char *buf, size_t buf_size);
+    float samples_per_second();
 
     int samples_last_interval = 0;
     int samples_per_interval = -1;
@@ -74,4 +74,5 @@ public:
                   malloc_32bit_addressed,
 #endif
                   heap_caps_free> history;
+    uint32_t history_last_update;
 };

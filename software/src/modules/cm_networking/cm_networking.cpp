@@ -21,9 +21,12 @@
 
 #include <Arduino.h>
 
-#include "task_scheduler.h"
-
+#include "api.h"
+#include "event_log.h"
 #include "modules.h"
+#include "task_scheduler.h"
+#include "tools.h"
+#include "web_server.h"
 
 #include <ESPmDNS.h>
 #include "NetBIOS.h"
@@ -33,11 +36,6 @@
 #include <cstring>
 
 #include "TFJson.h"
-
-extern TaskScheduler task_scheduler;
-extern API api;
-extern EventLog logger;
-extern WebServer server;
 
 void CMNetworking::pre_setup()
 {
@@ -71,7 +69,7 @@ void CMNetworking::register_urls()
         return;
 
     MDNS.addService("tf-warp-cm", "udp", 34127);
-    MDNS.addServiceTxt("tf-warp-cm", "udp", "version", __XSTRING(CM_PACKET_MAGIC) "." __XSTRING(CM_PROTOCOL_VERSION));
+    MDNS.addServiceTxt("tf-warp-cm", "udp", "version", MACRO_VALUE_TO_STRING(CM_PACKET_MAGIC) "." MACRO_VALUE_TO_STRING(CM_PROTOCOL_VERSION));
     task_scheduler.scheduleWithFixedDelay([](){
         #if MODULE_DEVICE_NAME_AVAILABLE()
             // Keep "display_name" updated because it can be changed at runtime without clicking "Save".
@@ -193,7 +191,7 @@ String CMNetworking::validate_packet_header(const struct cm_packet_header *heade
     }
 
     if (header->version < CM_PROTOCOL_VERSION_MIN) {
-        return String("Protocol version ") + header->version + " too old. Need at least version " __XSTRING(CM_PROTOCOL_VERSION_MIN) ".";
+        return String("Protocol version ") + header->version + " too old. Need at least version " MACRO_VALUE_TO_STRING(CM_PROTOCOL_VERSION_MIN) ".";
     }
 
     return String();
@@ -425,7 +423,7 @@ void CMNetworking::register_client(std::function<void(uint16_t, bool)> client_ca
 
         String validation_error = validate_command_packet_header(&command_pkt, len);
         if (validation_error != "") {
-            logger.printfln("Received command packet from %s (%iB) failed validation: %s",
+            logger.printfln("Received command packet from %s (%i bytes) failed validation: %s",
                 inet_ntoa(((struct sockaddr_in*)&temp_addr)->sin_addr),
                 len,
                 validation_error.c_str());
@@ -622,7 +620,7 @@ void CMNetworking::add_scan_result_entry(mdns_result_t *entry, TFJsonSerializer 
         if (!protocol_version) {
             error = SCAN_RESULT_ERROR_FIRMWARE_MISMATCH;
         } else {
-            if (strncmp(version, __XSTRING(CM_PACKET_MAGIC), protocol_version - version) != 0) {
+            if (strncmp(version, MACRO_VALUE_TO_STRING(CM_PACKET_MAGIC), protocol_version - version) != 0) {
                 error = SCAN_RESULT_ERROR_FIRMWARE_MISMATCH;
             } else {
                 long num_version = strtol(++protocol_version, nullptr, 10);
