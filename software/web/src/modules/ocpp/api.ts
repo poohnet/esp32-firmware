@@ -25,7 +25,8 @@ export interface state {
     txn_with_invalid_id: boolean,
     unavailable_requested: boolean,
     message_in_flight_type: number,
-    message_in_flight_id: number,
+    message_in_flight_id_high: number,
+    message_in_flight_id_low: number,
     message_in_flight_len: number,
     message_timeout: number,
     txn_msg_retry_timeout: number,
@@ -69,4 +70,9 @@ export interface configuration {
     ChargingScheduleMaxPeriods: string
     ConnectorSwitch3to1PhaseSupported: string
     MaxChargingProfilesInstalled: string
+}
+
+export interface change_configuration {
+    key: string,
+    value: string
 }

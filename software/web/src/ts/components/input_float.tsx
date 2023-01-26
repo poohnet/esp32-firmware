@@ -53,7 +53,7 @@ export function InputFloat(props: InputFloatProps | InputFloatReadonlyProps) {
     const [inputInFlight, setInputInFlight] = useState<string | null>(null);
 
     const setTarget = 'onValue' in props ? (target: number) => {
-        target = util.clamp(props.min, target, props.max);
+        target = util.clamp(props.min, Math.round(target), props.max);
         input.current.parentNode.dispatchEvent(new Event('input', {bubbles: true}));
         props.onValue(target)
     } : (target: number) => {};
@@ -81,15 +81,19 @@ export function InputFloat(props: InputFloatProps | InputFloatReadonlyProps) {
                        step={1/pow10}
                        onInput={'onValue' in props ? (e) => setInputInFlight((e.target as HTMLInputElement).value) : undefined}
                        onfocusout={'onValue' in props ? () => {
-                            if (inputInFlight !== null) {
-                                let target = parseFloat(inputInFlight) * pow10;
-                                target = util.clamp(props.min, target, props.max);
-                                setTarget(target);
-                            }
+                            if (inputInFlight === null)
+                                return;
+
+                            let target = parseFloat(inputInFlight);
+                            if (isNaN(target))
+                                return;
+
+                            setTarget(target * pow10);
                             setInputInFlight(null);
                         } : undefined}
                        value={value}
-                       disabled={!('onValue' in props)}/>
+                       disabled={!('onValue' in props)}
+                       inputMode="decimal"/>
             <div class="input-group-append">
                 <div class="form-control input-group-text">
                     {this.props.unit}
