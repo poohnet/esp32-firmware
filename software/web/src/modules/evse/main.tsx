@@ -37,6 +37,8 @@ import { Button} from "react-bootstrap";
 import { CollapsedSection } from "src/ts/components/collapsed_section";
 import { EVSE_SLOT_EXTERNAL, EVSE_SLOT_GLOBAL, EVSE_SLOT_GP_INPUT, EVSE_SLOT_SHUTDOWN_INPUT } from "../evse_common/api";
 import { InputFile } from "src/ts/components/input_file";
+import { DebugLogger } from "../../ts/components/debug_logger"
+import { extend } from "jquery";
 
 interface EVSEState {
     state: API.getType['evse/state'];
@@ -44,15 +46,17 @@ interface EVSEState {
     hardware_cfg: API.getType['evse/hardware_configuration'];
     slots: Readonly<API.getType['evse/slots']>;
     user_calibration: API.getType['evse/user_calibration'];
+}
+
+interface EVSESettingsState {
+    slots: Readonly<API.getType['evse/slots']>;
     boost_mode: API.getType['evse/boost_mode'];
-    debug_running: boolean;
-    debug_status: string;
+    auto_start_charging: API.getType['evse/auto_start_charging'];
 }
 
 let toDisplayCurrent = (x: number) => util.toLocaleFixed(x / 1000.0, 3) + " A"
 
 export class EVSE extends Component<{}, EVSEState> {
-    debug_log = "";
 
     constructor() {
         super();
@@ -76,87 +80,6 @@ export class EVSE extends Component<{}, EVSEState> {
         util.eventTarget.addEventListener('evse/user_calibration', () => {
             this.setState({user_calibration: API.get('evse/user_calibration')});
         });
-
-        util.eventTarget.addEventListener('evse/boost_mode', () => {
-            this.setState({boost_mode: API.get('evse/boost_mode')});
-        });
-
-        util.eventTarget.addEventListener("evse/debug_header", (e) => {
-            this.debug_log += e.data + "\n";
-        }, false);
-
-        util.eventTarget.addEventListener("evse/debug", (e) => {
-            this.debug_log += e.data + "\n";
-        }, false);
-    }
-
-    async get_debug_report_and_event_log() {
-        try {
-            this.setState({debug_status: __("evse.script.loading_debug_report")});
-            this.debug_log += await util.download("/debug_report").then(blob => blob.text());
-            this.debug_log += "\n\n";
-        } catch (error) {
-            this.setState({debug_running: false, debug_status: __("evse.script.loading_debug_report_failed")});
-            throw __("evse.script.loading_debug_report_failed") + ": " + error;
-        }
-
-        try {
-            this.setState({debug_status: __("evse.script.loading_event_log")});
-            this.debug_log += await util.download("/event_log").then(blob => blob.text());
-            this.debug_log += "\n";
-        } catch (error) {
-            this.setState({debug_running: false, debug_status: __("evse.script.loading_event_log_failed")});
-            throw __("evse.script.loading_event_log_failed") + ": " + error;
-        }
-    }
-
-    async debug_start() {
-        this.debug_log = "";
-        this.setState({debug_running: true});
-
-        try {
-            await this.get_debug_report_and_event_log();
-
-            this.setState({debug_status: __("evse.script.starting_debug")});
-        } catch(error) {
-            this.setState({debug_running: false, debug_status: error});
-            return;
-        }
-
-        try{
-            await util.download("/evse/start_debug");
-        } catch {
-            this.setState({debug_running: false, debug_status: __("evse.script.starting_debug_failed")});
-            return;
-        }
-
-        this.setState({debug_status: __("evse.script.debug_running")});
-    }
-
-    async debug_stop() {
-        this.setState({debug_running: false});
-
-        try {
-            await util.download("/evse/stop_debug");
-        } catch {
-            this.setState({debug_running: true, debug_status: __("evse.script.debug_stop_failed")});
-        }
-
-        try {
-            this.debug_log += "\n\n";
-            this.setState({debug_status: __("evse.script.debug_stopped")});
-
-            await this.get_debug_report_and_event_log();
-            this.setState({debug_status: __("evse.script.debug_done")});
-        } catch (error) {
-            this.debug_log += "\n\nError while stopping charge protocol: ";
-            this.debug_log += error;
-
-            this.setState({debug_status: error});
-        }
-
-        //Download log in any case: Even an incomplete log can be useful for debugging.
-        util.downloadToFile(this.debug_log, "evse-debug-log", "txt", "text/plain");
     }
 
     render(props: {}, s: Readonly<EVSEState>) {
@@ -167,24 +90,9 @@ export class EVSE extends Component<{}, EVSEState> {
             ll_state,
             hardware_cfg,
             slots,
-            user_calibration,
-            boost_mode,
-            debug_running,
-            debug_status} = s;
+            user_calibration} = s;
 
         let min = Math.min(...slots.filter(s => s.active).map(s => s.max_current));
-
-        if (debug_running) {
-            window.onbeforeunload = (e: Event) => {
-                e.preventDefault();
-                // returnValue is not a boolean, but the string to be shown
-                // in the "are you sure you want to close this tab" message
-                // box. However this string is only shown in some browsers.
-                e.returnValue = __("evse.script.tab_close_warning") as any;
-            }
-        } else {
-            window.onbeforeunload = null;
-        }
 
         return (
             <>
@@ -264,26 +172,6 @@ export class EVSE extends Component<{}, EVSEState> {
 
                     <FormRow label={__("evse.content.uptime")}>
                         <InputText value={util.format_timespan(Math.floor(ll_state.uptime / 1000.0))}/>
-                    </FormRow>
-
-                    <FormSeparator heading={__("evse.content.settings")}/>
-
-                    <FormRow label={__("evse.content.external_description")} label_muted={__("evse.content.external_description_muted")}>
-                        <Switch desc={__("evse.content.external_enable")}
-                                checked={slots[EVSE_SLOT_EXTERNAL].active}
-                                onClick={async () => {
-                                    let inverted = !slots[EVSE_SLOT_EXTERNAL].active;
-                                    await API.save('evse/external_enabled', {"enabled": inverted}, __("evse.script.save_failed"));
-                                }}/>
-                    </FormRow>
-
-                    <FormRow label={__("evse.content.boost_mode_desc")} label_muted={__("evse.content.boost_mode_desc_muted")}>
-                        <Switch desc={__("evse.content.boost_mode")}
-                                checked={boost_mode.enabled}
-                                onClick={async () => {
-                                    let inverted = !boost_mode.enabled;
-                                    await API.save('evse/boost_mode', {"enabled": inverted}, __("evse.script.save_failed"));
-                                }}/>
                     </FormRow>
 
                     <FormSeparator heading={__("evse.content.charging_current")}/>
@@ -377,13 +265,7 @@ export class EVSE extends Component<{}, EVSEState> {
 
                     <FormSeparator heading={__("evse.content.debug")}/>
 
-                    <FormRow label={__("evse.content.debug_description")} label_muted={__("evse.content.debug_description_muted")}>
-                        <div class="input-group pb-2">
-                            <Button variant="primary" className="form-control rounded-right mr-2" onClick={() => {this.debug_start()}} disabled={debug_running}>{__("evse.content.debug_start")}</Button>
-                            <Button variant="primary" className="form-control rounded-left" onClick={() => {this.debug_stop()}} disabled={!debug_running}>{__("evse.content.debug_stop")}</Button>
-                        </div>
-                        <InputText value={debug_status}/>
-                    </FormRow>
+                    <DebugLogger prefix="evse" debug="evse/debug" debugHeader="evse/debug_header" translationPrefix="evse"/>
 
                     <CollapsedSection label={__("evse.content.low_level_state")}>
                         <FormRow label={__("evse.content.led_state")}>
@@ -527,202 +409,75 @@ export class EVSE extends Component<{}, EVSEState> {
 
 render(<EVSE />, $('#evse')[0]);
 
-function update_evse_status_start_charging_button() {
-    let state = API.get('evse/state');
-    let slots = API.get('evse/slots');
-    let ll_state = API.get('evse/low_level_state');
+class EVSESettings extends Component<{}, EVSESettingsState>
+{
+    constructor()
+    {
+        super();
 
-    // It is not helpful to enable the button if auto-start is active, but we are blocked for some other reason.
-    $('#status_start_charging').prop("disabled", state.iec61851_state != 1 || slots[4].max_current != 0 || ll_state.gpio[0]);
-}
+        util.eventTarget.addEventListener('evse/boost_mode', () => {
+            this.setState({boost_mode: API.get('evse/boost_mode')});
+        });
 
-function update_evse_state() {
-    let state = API.get('evse/state');
+        util.eventTarget.addEventListener('evse/auto_start_charging', () => {
+            this.setState({auto_start_charging: API.get('evse/auto_start_charging')});
+        });
 
-    util.update_button_group("btn_group_evse_state", state.charger_state);
-
-    $('#status_stop_charging').prop("disabled", state.charger_state != 2 && state.charger_state != 3);
-}
-
-let status_charging_current_dirty = false;
-
-
-function set_charging_current(current: number) {
-    if (status_plus_minus_timeout != null) {
-        window.clearTimeout(status_plus_minus_timeout);
-        status_plus_minus_timeout = null;
+        util.eventTarget.addEventListener('evse/slots', () => {
+            this.setState({slots: API.get('evse/slots')});
+        });
     }
+    render(props: {}, s: EVSESettingsState)
+    {
+        if (!s || !s.slots)
+            return (<></>);
 
-    status_charging_current_dirty = false;
-    util.setNumericInput("status_charging_current", current / 1000, 3);
+        let {
+            slots,
+            boost_mode,
+            auto_start_charging} = s;
 
-    API.save('evse/global_current', {"current": current}, __("evse.script.set_charging_current_failed"));
-}
+        return <>
+                <PageHeader title={__("evse.content.settings")}/>
 
+                <FormRow label={__("evse.content.auto_start_description")} label_muted={__("evse.content.auto_start_description_muted")}>
+                    <Switch desc={__("evse.content.auto_start_enable")}
+                            checked={!auto_start_charging.auto_start_charging}
+                            onClick={async () => {
+                                let inverted = !auto_start_charging.auto_start_charging;
+                                await API.save('evse/auto_start_charging', {"auto_start_charging": inverted}, __("evse.script.save_failed"));
+                            }}/>
+                </FormRow>
 
-function update_evse_auto_start_charging() {
-    let x = API.get('evse/auto_start_charging');
+                <FormRow label={__("evse.content.external_description")} label_muted={__("evse.content.external_description_muted")}>
+                    <Switch desc={__("evse.content.external_enable")}
+                            checked={slots[EVSE_SLOT_EXTERNAL].active}
+                            onClick={async () => {
+                                let inverted = !slots[EVSE_SLOT_EXTERNAL].active;
+                                await API.save('evse/external_enabled', {"enabled": inverted}, __("evse.script.save_failed"));
+                            }}/>
+                </FormRow>
 
-    $('#status_auto_start_charging').prop("checked", x.auto_start_charging);
-}
-
-function set_auto_start_charging(auto_start_charging: boolean) {
-    API.save('evse/auto_start_charging', {"auto_start_charging": auto_start_charging}, __("evse.script.auto_start_charging_update"));
-}
-
-function start_charging() {
-    API.call('evse/start_charging', {}, __("evse.script.start_charging_failed"));
-}
-
-function stop_charging() {
-    API.call('evse/stop_charging', {}, __("evse.script.stop_charging_failed"));
-}
-
-function update_evse_slots() {
-    let slots = API.get('evse/slots');
-
-    let real_maximum = 32000;
-    for(let i = 0; i < slots.length; ++i) {
-        let s = slots[i];
-        if (s.active)
-            real_maximum = Math.min(real_maximum, s.max_current);
+                <FormRow label={__("evse.content.boost_mode_desc")} label_muted={__("evse.content.boost_mode_desc_muted")}>
+                    <Switch desc={__("evse.content.boost_mode")}
+                            checked={boost_mode.enabled}
+                            onClick={async () => {
+                                let inverted = !boost_mode.enabled;
+                                await API.save('evse/boost_mode', {"enabled": inverted}, __("evse.script.save_failed"));
+                            }}/>
+                </FormRow>
+            </>;
     }
-
-    let theoretical_maximum = Math.min(slots[0].max_current, slots[1].max_current);
-    let theoretical_maximum_str = util.toLocaleFixed(theoretical_maximum / 1000.0, 0) + " A";
-    $('#status_charging_current').prop("max", theoretical_maximum / 1000);
-    $("#status_charging_current_maximum").on("click", () => set_charging_current(theoretical_maximum));
-    $('#status_charging_current_maximum').html(theoretical_maximum_str);
-
-    if(!status_charging_current_dirty) {
-        let shown_current = Math.min(slots[EVSE_SLOT_GLOBAL].max_current, theoretical_maximum);
-        util.setNumericInput("status_charging_current", shown_current / 1000.0, 3);
-    }
-
-    if (real_maximum == 32000) {
-        $('#evse_status_allowed_charging_current').val(util.toLocaleFixed(real_maximum / 1000.0, 3) + " A");
-        return;
-    }
-
-    let status_string = util.toLocaleFixed(real_maximum / 1000.0, 3) + " A " + __("evse.script.by") + " ";
-
-    let status_list = [];
-    for(let i = 0; i < slots.length; ++i) {
-        let s = slots[i];
-        if (s.active && s.max_current == real_maximum && real_maximum > 0)
-            $(`#slot_${i}`).css("border-left-color", "#ffc107");
-        if (!s.active || s.max_current != real_maximum)
-            continue;
-
-        status_list.push(translate_unchecked(`evse.script.slot_${i}`));
-    }
-
-    status_string += status_list.join(", ");
-
-    $('#evse_status_allowed_charging_current').val(status_string);
 }
 
-let status_plus_minus_timeout: number = null;
+render(<EVSESettings/>, $('#evse-settings')[0])
 
-export function init() {
-    $("#status_charging_current_minimum").on("click", () => set_charging_current(6000));
-    $("#status_charging_current_maximum").on("click", () => set_charging_current(32000));
+export function init(){}
 
-    $("#status_stop_charging").on("click", stop_charging);
-    $("#status_start_charging").on("click", start_charging);
-
-    $('#status_auto_start_charging').on("change", () => set_auto_start_charging($('#status_auto_start_charging').prop('checked')));
-
-    let input = $('#status_charging_current');
-
-    $('#evse_status_charging_current_form').on('submit', function (this: HTMLFormElement, event: Event) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (this.checkValidity() === false) {
-            return;
-        }
-
-        set_charging_current(Math.round((input.val() as number) * 1000));
-    });
-
-    $('#status_charging_current_minus').on("click", () => {
-        let val: number = parseInt(input.val().toString());
-        let target = (val % 1 === 0) ? (Math.floor(val) - 1) : Math.floor(val);
-
-        if (target < $('#status_charging_current').prop("min"))
-            return;
-
-        if (status_plus_minus_timeout != null) {
-            window.clearTimeout(status_plus_minus_timeout);
-            status_plus_minus_timeout = null;
-        }
-
-        util.setNumericInput("status_charging_current", target, 3);
-
-        status_plus_minus_timeout = window.setTimeout(() => {
-            set_charging_current(target * 1000);
-        }, 2000);
-    });
-
-    $('#status_charging_current_plus').on("click", () => {
-        let val = parseFloat(input.val().toString());
-        let target = Math.floor(val) + 1;
-
-        if (target > $('#status_charging_current').prop("max"))
-            return;
-
-        if (status_plus_minus_timeout != null) {
-            window.clearTimeout(status_plus_minus_timeout);
-            status_plus_minus_timeout = null;
-        }
-
-        util.setNumericInput("status_charging_current", target, 3);
-
-        status_plus_minus_timeout = window.setTimeout(() => {
-            set_charging_current(target * 1000);
-        }, 2000);
-    });
-
-    $('#status_charging_current').on("input", () => {
-        status_charging_current_dirty = true;
-
-        let val = parseFloat(input.val().toString());
-        let target = val;
-
-        if (target > parseInt($('#status_charging_current').prop("max"))) {
-            return;
-        }
-
-        if (target < parseInt($('#status_charging_current').prop("min"))) {
-            return;
-        }
-
-        if (status_plus_minus_timeout != null) {
-            window.clearTimeout(status_plus_minus_timeout);
-            status_plus_minus_timeout = null;
-        }
-
-        status_plus_minus_timeout = window.setTimeout(() => {
-            // Use round here instead of float, as non-representable floats * 1000 create
-            // confusing behaviour otherwise.
-            // For example 8.123 (represented as 8.1229999...3 * 1000 is 8122.999...3, with floor results in 8122 instead of 8123.
-            // This is only a problem here, as all other occurences only work on non-fractional numbers.
-            set_charging_current(Math.round(target * 1000));
-        }, 2000);
-    });
-}
-
-export function add_event_listeners(source: API.APIEventTarget) {
-    source.addEventListener('evse/state', update_evse_state);
-    source.addEventListener('evse/auto_start_charging', update_evse_auto_start_charging);
-    source.addEventListener("evse/slots", update_evse_slots);
-    source.addEventListener("evse/state", update_evse_status_start_charging_button);
-    source.addEventListener("evse/slots", update_evse_status_start_charging_button);
-    source.addEventListener("evse/low_level_state", update_evse_status_start_charging_button);
-}
+export function add_event_listeners(){}
 
 export function update_sidebar_state(module_init: any) {
     $('#sidebar-evse').prop('hidden', !module_init.evse);
+    $('#sidebar-evse-settings').prop('hidden', !module_init.evse);
     $('#status-evse').prop('hidden', !module_init.evse);
 }

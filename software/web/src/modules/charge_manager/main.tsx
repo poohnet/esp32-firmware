@@ -35,6 +35,7 @@ import { InputText } from "../../ts/components/input_text";
 import { Button, Card, Collapse, ListGroup, Modal } from "react-bootstrap";
 import { InputSelect } from "src/ts/components/input_select";
 import { InputFloat } from "src/ts/components/input_float";
+import { ItemModal } from "src/ts/components/item_modal";
 import { Switch } from "src/ts/components/switch";
 import { config } from "./api";
 
@@ -123,6 +124,23 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
     }
 
     override async sendSave(t: "charge_manager/config", cfg: config) {
+        const modal = util.async_modal_ref.current;
+        let illegal_chargers = "";
+        for (let i = 0; i < cfg.chargers.length; i++)
+        {
+            if (this.isMultiOrBroadcastIp(cfg.chargers[i].host))
+                illegal_chargers += cfg.chargers[i].name + ": " + cfg.chargers[i].host + "<br>";
+        }
+
+        if (illegal_chargers != "" && !await modal.show({
+            title: __("charge_manager.content.multi_broadcast_modal_title"),
+            body: __("charge_manager.content.multi_broadcast_modal_body") + "<br><br>" + illegal_chargers + "<br>" + __("charge_manager.content.multi_broadcast_modal_body_end"),
+            no_text: __("charge_manager.content.multi_broadcast_modal_cancel"),
+            yes_text: __("charge_manager.content.multi_broadcast_modal_save"),
+            no_variant: "secondary",
+            yes_variant: "danger"
+        }))
+            return;
         await API.save_maybe('evse/management_enabled', {"enabled": this.state.managementEnabled}, translate_unchecked("evse.script.save_failed"));
         await super.sendSave(t, cfg);
     }
@@ -177,6 +195,52 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
             } catch {
             }
         }, 3000);
+    }
+
+    intToIP(int: number) {
+        var part1 = int & 255;
+        var part2 = ((int >> 8) & 255);
+        var part3 = ((int >> 16) & 255);
+        var part4 = ((int >> 24) & 255);
+
+        return part4 + "." + part3 + "." + part2 + "." + part1;
+    }
+
+    isMultiOrBroadcastIp(v: string): boolean
+    {
+        const ip = util.parseIP(v);
+        if (isNaN(ip))
+            return false;
+
+        const wifi_subnet = util.parseIP(API.get("wifi/sta_config").subnet);
+        const wifi_ip = util.parseIP(API.get("wifi/sta_config").ip);
+        const wifi_network = wifi_subnet & wifi_ip;
+        const wifi_broadcast = (~wifi_subnet) | wifi_network;
+
+        if (API.get("wifi/sta_config").subnet != "255.255.255.254" && (v == this.intToIP(wifi_broadcast) || v == this.intToIP(wifi_network)))
+            return true;
+
+        if (API.hasFeature("ethernet")) {
+            const eth_subnet = util.parseIP(API.get_maybe("ethernet/config").subnet);
+            const eth_ip = util.parseIP(API.get_maybe("ethernet/config").ip);
+            const eth_network = eth_ip & eth_subnet;
+            const eth_broadcast = (~eth_subnet) | eth_network;
+            if (API.get_maybe("ethernet/config")?.subnet != "255.255.255.254" && (v == this.intToIP(eth_broadcast) || v == this.intToIP(eth_network)))
+                return true;
+        }
+
+        const start_multicast = util.parseIP("224.0.0.0");
+        const end_multicast = util.parseIP("239.255.255.255");
+        if (ip >= start_multicast && ip <= end_multicast)
+            return true;
+
+        const ap_ip = util.parseIP(API.get("wifi/ap_config").ip);
+        const ap_subnet = util.parseIP(API.get("wifi/ap_config").subnet);
+        const ap_network = ap_ip & ap_subnet;
+        const ap_broadcast =  (~ap_subnet) | ap_network;
+        if (API.get("wifi/ap_config").subnet != "255.255.255.254" && (v == this.intToIP(ap_network) || v == this.intToIP(ap_broadcast)))
+            return true;
+
     }
 
     render(props: {}, state: ChargeManagerConfig & ChargeManagerState) {
@@ -317,21 +381,21 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
                 </div>
             </FormRow>
 
-        let modal = <Modal show={state.showModal}
-                        onHide={() => this.setState({showModal: false})}
-                        centered
-                        onEnter={() => {this.scan_services(); this.intervalID = setInterval(this.scan_services, 3000)}}
-                        onExited={() => {this.setState({scanResult: []}); window.clearInterval(this.intervalID)}}
-                        >
-                    <Modal.Header closeButton>
-                        <label class="modal-title form-label">{__("charge_manager.content.add_charger_modal_title")}</label>
-                    </Modal.Header>
-                    <form onSubmit={() => {this.setState({showModal: false,
-                                                            chargers: state.chargers.concat(state.newCharger),
-                                                            newCharger: {name: "", host: ""}});
-                                                this.hackToAllowSave();}}>
-                    <Modal.Body>
-                            <FormGroup label={__("charge_manager.content.add_charger_modal_name")}>
+        let modal = <ItemModal onSubmit={() => {
+                this.setState({showModal: false,
+                    chargers: state.chargers.concat(state.newCharger),
+                    newCharger: {name: "", host: ""}});
+                this.hackToAllowSave();}}
+            onHide={() => this.setState({showModal: false})}
+            onEnter={() => {this.scan_services(); this.intervalID = setInterval(this.scan_services, 3000)}}
+            onExited={() => {this.setState({scanResult: []}); window.clearInterval(this.intervalID)}}
+            show={state.showModal}
+            no_variant="secondary"
+            yes_variant="primary"
+            title={__("charge_manager.content.add_charger_modal_title")}
+            no_text={__("charge_manager.content.add_charger_modal_abort")}
+            yes_text={__("charge_manager.content.add_charger_modal_save")}>
+                    <FormGroup label={__("charge_manager.content.add_charger_modal_name")}>
                                 <InputText value={state.newCharger.name}
                                         onValue={(v) => this.setState({newCharger: {...state.newCharger, name: v}})}
                                         maxLength={32}
@@ -367,18 +431,7 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
                                 }
                                 </ListGroup>
                             </FormGroup>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => this.setState({showModal: false})}>
-                            {__("charge_manager.content.add_charger_modal_abort")}
-                        </Button>
-                        <Button variant="primary"
-                                type="submit">
-                            {__("charge_manager.content.add_charger_modal_save")}
-                        </Button>
-                    </Modal.Footer>
-                    </form>
-                </Modal>;
+                </ItemModal>
 
         return (
             <>
@@ -390,6 +443,8 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
                     {state.energyManagerMode ?
                         <>
                             {verbose}
+                            {maximum_available_current}
+                            {minimum_current}
                             {chargers}
                         </>
                     :

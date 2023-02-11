@@ -59,14 +59,9 @@ static char distribution_log[DISTRIBUTION_LOG_LEN] = {0};
 #if MODULE_ENERGY_MANAGER_AVAILABLE()
 static void apply_energy_manager_config(Config &conf)
 {
-    if (!api.hasFeature("energy_manager"))
-        return;
-
     conf.get("enable_charge_manager")->updateBool(true);
     conf.get("enable_watchdog")->updateBool(false);
     conf.get("default_available_current")->updateUint(0);
-    conf.get("maximum_available_current")->updateUint(energy_manager.energy_manager_config_in_use.get("maximum_available_current")->asUint());
-    conf.get("minimum_current")->updateUint(energy_manager.energy_manager_config_in_use.get("minimum_current")->asUint());
 }
 #endif
 
@@ -76,8 +71,8 @@ void ChargeManager::pre_setup()
         {"enable_charge_manager", Config::Bool(false)},
         {"enable_watchdog", Config::Bool(false)},
         {"default_available_current", Config::Uint32(0)},
-        {"maximum_available_current", Config::Uint32(0xFFFFFFFF)}, // Keep in sync with energy_manager.cpp
-        {"minimum_current", Config::Uint(6000, 6000, 32000)}, // Keep in sync with energy_manager.cpp
+        {"maximum_available_current", Config::Uint32(0xFFFFFFFF)},
+        {"minimum_current", Config::Uint(6000, 6000, 32000)},
         {"verbose", Config::Bool(false)},
         {"chargers", Config::Array({},
             new Config{Config::Object({
@@ -107,6 +102,7 @@ void ChargeManager::pre_setup()
     charge_manager_state = Config::Object({
         {"state", Config::Uint8(0)}, // 0 - not configured, 1 - active, 2 - shutdown
         {"uptime", Config::Uint32(0)},
+        {"allocated_current", Config::Uint32(0)},
         {"chargers", Config::Array(
             {},
             new Config{Config::Object({
@@ -272,11 +268,11 @@ void ChargeManager::setup()
 {
     uint32_t control_cycle_time_ms;
     if (!api.restorePersistentConfig("charge_manager/config", &charge_manager_config)) {
+        charge_manager_config.get("maximum_available_current")->updateUint(0);
 #if MODULE_ENERGY_MANAGER_AVAILABLE()
         apply_energy_manager_config(charge_manager_config);
         control_cycle_time_ms = 5 * 1000;
 #else
-        charge_manager_config.get("maximum_available_current")->updateUint(0);
         control_cycle_time_ms = 10 * 1000;
 #endif
     }
@@ -331,6 +327,10 @@ void ChargeManager::set_available_current(uint32_t current)
     charge_manager_available_current.get("current")->updateUint(current);
 }
 
+bool ChargeManager::have_chargers() {
+    return charge_manager_state.get("chargers")->count() > 0;
+}
+
 // Check is not 100% reliable after an uptime of 49 days because last_update might legitimately 0.
 // Work around that by caching the value once all chargers were seen once.
 bool ChargeManager::seen_all_chargers() {
@@ -338,6 +338,10 @@ bool ChargeManager::seen_all_chargers() {
         return true;
 
     std::vector<Config> &chargers = charge_manager_state.get("chargers")->asArray();
+
+    // Don't claim to have seen "all" chargers when none are configured.
+    if (chargers.size() == 0)
+        return false;
 
     for (auto &charger : chargers) {
         if (charger.get("last_update")->asUint() == 0) {
@@ -739,6 +743,8 @@ void ChargeManager::distribute_current()
             len = strlen(local_log);
         }
     }
+
+    charge_manager_state.get("allocated_current")->updateUint(available_current_init - available_current);
 
     if (allocated_current_callback) {
         // Inform callback about how much current we distributed to chargers.

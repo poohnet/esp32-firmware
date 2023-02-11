@@ -481,7 +481,22 @@ void Users::search_next_free_user() {
 void Users::register_urls()
 {
     // No users (except anonymous) configured: Make sure the EVSE's user slot is disabled.
-    if (user_config.get("users")->count() <= 1) {
+    bool user_slot = false;
+
+#if MODULE_EVSE_AVAILABLE()
+
+    if (api.hasFeature("evse"))
+        user_slot = evse.evse_slots.get(CHARGING_SLOT_USER)->get("active")->asBool();
+
+#elif MODULE_EVSE_V2_AVAILABLE()
+
+    if (api.hasFeature("evse"))
+        user_slot = evse_v2.evse_slots.get(CHARGING_SLOT_USER)->get("active")->asBool();
+
+#endif
+
+
+    if (user_config.get("users")->count() <= 1 && user_slot) {
         logger.printfln("User slot enabled, but no users configured. Disabling user slot.");
         api.callCommand("evse/user_enabled_update", Config::ConfUpdateObject{{
             {"enabled", false}
@@ -684,6 +699,7 @@ void Users::register_urls()
         user_config.get("users")->remove(idx);
         API::writeConfig("users/config", &user_config);
 
+#if MODULE_NFC_AVAILABLE()
         Config *tags = (Config *)nfc.config.get("authorized_tags");
 
         for(int i = 0; i < tags->count(); ++i) {
@@ -691,6 +707,7 @@ void Users::register_urls()
                 tags->get(i)->get("user_id")->updateUint(0);
         }
         API::writeConfig("nfc/config", &nfc.config);
+#endif
 
         if (!charge_tracker.is_user_tracked(remove.get("id")->asUint()))
         {

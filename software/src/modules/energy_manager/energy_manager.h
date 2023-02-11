@@ -27,6 +27,12 @@
 #include "output_relay.h"
 #include "warp_energy_manager_bricklet_firmware_bin.embedded.h"
 
+#define MODE_FAST                       0
+#define MODE_OFF                        1
+#define MODE_PV                         2
+#define MODE_MIN_PV                     3
+#define MODE_DO_NOTHING                 255
+
 #define PHASE_SWITCHING_AUTOMATIC       0
 #define PHASE_SWITCHING_ALWAYS_1PHASE   1
 #define PHASE_SWITCHING_ALWAYS_3PHASE   2
@@ -58,9 +64,8 @@
 #define INPUT_CONFIG_DISABLED           0
 #define INPUT_CONFIG_CONTACTOR_CHECK    1
 #define INPUT_CONFIG_BLOCK_CHARGING     2
-#define INPUT_CONFIG_EXCESS_CHARGING    3
-#define INPUT_CONFIG_LIMIT_MAX_CURRENT  4
-#define INPUT_CONFIG_OVERRIDE_GRID_DRAW 5
+#define INPUT_CONFIG_LIMIT_MAX_CURRENT  3
+#define INPUT_CONFIG_SWITCH_MODE        4
 
 #define INPUT_CONFIG_WHEN_HIGH          0
 #define INPUT_CONFIG_WHEN_LOW           1
@@ -86,6 +91,17 @@ typedef struct {
     uint16_t voltage;
     uint8_t contactor_check_state;
 } EnergyManagerAllData;
+
+struct sdcard_info {
+    uint32_t sd_status;
+    uint32_t lfs_status;
+    uint32_t card_type;
+    uint32_t sector_count;
+    uint16_t sector_size;
+    uint8_t  manufacturer_id;
+    uint8_t  product_rev;
+    char     product_name[6];
+} __attribute__((packed));
 
 enum class SwitchingState
 {
@@ -117,6 +133,7 @@ public:
     void limit_max_current(uint32_t limit_ma);
     void override_grid_draw(int32_t limit_w);
     void override_guaranteed_power(uint32_t power_w);
+    void switch_mode(uint32_t new_mode);
 
     void setup_energy_manager();
     String get_energy_manager_debug_header();
@@ -124,15 +141,18 @@ public:
 
     void apply_defaults();
 
+    void get_sdcard_info(struct sdcard_info *data);
+    bool format_sdcard();
     uint16_t get_energy_meter_detailed_values(float *ret_values);
     void set_output(bool output);
-
 
     bool debug = false;
 
     ConfigRoot energy_manager_state;
     ConfigRoot energy_manager_config;
     ConfigRoot energy_manager_config_in_use;
+    ConfigRoot energy_manager_runtime_config;
+    ConfigRoot energy_manager_runtime_config_update;
 
     EnergyManagerAllData all_data;
 
@@ -148,40 +168,50 @@ public:
     int32_t  power_at_meter_w;
 
 private:
+    void check_bricklet_reachable(int rc);
     void update_all_data_struct();
     void update_io();
     void update_energy();
 
     void set_available_current(uint32_t current);
 
+    void check_debug();
+    String prepare_fmtstr();
+
     OutputRelay *output;
     InputPin *input3;
     InputPin *input4;
 
+    unsigned long last_debug_check;
     bool     uptime_past_hysteresis;
+    uint32_t consecutive_bricklet_errors;
+    bool     bricklet_reachable;
     SwitchingState switching_state;
     uint32_t switching_start;
+    uint32_t mode;
     uint8_t  have_phases;
     bool     wants_3phase;
     bool     wants_3phase_last;
     bool     is_on_last;
     bool     just_switched_phases;
+    bool     just_switched_mode;
     uint32_t phase_state_change_blocked_until;
     uint32_t on_state_change_blocked_until;
     uint32_t charge_manager_allocated_current_ma;
     uint32_t guaranteed_power_w;
     uint32_t max_current_limited_ma;
     int32_t  target_power_from_grid_w;
+    int32_t  power_available_w;
 
     // Config cache
     int32_t  target_power_from_grid_conf_w;
     uint32_t guaranteed_power_conf_w;
-    uint32_t max_current_unlimited_ma;
-    uint32_t min_current_ma;
     bool     contactor_installed;
     uint8_t  phase_switching_mode;
     uint32_t switching_hysteresis_ms;
     bool     hysteresis_wear_ok;
+    uint32_t max_current_unlimited_ma;
+    uint32_t min_current_ma;
 
     // Pre-calculated limits
     int32_t  overall_min_power_w;

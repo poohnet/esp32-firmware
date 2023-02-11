@@ -98,6 +98,9 @@ function build_chart_options(chart_extra: ChartExtra, chart_container_id: string
         elements: {
             point: {
                 pointStyle: false,
+            },
+            line: {
+                borderWidth: 2,
             }
         },
         plugins: {
@@ -148,6 +151,7 @@ function build_chart_options(chart_extra: ChartExtra, chart_container_id: string
                 },
                 ticks: {
                     autoSkipPadding: 10,
+                    stepSize: 1,
                 }
             }
         }

@@ -24,19 +24,24 @@
 #include "modules.h"
 #include "tools.h"
 
-InputPin::InputPin(uint32_t num_name, uint32_t num_logic, const ConfigRoot &conf)
+InputPin::InputPin(uint32_t num_name, uint32_t num_logic, const ConfigRoot &conf, bool level_init)
 {
-    String pin_func_str     = String("input") + num_name + "_config";
-    String pin_limit_str    = String("input") + num_name + "_config_limit";
-    String pin_when_str     = String("input") + num_name + "_config_when";
-    uint32_t pin_conf_func  = conf.get(pin_func_str )->asUint();
-    int32_t  pin_conf_limit = conf.get(pin_limit_str)->asInt();
-    uint32_t pin_conf_when  = conf.get(pin_when_str)->asUint();
+    String pin_func_str            = String("input") + num_name + "_config";
+    String pin_limit_str           = String("input") + num_name + "_config_limit";
+    String pin_when_str            = String("input") + num_name + "_config_when";
+    String pin_rising_mode_str     = String("input") + num_name + "_config_rising_mode";
+    String pin_falling_mode_str    = String("input") + num_name + "_config_falling_mode";
+    uint32_t pin_conf_func         = conf.get(pin_func_str )->asUint();
+    uint32_t pin_conf_limit_ma     = conf.get(pin_limit_str)->asUint() * 1000;
+    uint32_t pin_conf_when         = conf.get(pin_when_str)->asUint();
+    uint32_t pin_conf_rising_mode  = conf.get(pin_rising_mode_str)->asUint();
+    uint32_t pin_conf_falling_mode = conf.get(pin_falling_mode_str)->asUint();
 
     // Don't risk crashing on an invalid function pointer, so make sure that update_func is always set to something sensible.
     update_func = &InputPin::nop;
 
     invert_pin = pin_conf_when == INPUT_CONFIG_WHEN_LOW;
+    prev_level = level_init;
 
     switch(pin_conf_func) {
         case INPUT_CONFIG_BLOCK_CHARGING:
@@ -47,17 +52,14 @@ InputPin::InputPin(uint32_t num_name, uint32_t num_logic, const ConfigRoot &conf
                 out_dst = &(energy_manager.charging_blocked.pin[num_logic]);
             }
             break;
-        case INPUT_CONFIG_EXCESS_CHARGING:
-            update_func = &InputPin::switch_excess_charging;
-            out_dst = &(energy_manager.excess_charging_enable);
-            break;
         case INPUT_CONFIG_LIMIT_MAX_CURRENT:
             update_func = &InputPin::limit_max_current;
-            limit = pin_conf_limit >= 0 ? pin_conf_limit : 0;
+            limit_ma = pin_conf_limit_ma;
             break;
-        case INPUT_CONFIG_OVERRIDE_GRID_DRAW:
-            update_func = &InputPin::override_grid_draw;
-            limit = pin_conf_limit;
+        case INPUT_CONFIG_SWITCH_MODE:
+            update_func = &InputPin::switch_mode;
+            rising_mode  = pin_conf_rising_mode;
+            falling_mode = pin_conf_falling_mode;
             break;
         default:
             logger.printfln("energy_manager/InputPin: Unknown INPUT_CONFIG type %u for input %u", pin_conf_func, num_name);
@@ -73,6 +75,7 @@ InputPin::InputPin(uint32_t num_name, uint32_t num_logic, const ConfigRoot &conf
 void InputPin::update(bool level)
 {
     (this->*update_func)(level);
+    prev_level = level;
 }
 
 void InputPin::nop(bool level)
@@ -85,6 +88,7 @@ void InputPin::block_charging(bool level)
     *(uint8_t*)out_dst = level ^ invert_pin;
 }
 
+// TODO remove?
 void InputPin::switch_excess_charging(bool level)
 {
     *(bool*)out_dst = level ^ invert_pin;
@@ -93,11 +97,21 @@ void InputPin::switch_excess_charging(bool level)
 void InputPin::limit_max_current(bool level)
 {
     if (level ^ invert_pin)
-        energy_manager.limit_max_current((uint32_t)limit);
+        energy_manager.limit_max_current((uint32_t)limit_ma);
 }
 
+// TODO remove?
 void InputPin::override_grid_draw(bool level)
 {
     if (level ^ invert_pin)
-        energy_manager.override_grid_draw(limit);
+        energy_manager.override_grid_draw(limit_ma);
+}
+
+void InputPin::switch_mode(bool level)
+{
+    // Only detect edges, do nothing if there's no change.
+    if (level == prev_level)
+        return;
+
+    energy_manager.switch_mode(level ? rising_mode : falling_mode);
 }

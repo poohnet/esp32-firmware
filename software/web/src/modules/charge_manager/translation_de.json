@@ -24,11 +24,11 @@
             "verbose_desc": "Erzeugt Einträge im Ereignis-Log, wenn Strom umverteilt wird",
             "default_available_current": "Voreingestellt verfügbarer Strom",
             "default_available_current_muted": "wird nach Neustart des Lastmanagers verwendet",
-            "default_available_current_invalid": "Der voreingestellt verfügbare Strom darf maximal so groß sein wie der maximale verfügbare Strom!",
-            "maximum_available_current": "Maximal verfügbarer Strom",
-            "maximum_available_current_muted": "verfügbarer Strom kann über Webinterface und API nur bis zu diesem Wert eingestellt werden",
+            "default_available_current_invalid": "Der voreingestellt verfügbare Strom darf höchstens so groß sein wie der maximale Gesamtstrom.",
+            "maximum_available_current": "Maximaler Gesamtstrom",
+            "maximum_available_current_muted": "Maximal zulässiger Ladestrom aller Wallboxen in Summe. Dies ist üblicherweise die Nennbelastbarkeit der gemeinsamen Zuleitung.",
             "minimum_current": "Minimaler Ladestrom",
-            "minimum_current_muted": "muss mindestens verfügbar sein, damit ein Ladevorgang beginnt",
+            "minimum_current_muted": "geringster Ladestrom, der von deinem Fahrzeug unterstützt wird",
 
             "configuration_mode": "Experteneinstellungen",
             "configuration_mode_muted": "",
@@ -39,6 +39,12 @@
             "add_charger_modal_abort": "Verwerfen",
             "add_charger_modal_save": "Hinzufügen",
             "add_charger_modal_found": "Gefundene Wallboxen",
+
+            "multi_broadcast_modal_title": "Reservierte/Gefährliche IP-Adresse(n) gefunden",
+            "multi_broadcast_modal_body": "Folgende reservierte oder potenziell gefährliche IP-Adressen wurden gefunden: ",
+            "multi_broadcast_modal_body_end": "Sind sie sicher, dass sie die Einstellungen übernehmen wollen?",
+            "multi_broadcast_modal_save": "Übernehmen",
+            "multi_broadcast_modal_cancel": "Abbrechen",
 
             "scan_error_1": "Firmwareversion inkompatibel",
             "scan_error_2": "Lastmanagement deaktiviert",

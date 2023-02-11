@@ -12,12 +12,11 @@ export interface state {
 }
 
 export interface config {
+    default_mode: number,
     excess_charging_enable: boolean,
     contactor_installed: boolean,
     phase_switching_mode: number,
     target_power_from_grid: number,
-    maximum_available_current: number,
-    minimum_current: number,
     guaranteed_power: number,
     hysteresis_time: number,
     hysteresis_wear_accepted: boolean,
@@ -27,9 +26,17 @@ export interface config {
     input3_config: number,
     input3_config_limit: number,
     input3_config_when: number,
+    input3_config_rising_mode: number,
+    input3_config_falling_mode: number,
     input4_config: number,
     input4_config_limit: number,
-    input4_config_when: number
+    input4_config_when: number,
+    input4_config_rising_mode: number,
+    input4_config_falling_mode: number
+}
+
+export interface runtime_config {
+    mode: number
 }
 
 export type debug_header = string;

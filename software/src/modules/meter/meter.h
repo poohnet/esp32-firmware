@@ -36,9 +36,13 @@
 
 // Supported by energy_manager module
 #define METER_TYPE_SDM72CTM 4
+#define METER_TYPE_SDM630MCTV2 5
 
 // Supported by mqtt_meter module
 #define METER_TYPE_MQTT 200
+
+// Supported by https://github.com/warp-more-hardware
+#define METER_TYPE_INTERNAL 254
 
 // Supported by modbus_meter module
 #define METER_TYPE_AUTO_DETECT 255

@@ -25,6 +25,7 @@
 #include "tools.h"
 #include "hal_arduino_esp32_ethernet_brick/hal_arduino_esp32_ethernet_brick.h"
 #include "event_log.h"
+#include "modules.h"
 #include "task_scheduler.h"
 
 #if TF_LOCAL_ENABLE != 0
@@ -56,6 +57,12 @@ static TF_Local local;
 
 #endif
 
+#if MODULE_DEBUG_AVAILABLE()
+#define RESET_WAIT_SECS 2
+#else
+#define RESET_WAIT_SECS 8
+#endif
+
 __attribute((unused))
 static void check_for_factory_reset() {
     // A factory reset will leave the green LED on, even across a restart. Switch it off here.
@@ -80,21 +87,21 @@ static void check_for_factory_reset() {
 
     bool blue_led_off = false;
     if (!seen_ethernet_clock) {
-        // Flash LED for 4 seconds while waiting for button press.
+        // Flash LED for 8 seconds while waiting for button press.
         bool button_pressed = false;
-        for (uint32_t i = 0; i < 40; i++) {
+        for (uint32_t i = 0; i < (RESET_WAIT_SECS*10); i++) {
             digitalWrite(blue_led_pin, i % 4 == 0 ? false : true);
-            delay(100); // 40 * 100ms = 4s
+            delay(100); // 8 * 10 * 100ms = 8s
             if (!digitalRead(BUTTON)) {
                 button_pressed = true;
                 break;
             }
         }
-        // Blink LED quickly while the button has to stay pressed for almost 10 seconds.
+        // Blink LED quickly while the button has to stay pressed for almost 8 seconds.
         if (button_pressed) {
-            for (uint32_t i = 0; i < 128; i++) {
+            for (uint32_t i = 0; i < 100; i++) {
                 digitalWrite(blue_led_pin, i % 2);
-                delay(75); // 128 * 75ms = 9.6s
+                delay(75); // 100 * 75ms = 7.5s
                 if (digitalRead(BUTTON)) {
                     button_pressed = false;
                     break;

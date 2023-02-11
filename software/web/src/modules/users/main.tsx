@@ -39,6 +39,7 @@ import { Switch } from "src/ts/components/switch";
 import { InputPassword } from "src/ts/components/input_password";
 import { Slash, User, UserPlus, UserX } from "react-feather";
 import { EVSE_SLOT_USER } from "../evse_common/api";
+import { ItemModal } from "src/ts/components/item_modal";
 
 const MAX_ACTIVE_USERS = 16;
 
@@ -384,11 +385,17 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
                     </FormRow>
                 </ConfigForm>
 
-                <Modal show={state.showModal} onHide={() => this.setState({showModal: false})} centered>
-                    <Modal.Header closeButton>
-                        <label class="modal-title form-label">{__("users.content.add_user_modal_title")}</label>
-                    </Modal.Header>
-                    <Modal.Body>
+                <ItemModal show={state.showModal}
+                    onHide={() => this.setState({showModal: false})}
+                    onSubmit={() => {this.setState({showModal: false,
+                        users: state.users.concat({...state.newUser, id: -1, roles: 0xFFFF}),
+                        newUser: {id: -1, roles: 0xFFFF, username: "", display_name: "", current: 32000, digest_hash: "", password: "", is_invalid: 0}});
+                        this.hackToAllowSave();}}
+                    title={__("users.content.add_user_modal_title")}
+                    no_variant={"secondary"}
+                    yes_variant={"primary"}
+                    no_text={__("users.content.add_user_modal_abort")}
+                    yes_text={__("users.content.add_user_modal_save")}>
                         <FormGroup label={__("users.content.add_user_modal_username")}>
                             <InputText
                                 value={state.newUser.username}
@@ -426,20 +433,7 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
                                 placeholder={__("users.content.add_user_modal_password_desc")}
                                 />
                         </FormGroup>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => this.setState({showModal: false})}>
-                            {__("users.content.add_user_modal_abort")}
-                        </Button>
-                        <Button variant="primary"
-                                onClick={() => {this.setState({showModal: false,
-                                                               users: state.users.concat({...state.newUser, id: -1, roles: 0xFFFF}),
-                                                               newUser: {id: -1, roles: 0xFFFF, username: "", display_name: "", current: 32000, digest_hash: "", password: "", is_invalid: 0}});
-                                                this.hackToAllowSave();}}>
-                            {__("users.content.add_user_modal_save")}
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
+                </ItemModal>
             </>
         )
     }
@@ -459,7 +453,7 @@ export function getAllUsernames() {
                 return [null, null];
             }
 
-            const decoder = new TextDecoder();
+            const decoder = new TextDecoder("utf-8");
             for(let i = 0; i < 256; ++i) {
                 let view = new DataView(buffer, i * 64, 32);
                 let username = decoder.decode(view).replace(/\0/g, "");
