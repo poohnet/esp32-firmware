@@ -28,6 +28,7 @@
 #include "web_server.h"
 #include "modules.h"
 
+extern uint32_t local_uid_num;
 extern bool firmware_update_allowed;
 
 #define SLOT_ACTIVE(x) ((bool)(x & 0x01))
@@ -517,7 +518,7 @@ uint16_t EVSE::get_ocpp_current()
 void EVSE::check_debug()
 {
     task_scheduler.scheduleOnce([this](){
-        if (millis() - last_debug_check > 60000 && debug == true)
+        if (deadline_elapsed(last_debug_check + 60000) && debug == true)
         {
             logger.printfln("Debug log creation canceled because no continue call was received for more than 60 seconds.");
             debug = false;
@@ -550,6 +551,7 @@ void EVSE::register_urls()
         }
 
         cm_networking.send_client_update(
+            local_uid_num,
             evse_state.get("iec61851_state")->asUint(),
             evse_state.get("charger_state")->asUint(),
             evse_state.get("error_state")->asUint(),
@@ -1063,7 +1065,7 @@ void EVSE::update_all_data()
         evse_user_calibration.get("resistance_880")->get(i)->updateInt(resistance_880[i]);
 
 #if MODULE_WATCHDOG_AVAILABLE()
-    static size_t watchdog_handle = watchdog.add("evse_all_data", "EVSE not reachable", 10 * 60 * 1000);
+    static size_t watchdog_handle = watchdog.add("evse_all_data", "EVSE not reachable");
     watchdog.reset(watchdog_handle);
 #endif
 }

@@ -212,6 +212,7 @@ static esp_err_t ws_handler(httpd_req_t *req)
     } else if (ws_pkt.type == HTTPD_WS_TYPE_TEXT) {
         // If it was a TEXT message, print it
         logger.printfln("Ignoring received packet with message: \"%s\" (web sockets are unidirectional for now)", ws_pkt.payload);
+        // FIXME: input handling
     } else if (ws_pkt.type == HTTPD_WS_TYPE_CLOSE) {
         // If it was a CLOSE, remove it from the keep-alive list
         WebSockets *ws = (WebSockets *)req->user_ctx;
@@ -545,8 +546,7 @@ void WebSockets::start(const char *uri)
     task_scheduler.scheduleOnce([this]() {
         watchdog_handle = watchdog.add(
             "websocket_worker",
-            "Websocket worker was not able to start for five minutes. The control socket is probably dead.",
-            5 * 60 * 1000);
+            "Websocket worker was not able to start for five minutes. The control socket is probably dead.");
     }, WORKER_START_ERROR_MIN_UPTIME_FOR_REBOOT);
 #endif
 

@@ -1,7 +1,7 @@
 {
     "em_sdcard": {
         "navbar": {
-            "em_sdcard": "EM SD card"
+            "em_sdcard": "SD card"
         },
         "content": {
             "header": "Energy Manager SD card",
@@ -24,7 +24,7 @@
             "formatting": "Formatting...",
 
             "bytes": "bytes",
-            "error_no_card": "No SD card detected"
+            "error_no_card": "No SD card inserted"
         },
         "script": {
             "sdcard_format_error": "Formatting SD card failed"

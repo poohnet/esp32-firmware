@@ -32,6 +32,7 @@ void EnergyManager::pre_setup()
 {
     // States
     energy_manager_state = Config::Object({
+        {"error_flags", Config::Uint32(0)},
         {"contactor", Config::Bool(false)},
         {"led_rgb", Config::Array({Config::Uint8(0), Config::Uint8(0), Config::Uint8(0)},
             new Config{Config::Uint8(0)}, 3, 3, Config::type_id<Config::ConfUint>())
@@ -48,12 +49,13 @@ void EnergyManager::pre_setup()
         {"energy_meter_energy_export", Config::Float(0)}, // kWh
         // Derived states
         {"phases_switched", Config::Uint8(0)},
-        {"contactor_check_tripped", Config::Bool(false)},
     });
 
     // Config
     energy_manager_config = ConfigRoot(Config::Object({
         {"default_mode", Config::Uint(0, 0, 3)},
+        {"auto_reset_mode", Config::Bool(false)},
+        {"auto_reset_time", Config::Uint(0, 0, 1439)},
         {"excess_charging_enable", Config::Bool(false)},
         {"contactor_installed", Config::Bool(false)},
         {"phase_switching_mode", Config::Uint8(PHASE_SWITCHING_AUTOMATIC)},
@@ -100,8 +102,6 @@ void EnergyManager::pre_setup()
         {"mode", Config::Uint(0, 0, 3)},
     });
     energy_manager_runtime_config_update = energy_manager_runtime_config;
-
-    switching_state = SwitchingState::Monitoring;
 }
 
 void EnergyManager::apply_defaults()
@@ -127,7 +127,7 @@ void EnergyManager::setup_energy_manager()
 void EnergyManager::check_debug()
 {
     task_scheduler.scheduleOnce([this](){
-        if (millis() - last_debug_check > 60000 && debug == true)
+        if (deadline_elapsed(last_debug_check + 60000)  && debug == true)
         {
             logger.printfln("Debug log creation canceled because no continue call was received for more than 60 seconds.");
             debug = false;
@@ -152,9 +152,6 @@ void EnergyManager::setup()
         return;
     }
 
-    mode = energy_manager_config_in_use.get("default_mode")->asUint();
-    energy_manager_runtime_config.get("mode")->updateUint(mode);
-
 #if MODULE_CHARGE_MANAGER_AVAILABLE()
     charge_manager.set_allocated_current_callback([this](uint32_t current_ma){
         //logger.printfln("energy_manager: allocated current callback: %u", current_ma);
@@ -164,21 +161,31 @@ void EnergyManager::setup()
 
     update_all_data();
 
+    rgb_led.setup();
+
     // Set up output relay and input pins
     output = new OutputRelay(energy_manager_config_in_use);
     input3 = new InputPin(3, 0, energy_manager_config_in_use, all_data.input[0]);
     input4 = new InputPin(4, 1, energy_manager_config_in_use, all_data.input[1]);
 
     // Cache config for energy update
-    excess_charging_enable          = energy_manager_config_in_use.get("excess_charging_enable")->asBool();
-    target_power_from_grid_conf_w   = energy_manager_config_in_use.get("target_power_from_grid")->asInt();          // watt
-    guaranteed_power_conf_w         = energy_manager_config_in_use.get("guaranteed_power")->asUint();               // watt
-    contactor_installed             = energy_manager_config_in_use.get("contactor_installed")->asBool();
-    phase_switching_mode            = energy_manager_config_in_use.get("phase_switching_mode")->asUint();
-    switching_hysteresis_ms         = energy_manager_config_in_use.get("hysteresis_time")->asUint() * 60 * 1000;    // milliseconds (from minutes)
-    hysteresis_wear_ok              = energy_manager_config_in_use.get("hysteresis_wear_accepted")->asBool();
-    max_current_unlimited_ma        = charge_manager.charge_manager_config_in_use.get("maximum_available_current")->asUint();      // milliampere
-    min_current_ma                  = charge_manager.charge_manager_config_in_use.get("minimum_current")->asUint();                // milliampere
+    default_mode                = energy_manager_config_in_use.get("default_mode")->asUint();
+    excess_charging_enable      = energy_manager_config_in_use.get("excess_charging_enable")->asBool();
+    target_power_from_grid_w    = energy_manager_config_in_use.get("target_power_from_grid")->asInt();          // watt
+    guaranteed_power_w          = energy_manager_config_in_use.get("guaranteed_power")->asUint();               // watt
+    contactor_installed         = energy_manager_config_in_use.get("contactor_installed")->asBool();
+    phase_switching_mode        = energy_manager_config_in_use.get("phase_switching_mode")->asUint();
+    switching_hysteresis_ms     = energy_manager_config_in_use.get("hysteresis_time")->asUint() * 60 * 1000;    // milliseconds (from minutes)
+    hysteresis_wear_ok          = energy_manager_config_in_use.get("hysteresis_wear_accepted")->asBool();
+    max_current_unlimited_ma    = charge_manager.charge_manager_config_in_use.get("maximum_available_current")->asUint();      // milliampere
+    min_current_ma              = charge_manager.charge_manager_config_in_use.get("minimum_current")->asUint();                // milliampere
+
+    uint32_t auto_reset_time    = energy_manager_config_in_use.get("auto_reset_time")->asUint();
+    auto_reset_hour   = auto_reset_time / 60;
+    auto_reset_minute = auto_reset_time % 60;
+
+    mode = default_mode;
+    energy_manager_runtime_config.get("mode")->updateUint(mode);
 
     // If the user accepts the additional wear, the minimum hysteresis time is 10s. Less than that will cause the control algorithm to oscillate.
     uint32_t hysteresis_min_ms = hysteresis_wear_ok ? 10 * 1000 : HYSTERESIS_MIN_TIME_MINUTES * 60 * 1000;  // milliseconds
@@ -213,8 +220,6 @@ void EnergyManager::setup()
     // Initialize contactor check state so that the check doesn't trip immediately if the first response from the bricklet is invalid.
     all_data.contactor_check_state = 1;
 
-    bricklet_reachable = true;
-
     task_scheduler.scheduleWithFixedDelay([this](){
         this->update_all_data();
     }, 0, 250);
@@ -246,6 +251,9 @@ void EnergyManager::setup()
     task_scheduler.scheduleOnce([this](){
         uptime_past_hysteresis = true;
     }, switching_hysteresis_ms);
+
+    if (energy_manager_config_in_use.get("auto_reset_mode")->asBool())
+        start_auto_reset_task();
 }
 
 void EnergyManager::register_urls()
@@ -316,8 +324,6 @@ void EnergyManager::loop()
 
 void EnergyManager::update_all_data()
 {
-    uint32_t time = micros();
-
     update_all_data_struct();
 
     energy_manager_state.get("contactor")->updateBool(all_data.contactor_value);
@@ -348,17 +354,8 @@ void EnergyManager::update_all_data()
         if ((all_data.contactor_check_state & 1) == 0) {
             logger.printfln("Contactor check tripped. Check contactor.");
             contactor_check_tripped = true;
-            energy_manager_state.get("contactor_check_tripped")->updateBool(true);
-        } else if (contactor_check_tripped) {
-            logger.printfln("Contactor check tripped in the past but reports ok now. Check contactor and reboot Energy Manager to clear.");
+            set_error(ERROR_FLAGS_CONTACTOR_MASK);
         }
-    }
-
-    static uint32_t time_max = 5000;
-    time = micros() - time;
-    if (time > time_max) {
-        time_max = time;
-        logger.printfln("energy_manager::update_all_data() took %uus", time_max);
     }
 }
 
@@ -382,14 +379,35 @@ void EnergyManager::update_all_data_struct()
     );
 
     check_bricklet_reachable(rc);
+}
 
-    // TODO Remove: Support reversed current clamps.
-    if (rc == TF_E_OK && em_meter_config.config.get("kulparga_mode")->asBool()) {
-        all_data.power *= -1;
-        float swap = all_data.energy_export;
-        all_data.energy_export = all_data.energy_import;
-        all_data.energy_import = swap;
-    }
+void EnergyManager::update_status_led()
+{
+    if (error_flags & ERROR_FLAGS_ALL_ERRORS_MASK)
+        rgb_led.set_status(EmRgbLed::Status::Error);
+    else if (error_flags & ERROR_FLAGS_ALL_WARNINGS_MASK)
+        rgb_led.set_status(EmRgbLed::Status::Warning);
+    else
+        rgb_led.set_status(EmRgbLed::Status::OK);
+}
+
+void EnergyManager::clr_error(uint32_t error_mask)
+{
+    error_flags &= ~error_mask;
+    energy_manager_state.get("error_flags")->updateUint(error_flags);
+    update_status_led();
+}
+
+bool EnergyManager::is_error(uint32_t error_bit_pos)
+{
+    return (error_flags >> error_bit_pos) & 1;
+}
+
+void EnergyManager::set_error(uint32_t error_mask)
+{
+    error_flags |= error_mask;
+    energy_manager_state.get("error_flags")->updateUint(error_flags);
+    update_status_led();
 }
 
 void EnergyManager::check_bricklet_reachable(int rc) {
@@ -397,6 +415,7 @@ void EnergyManager::check_bricklet_reachable(int rc) {
         consecutive_bricklet_errors = 0;
         if (!bricklet_reachable) {
             bricklet_reachable = true;
+            clr_error(ERROR_FLAGS_BRICKLET_MASK);
             logger.printfln("energy_manager: Bricklet is reachable again.");
         }
     } else {
@@ -407,6 +426,7 @@ void EnergyManager::check_bricklet_reachable(int rc) {
         }
         if (bricklet_reachable && ++consecutive_bricklet_errors >= 8) {
             bricklet_reachable = false;
+            set_error(ERROR_FLAGS_BRICKLET_MASK);
             logger.printfln("energy_manager: Bricklet is unreachable.");
         }
     }
@@ -414,8 +434,6 @@ void EnergyManager::check_bricklet_reachable(int rc) {
 
 void EnergyManager::update_io()
 {
-    uint32_t time = micros();
-
     output->update();
 
     // Oversampling inputs is currently not used because all of the implemented input pin functions require update_energy() to run anyway.
@@ -428,34 +446,36 @@ void EnergyManager::update_io()
 
     // Restore values that can be changed by input pins.
     max_current_limited_ma      = max_current_unlimited_ma;
-    target_power_from_grid_w    = target_power_from_grid_conf_w;
-    guaranteed_power_w          = guaranteed_power_conf_w;
 
     input3->update(all_data.input[0]);
     input4->update(all_data.input[1]);
+}
 
-    static uint32_t time_max = 2000;
-    time = micros() - time;
-    if (time > time_max) {
-        time_max = time;
-        logger.printfln("energy_manager::update_io() took %uus", time_max);
-    }
+void EnergyManager::start_auto_reset_task()
+{
+#if MODULE_NTP_AVAILABLE()
+    task_scheduler.scheduleOnce([this](){
+        if (ntp.state.get("synced")->asBool())
+            schedule_auto_reset_task();
+        else
+            start_auto_reset_task();
+    }, 30 * 1000);
+#endif
+}
+
+void EnergyManager::schedule_auto_reset_task()
+{
+    uint32_t delay_ms = ms_until_time(auto_reset_hour, auto_reset_minute);
+    task_scheduler.scheduleOnce([this](){
+        switch_mode(default_mode);
+        schedule_auto_reset_task();
+    }, delay_ms);
 }
 
 void EnergyManager::limit_max_current(uint32_t limit_ma)
 {
     if (max_current_limited_ma > limit_ma)
         max_current_limited_ma = limit_ma;
-}
-
-void EnergyManager::override_grid_draw(int32_t limit_w)
-{
-    target_power_from_grid_w = limit_w;
-}
-
-void EnergyManager::override_guaranteed_power(uint32_t power_w)
-{
-    guaranteed_power_w = power_w;
 }
 
 void EnergyManager::switch_mode(uint32_t new_mode)
@@ -478,8 +498,6 @@ void EnergyManager::update_energy()
 #if !MODULE_CHARGE_MANAGER_AVAILABLE()
     logger.printfln("energy_manager: Module 'Charge Manager' not available. update_energy() does nothing.");
 #else
-    uint32_t time = micros();
-
     static SwitchingState prev_state = switching_state;
     if (switching_state != prev_state) {
         logger.printfln("energy_manager: now in state %d", (int)switching_state);
@@ -521,6 +539,20 @@ void EnergyManager::update_energy()
         // TODO Evil: Allow runtime changes, overrides input pins!
         target_power_from_grid_w    = energy_manager_config.get("target_power_from_grid")->asInt(); // watt
 
+        int32_t p_error_w;
+        if (!excess_charging_enable) {
+            p_error_w = 0;
+        } else {
+            p_error_w = target_power_from_grid_w - power_at_meter_w;
+
+            if (p_error_w > 200)
+                rgb_led.update_grid_balance(EmRgbLed::GridBalance::Export);
+            else if (p_error_w < -200)
+                rgb_led.update_grid_balance(EmRgbLed::GridBalance::Import);
+            else
+                rgb_led.update_grid_balance(EmRgbLed::GridBalance::Balanced);
+        }
+
         switch (mode) {
             case MODE_FAST:
                 power_available_w = 230 * 3 * max_current_limited_ma / 1000;
@@ -532,8 +564,6 @@ void EnergyManager::update_energy()
             case MODE_PV:
             case MODE_MIN_PV:
                 // Excess charging enabled; use a simple P controller to adjust available power.
-                int32_t p_error_w = target_power_from_grid_w - power_at_meter_w;
-
                 int32_t p_adjust_w;
                 if (!is_on) {
                     // When the power is not on, use p=1 so that the switch-on threshold can be reached properly.
@@ -683,15 +713,6 @@ void EnergyManager::update_energy()
             just_switched_phases = false;
             just_switched_mode = false;
         }
-
-        const uint32_t print_every = 8;
-        if (print_every > 0) {
-            static uint32_t last_print = 0;
-            last_print = (last_print + 1) % print_every;
-            if (last_print == 0)
-                logger.printfln("mode %u | power_at_meter_w %i | target_power_from_grid_w %i | power_available_w %i | wants_3phase %i | is_3phase %i | is_on %i | max_current_limited_ma %u | cm avail ma %u | cm alloc ma %u",
-                    mode, power_at_meter_w, target_power_from_grid_w, power_available_w, wants_3phase, is_3phase, is_on, max_current_limited_ma, charge_manager.charge_manager_available_current.get("current")->asUint(), charge_manager_allocated_current_ma);
-        }
     } else if (switching_state == SwitchingState::Stopping) {
         set_available_current(0);
 
@@ -721,20 +742,11 @@ void EnergyManager::update_energy()
 
         just_switched_phases = true;
     }
-
-    static uint32_t time_max = 20000;
-    time = micros() - time;
-    if (time > time_max) {
-        time_max = time;
-        logger.printfln("energy_manager::update_energy() took %uus", time_max);
-    }
 #endif
 }
 
-void EnergyManager::get_sdcard_info(struct sdcard_info *data)
+bool EnergyManager::get_sdcard_info(struct sdcard_info *data)
 {
-    uint32_t time = micros();
-
     int rc = tf_warp_energy_manager_get_sd_information(
         &device,
         &data->sd_status,
@@ -746,18 +758,19 @@ void EnergyManager::get_sdcard_info(struct sdcard_info *data)
         data->product_name,
         &data->manufacturer_id
     );
-    
+
     check_bricklet_reachable(rc);
 
-    if (rc != TF_E_OK)
-        logger.printfln("energy_manager: Failed to get SD card information.");
-
-    static uint32_t time_max = 1000;
-    time = micros() - time;
-    if (time > time_max) {
-        time_max = time;
-        logger.printfln("energy_manager::get_sdcard_info() took %uus", time_max);
+    if (rc != TF_E_OK) {
+        set_error(ERROR_FLAGS_SDCARD_MASK);
+        logger.printfln("energy_manager: Failed to get SD card information. Error %i", rc);
+        return false;
     }
+
+    if (is_error(ERROR_FLAGS_SDCARD_BIT_POS))
+        clr_error(ERROR_FLAGS_SDCARD_MASK);
+
+    return true;
 }
 
 bool EnergyManager::format_sdcard()
@@ -772,38 +785,30 @@ bool EnergyManager::format_sdcard()
 
 uint16_t EnergyManager::get_energy_meter_detailed_values(float *ret_values)
 {
-    uint32_t time = micros();
-
     uint16_t len = 0;
-    uint16_t ret;
     int rc = tf_warp_energy_manager_get_energy_meter_detailed_values(&device, ret_values, &len);
 
     check_bricklet_reachable(rc);
 
-    if (rc == TF_E_OK) {
-        // TODO Remove: Support reversed current clamps.
-        if (em_meter_config.config.get("kulparga_mode")->asBool()) {
-            for (int i = 0; i < len; i++)
-                ret_values[i] *= -1;
-        }
-        ret = len;
-    } else {
-        ret = 0;
-    }
-
-    static uint32_t time_max = 8000;
-    time = micros() - time;
-    if (time > time_max) {
-        time_max = time;
-        logger.printfln("energy_manager::get_energy_meter_detailed_values() took %uus", time_max);
-    }
-
-    return ret;
+    return rc == TF_E_OK ? len : 0;
 }
 
 void EnergyManager::set_output(bool output)
 {
     int result = tf_warp_energy_manager_set_output(&device, output);
+
+    // Don't check if bricklet is reachable because the setter call won't tell us.
+
     if (result != TF_E_OK)
         logger.printfln("energy_manager: Failed to set output relay: error %i", result);
+}
+
+void EnergyManager::set_rgb_led(uint8_t r, uint8_t g, uint8_t b)
+{
+    int rc = tf_warp_energy_manager_set_rgb_value(&device, r, g, b);
+
+    // Don't check if bricklet is reachable because the setter call won't tell us.
+
+    if (rc != TF_E_OK)
+        logger.printfln("energy_manager: Failed to set RGB LED values: error %i. Continuing anyway.", rc);
 }

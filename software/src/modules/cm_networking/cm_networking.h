@@ -151,14 +151,15 @@ struct cm_state_v1 {
     Other bits must be sent unset and ignored on reception.
     */
     uint32_t feature_flags;
+    uint32_t esp32_uid;
     uint32_t evse_uptime;
     uint32_t charging_time;
     uint16_t allowed_charging_current;
     uint16_t supported_current;
-    
+
     uint8_t iec61851_state;
     uint8_t charger_state;
-    uint8_t error_state;    
+    uint8_t error_state;
     /* state_flags
     bit 7 - managed
     bit 6 - control_pilot_permanently_disconnected
@@ -179,7 +180,7 @@ struct cm_state_v1 {
 } __attribute__((packed));
 
 #define CM_STATE_V1_LENGTH (sizeof(cm_state_v1))
-static_assert(CM_STATE_V1_LENGTH == 68);
+static_assert(CM_STATE_V1_LENGTH == 72);
 
 struct cm_state_packet {
     cm_packet_header header;
@@ -187,7 +188,7 @@ struct cm_state_packet {
 } __attribute__((packed));
 
 #define CM_STATE_PACKET_LENGTH (sizeof(cm_state_packet))
-static_assert(CM_STATE_PACKET_LENGTH == 76);
+static_assert(CM_STATE_PACKET_LENGTH == 80);
 
 class CMNetworking
 {
@@ -220,7 +221,8 @@ public:
     bool send_manager_update(uint8_t client_id, uint16_t allocated_current, bool cp_disconnect_requested);
 
     void register_client(std::function<void(uint16_t, bool)> client_callback);
-    bool send_client_update(uint8_t iec61851_state,
+    bool send_client_update(uint32_t esp32_uid,
+                            uint8_t iec61851_state,
                             uint8_t charger_state,
                             uint8_t error_state,
                             uint32_t uptime,
@@ -235,12 +237,12 @@ public:
     void resolve_hostname(uint8_t charger_idx);
     bool is_resolved(uint8_t charger_idx);
 
-    String validate_packet_header(const struct cm_packet_header *header, ssize_t recv_length) const;
+    String validate_packet_header(const struct cm_packet_header *header, ssize_t recv_length, const uint8_t packet_length_versions[], const char *packet_type_name) const;
     String validate_command_packet_header(const struct cm_command_packet *pkt, ssize_t recv_length) const;
     String validate_state_packet_header(const struct cm_state_packet *pkt, ssize_t recv_length) const;
     bool seq_num_invalid(uint16_t received_sn, uint16_t last_seen_sn) const;
 
-    bool check_results();
+    void check_results();
 
     bool scanning = false;
 

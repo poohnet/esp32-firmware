@@ -24,8 +24,6 @@
 #include "api.h"
 #include "config.h"
 
-#define MAX_CONNECT_ATTEMPT_INTERVAL_MS (5 * 60 * 1000)
-
 enum class MqttConnectionState {
     NOT_CONFIGURED,
     NOT_CONNECTED,
@@ -63,6 +61,7 @@ public:
     void addCommand(size_t commandIdx, const CommandRegistration &reg) override;
     void addState(size_t stateIdx, const StateRegistration &reg) override;
     void addRawCommand(size_t rawCommandIdx, const RawCommandRegistration &reg) override;
+    void addResponse(size_t responseIdx, const ResponseRegistration &reg) override;
     bool pushStateUpdate(size_t stateIdx, const String &payload, const String &path) override;
     void pushRawStateUpdate(const String &payload, const String &path) override;
     void wifiAvailable() override;

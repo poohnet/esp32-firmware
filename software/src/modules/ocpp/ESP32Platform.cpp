@@ -750,7 +750,10 @@ void platform_set_charging_current(int32_t connectorId, uint32_t milliAmps)
 
 size_t platform_read_file(const char *name, char *buf, size_t len) {
     File f = LittleFS.open(PATH_PREFIX + name);
-    return f.read((uint8_t *)buf, len);
+    // File::read can return 2^32-1 because it returns -1 if the file is not open but the return type is size_t.
+    if (f.read((uint8_t *)buf, len) > len)
+        return 0;
+    return len;
 }
 bool platform_write_file(const char *name, char *buf, size_t len) {
     File f = LittleFS.open(PATH_PREFIX + name, "w", true);
@@ -776,7 +779,7 @@ OcppDirEnt *platform_read_dir(void *dir_fd) {
     File f;
     while (f = dir->openNextFile()) {
         dir_ent.is_dir = f.isDirectory();
-        strncpy(dir_ent.name, f.name(), ARRAY_SIZE(dir_ent.name));
+        strncpy(dir_ent.name, f.name(), ARRAY_SIZE(dir_ent.name) - 1);
         return &dir_ent;
     }
     return nullptr;

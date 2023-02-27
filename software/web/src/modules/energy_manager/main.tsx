@@ -30,25 +30,31 @@ import { Switch } from "src/ts/components/switch";
 import { InputSelect } from "src/ts/components/input_select";
 import { InputFloat } from "src/ts/components/input_float";
 import { InputNumber } from "src/ts/components/input_number";
+import { InputTime } from "src/ts/components/input_time";
 import { ConfigForm } from "src/ts/components/config_form";
 import { FormSeparator } from "src/ts/components/form_separator";
-import { Button, Collapse } from "react-bootstrap";
-import { CollapsedSection } from "src/ts/components/collapsed_section";
+import { Button, ButtonGroup, Collapse } from "react-bootstrap";
 
 type StringStringTuple = [string, string];
 
 interface EnergyManagerState {
-    state: API.getType['energy_manager/state'];
+    state: API.getType['energy_manager/state']
+    debug_mode: boolean
 }
 
-interface EnergyManagerAllConfig {
-    config: API.getType['energy_manager/config'];
-    runtime_config: API.getType['energy_manager/runtime_config'];
+interface EnergyManagerAllData {
+    state: API.getType['energy_manager/state']
+    config: API.getType['energy_manager/config']
+    runtime_config: API.getType['energy_manager/runtime_config']
 }
 
-export class EnergyManagerStatus extends Component<{}, EnergyManagerAllConfig> {
+export class EnergyManagerStatus extends Component<{}, EnergyManagerAllData> {
     constructor() {
         super();
+
+        util.eventTarget.addEventListener('energy_manager/state', () => {
+            this.setState({state: API.get('energy_manager/state')});
+        });
 
         util.eventTarget.addEventListener('energy_manager/config', () => {
             this.setState({config: API.get('energy_manager/config')});
@@ -63,40 +69,69 @@ export class EnergyManagerStatus extends Component<{}, EnergyManagerAllConfig> {
         API.save('energy_manager/runtime_config', {"mode": mode}, __("energy_manager.script.mode_change_failed"));
     }
 
-    render(props: {}, c: Readonly<EnergyManagerAllConfig>) {
-        if (!c || !c.config || !c.runtime_config)
+    render(props: {}, d: Readonly<EnergyManagerAllData>) {
+        if (!util.allow_render)
             return <></>;
 
+        let error_flags_ok        = d.state.error_flags == 0;
+        let error_flags_internal  = d.state.error_flags & 0xFF000000;
+        let error_flags_contactor = d.state.error_flags & 0x00010000;
+        let error_flags_network   = d.state.error_flags & 0x00000002;
+
         return <>
-            <FormRow label={__("energy_manager.status.mode")} labelColClasses="col-sm-4" contentColClasses="col-lg-8 col-xl-4">
+            <FormRow label={__("energy_manager.status.mode")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
                 <div class="input-group">
-                    {c.config.excess_charging_enable ? <>
+                    {d.config.excess_charging_enable ? <>
                         <Button
                             className="form-control mr-2 rounded-right"
-                            variant={c.runtime_config.mode == 2 ? "primary" : "secondary"}
+                            variant={d.runtime_config.mode == 2 ? "primary" : "secondary"}
                             onClick={() => this.change_mode(2)}>
                             {__("energy_manager.status.mode_pv")}
                         </Button>
                         <Button
                             className="form-control mr-2 rounded-left rounded-right"
-                            variant={c.runtime_config.mode == 3 ? "primary" : "secondary"}
+                            variant={d.runtime_config.mode == 3 ? "primary" : "secondary"}
                             onClick={() => this.change_mode(3)}>
                             {__("energy_manager.status.mode_min_pv")}
                         </Button>
                     </>: <></>}
                     <Button
                         className="form-control mr-2 rounded-left rounded-right"
-                        variant={c.runtime_config.mode == 0 ? "primary" : "secondary"}
+                        variant={d.runtime_config.mode == 0 ? "primary" : "secondary"}
                         onClick={() => this.change_mode(0)}>
                         {__("energy_manager.status.mode_fast")}
                     </Button>
                     <Button
                         className="form-control rounded-left"
-                        variant={c.runtime_config.mode == 1 ? "primary" : "secondary"}
+                        variant={d.runtime_config.mode == 1 ? "primary" : "secondary"}
                         onClick={() => this.change_mode(1)}>
                         {__("energy_manager.status.mode_off")}
                     </Button>
                 </div>
+            </FormRow>
+            <FormRow label={__("energy_manager.status.status")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
+                <ButtonGroup className="flex-wrap w-100">
+                    <Button disabled
+                        key="13"
+                        variant={(error_flags_ok ? "" : "outline-") + "success"}>
+                        {__("energy_manager.status.error_ok")}
+                    </Button>
+                    <Button disabled
+                        key="42"
+                        variant={(error_flags_network ? "" : "outline-") + "warning"}>
+                        {__("energy_manager.status.error_network")}
+                    </Button>
+                    <Button disabled
+                        key="99"
+                        variant={(error_flags_contactor ? "" : "outline-") + "danger"}>
+                        {__("energy_manager.status.error_contactor")}
+                    </Button>
+                    <Button disabled
+                        key="7"
+                        variant={(error_flags_internal ? "" : "outline-") + "danger"}>
+                        {__("energy_manager.status.error_internal")}
+                    </Button>
+                </ButtonGroup>
             </FormRow>
         </>
     }
@@ -113,11 +148,15 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
         util.eventTarget.addEventListener('energy_manager/state', () => {
             this.setState({state: API.get('energy_manager/state')});
         });
+
+        util.eventTarget.addEventListener('info/modules', () => {
+            this.setState({debug_mode: !!((API.get('info/modules') as any).debug)})
+        });
     }
 
     render(props: {}, s: Readonly<API.getType['energy_manager/config'] & EnergyManagerState>) {
-        if (!s || !s.state)
-            return <></>;
+        if (!util.allow_render)
+            return <></>
 
         let mode_list: StringStringTuple[] = [];
         if (s.excess_charging_enable) {
@@ -144,6 +183,22 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                             value={s.default_mode}
                             onValue={(v) => this.setState({default_mode: parseInt(v)})}/>
                     </FormRow>
+
+                    <FormRow label={__("energy_manager.content.auto_reset_charging_mode")}>
+                        <Switch desc={__("energy_manager.content.auto_reset_charging_mode_desc")}
+                                checked={s.auto_reset_mode}
+                                onClick={this.toggle('auto_reset_mode')}/>
+                    </FormRow>
+
+                    <Collapse in={s.auto_reset_mode}>
+                        <div>
+                            <FormRow label={__("energy_manager.content.auto_reset_time")}>
+                                <InputTime
+                                    value={[Math.floor(s.auto_reset_time / 60), s.auto_reset_time % 60]}
+                                    onValue={(h, m) => this.setState({auto_reset_time: h * 60 + m})} />
+                            </FormRow>
+                        </div>
+                    </Collapse>
 
                     <FormSeparator heading={__("energy_manager.content.header_load_management")} />
                     <FormRow label="">
@@ -402,7 +457,8 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                         </div>
                     </Collapse>
 
-                    <CollapsedSection label={__("energy_manager.content.expert_settings")}>
+                    {s.debug_mode ? <>
+                        <FormSeparator heading={__("energy_manager.content.header_expert_settings")} />
                         <FormRow label={__("energy_manager.content.target_power_from_grid")} label_muted={__("energy_manager.content.target_power_from_grid_muted")}>
                             <InputFloat
                                 unit="kW"
@@ -429,7 +485,7 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                                 checked={s.hysteresis_wear_accepted}
                                 onClick={() => { this.toggle('hysteresis_wear_accepted')(); if (s.hysteresis_wear_accepted && s.hysteresis_time < 10) this.setState({ hysteresis_time: 10 }); }} />
                         </FormRow>
-                    </CollapsedSection>
+                    </> : null }
                 </ConfigForm>
             </>
         )

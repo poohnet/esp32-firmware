@@ -245,6 +245,9 @@ def hyphenate_translation(translation, parent_key=None):
     return {key: (hyphenate(value) if isinstance(value, str) else hyphenate_translation(value, parent_key=parent_key + [key])) for key, value in translation.items()}
 
 def main():
+    if env.IsCleanTarget():
+        return
+
     subprocess.check_call([env.subst('$PYTHONEXE'), "-u", "update_packages.py"])
 
     # Add build flags
@@ -259,6 +262,19 @@ def main():
     build_flags = env.GetProjectOption("build_flags")
     frontend_debug = env.GetProjectOption("custom_frontend_debug") == "true"
     web_only = env.GetProjectOption("custom_web_only") == "true"
+
+    is_release = len(subprocess.run(["git", "tag", "--contains", "HEAD"], check=True, capture_output=True).stdout) > 0
+    is_dirty = len(subprocess.run(["git", "diff"], check=True, capture_output=True).stdout) > 0
+    dirty_suffix = ""
+    git_url = subprocess.run(["git", "config", "--get", "remote.origin.url"], check=True, capture_output=True).stdout.decode("utf-8").strip()
+    git_commit_id = subprocess.run(["git", "rev-parse", "--short=15", "HEAD"], check=True, capture_output=True).stdout.decode("utf-8").strip()
+    branch_name = subprocess.run(["git", "branch", "--show-current"], check=True, capture_output=True).stdout.decode("utf-8").strip()
+
+    if is_dirty or not is_release:
+        if branch_name == "master":
+            dirty_suffix = '_' + git_commit_id
+        else:
+            dirty_suffix = '_' + git_commit_id + "_" + branch_name.replace("_", "-")
 
     try:
         oldest_version, version = get_changelog_version(name)
@@ -323,6 +339,13 @@ def main():
         not_for_distribution = is_from_default_wifi_json
         build_flags.append('-DDEFAULT_WIFI_STA_PASSPHRASE="\\"{0}\\""'.format(custom_wifi['sta_passphrase']))
 
+    if 'debug_fs_enable' in custom_wifi:
+        # Force not for distribution if file system access is enabled.
+        # This is too dangerous to distribute, as one can access for example stored wifi passphrases
+        # via /debug/fs/config/wifi_sta_config
+        not_for_distribution = True
+        build_flags.append('-DDEBUG_FS_ENABLE="\\"{0}\\""'.format(custom_wifi['debug_fs_enable']))
+
     env.Replace(BUILD_FLAGS=build_flags)
 
     write_firmware_info(display_name, *version, timestamp)
@@ -344,18 +367,25 @@ def main():
         f.write('uint32_t build_timestamp(void);\n')
         f.write('const char *build_timestamp_hex_str(void);\n')
         f.write('const char *build_version_full_str(void);\n')
+        f.write('const char *build_info_str(void);\n')
 
     with open(os.path.join('src', 'build.cpp'), 'w', encoding='utf-8') as f:
         f.write('#include "build.h"\n')
         f.write('uint32_t build_timestamp(void) {{ return {}; }}\n'.format(timestamp))
         f.write('const char *build_timestamp_hex_str(void) {{ return "{:x}"; }}\n'.format(timestamp))
         f.write('const char *build_version_full_str(void) {{ return "{}.{}.{}-{:x}"; }}\n'.format(*version, timestamp))
+        f.write('const char *build_info_str(void) {{ return "git url: {}, git branch: {}, git commit id: {}"; }}\n'.format(git_url, branch_name, git_commit_id))
+
+    firmware_basename = '{}_firmware{}_{}_{:x}{}'.format(
+        name,
+        "-WITH-WIFI-PASSPHRASE-DO-NOT-DISTRIBUTE" if not_for_distribution else "",
+        '_'.join(version),
+        timestamp,
+        dirty_suffix,
+    )
 
     with open(os.path.join(env.subst('$BUILD_DIR'), 'firmware_basename'), 'w', encoding='utf-8') as f:
-        if not_for_distribution:
-            f.write('{}_firmware-WITH-WIFI-PASSPHRASE-DO-NOT-DISTRIBUTE_{}_{:x}'.format(name, '_'.join(version), timestamp))
-        else:
-            f.write('{}_firmware_{}_{:x}'.format(name, '_'.join(version), timestamp))
+        f.write(firmware_basename)
 
     # Handle backend modules
     excluded_backend_modules = list(os.listdir('src/modules'))

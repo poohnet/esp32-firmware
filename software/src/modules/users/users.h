@@ -25,6 +25,11 @@
 #define IND_NACK 1002
 #define IND_NAG 1003
 
+#define USERNAME_LENGTH 32
+#define DISPLAY_NAME_LENGTH 32
+#define USERNAME_ENTRY_LENGTH (USERNAME_LENGTH + DISPLAY_NAME_LENGTH)
+#define MAX_PASSIVE_USERS 256
+
 class Users
 {
 public:
@@ -38,6 +43,7 @@ public:
     void rename_user(uint8_t user_id, const String &username, const String &display_name);
     void remove_from_username_file(uint8_t user_id);
     void search_next_free_user();
+    int get_display_name(uint8_t user_id, char *ret_buf);
 
     #define TRIGGER_CHARGE_ANY 0
     #define TRIGGER_CHARGE_START 1

@@ -149,11 +149,15 @@ void ESP32EthernetBrick::setup()
     blue_led_pin = BLUE_LED;
     button_pin = BUTTON;
 
-#if defined(BUILD_NAME_ENERGY_MANAGER) || defined(BUILD_NAME_WARP2)
+#if defined(BUILD_NAME_ENERGY_MANAGER)
     check_for_factory_reset();
 #endif
 
     task_scheduler.scheduleWithFixedDelay([](){
+#if MODULE_WATCHDOG_AVAILABLE()
+    static int watchdog_handle = watchdog.add("esp_ethernet_led_blink", "Main thread blocked");
+    watchdog.reset(watchdog_handle);
+#endif
         led_blink(BLUE_LED, 2000, 1, 0);
     }, 0, 100);
 

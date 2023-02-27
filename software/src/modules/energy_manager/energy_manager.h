@@ -23,6 +23,7 @@
 
 #include "config.h"
 #include "device_module.h"
+#include "em_rgb_led.h"
 #include "input_pin.h"
 #include "output_relay.h"
 #include "warp_energy_manager_bricklet_firmware_bin.embedded.h"
@@ -71,6 +72,19 @@
 #define INPUT_CONFIG_WHEN_LOW           1
 
 #define HYSTERESIS_MIN_TIME_MINUTES     10
+
+#define ERROR_FLAGS_SDCARD_BIT_POS      25
+#define ERROR_FLAGS_SDCARD_MASK         (1 << ERROR_FLAGS_SDCARD_BIT_POS)
+#define ERROR_FLAGS_BRICKLET_BIT_POS    24
+#define ERROR_FLAGS_BRICKLET_MASK       (1 << ERROR_FLAGS_BRICKLET_BIT_POS)
+#define ERROR_FLAGS_CONTACTOR_BIT_POS   16
+#define ERROR_FLAGS_CONTACTOR_MASK      (1 << ERROR_FLAGS_CONTACTOR_BIT_POS)
+#define ERROR_FLAGS_NETWORK_BIT_POS     1
+#define ERROR_FLAGS_NETWORK_MASK        (1 << ERROR_FLAGS_NETWORK_BIT_POS)
+
+#define ERROR_FLAGS_ALL_INTERNAL_MASK   (ERROR_FLAGS_SDCARD_MASK | ERROR_FLAGS_BRICKLET_MASK)
+#define ERROR_FLAGS_ALL_ERRORS_MASK     (ERROR_FLAGS_ALL_INTERNAL_MASK | ERROR_FLAGS_CONTACTOR_MASK)
+#define ERROR_FLAGS_ALL_WARNINGS_MASK   (ERROR_FLAGS_NETWORK_MASK)
 
 typedef struct {
     bool contactor_value;
@@ -131,8 +145,6 @@ public:
     void update_all_data();
 
     void limit_max_current(uint32_t limit_ma);
-    void override_grid_draw(int32_t limit_w);
-    void override_guaranteed_power(uint32_t power_w);
     void switch_mode(uint32_t new_mode);
 
     void setup_energy_manager();
@@ -141,10 +153,11 @@ public:
 
     void apply_defaults();
 
-    void get_sdcard_info(struct sdcard_info *data);
+    bool get_sdcard_info(struct sdcard_info *data);
     bool format_sdcard();
     uint16_t get_energy_meter_detailed_values(float *ret_values);
     void set_output(bool output);
+    void set_rgb_led(uint8_t r, uint8_t g, uint8_t b);
 
     bool debug = false;
 
@@ -159,62 +172,71 @@ public:
     union {
         uint32_t combined;
         uint8_t  pin[4];
-    } charging_blocked;
+    } charging_blocked               = {0};
 
-    bool     excess_charging_enable;
-    bool     contactor_check_tripped;
-    bool     is_3phase;
-    bool     wants_on_last;
-    int32_t  power_at_meter_w;
+    uint32_t error_flags             = 0;
+    bool     contactor_check_tripped = false;
+    bool     is_3phase               = false;
+    bool     wants_on_last           = false;
+    int32_t  power_at_meter_w        = 0;
 
 private:
+    void update_status_led();
+    void clr_error(uint32_t error_mask);
+    void set_error(uint32_t error_mask);
+    bool is_error(uint32_t error_bit_pos);
     void check_bricklet_reachable(int rc);
     void update_all_data_struct();
     void update_io();
     void update_energy();
 
+    void start_auto_reset_task();
+    void schedule_auto_reset_task();
     void set_available_current(uint32_t current);
 
     void check_debug();
     String prepare_fmtstr();
 
+    EmRgbLed rgb_led;
     OutputRelay *output;
     InputPin *input3;
     InputPin *input4;
 
-    unsigned long last_debug_check;
-    bool     uptime_past_hysteresis;
-    uint32_t consecutive_bricklet_errors;
-    bool     bricklet_reachable;
-    SwitchingState switching_state;
-    uint32_t switching_start;
-    uint32_t mode;
-    uint8_t  have_phases;
-    bool     wants_3phase;
-    bool     wants_3phase_last;
-    bool     is_on_last;
-    bool     just_switched_phases;
-    bool     just_switched_mode;
-    uint32_t phase_state_change_blocked_until;
-    uint32_t on_state_change_blocked_until;
-    uint32_t charge_manager_allocated_current_ma;
-    uint32_t guaranteed_power_w;
-    uint32_t max_current_limited_ma;
-    int32_t  target_power_from_grid_w;
-    int32_t  power_available_w;
+    uint32_t last_debug_check                    = 0;
+    bool     uptime_past_hysteresis              = false;
+    uint32_t consecutive_bricklet_errors         = 0;
+    bool     bricklet_reachable                  = true;
+    SwitchingState switching_state               = SwitchingState::Monitoring;
+    uint32_t switching_start                     = 0;
+    uint32_t mode                                = 0;
+    uint8_t  have_phases                         = 0;
+    bool     wants_3phase                        = false;
+    bool     wants_3phase_last                   = false;
+    bool     is_on_last                          = false;
+    bool     just_switched_phases                = false;
+    bool     just_switched_mode                  = false;
+    uint32_t phase_state_change_blocked_until    = 0;
+    uint32_t on_state_change_blocked_until       = 0;
+    uint32_t charge_manager_allocated_current_ma = 0;
+    uint32_t max_current_limited_ma              = 0;
+    int32_t  power_available_w                   = 0;
 
     // Config cache
-    int32_t  target_power_from_grid_conf_w;
-    uint32_t guaranteed_power_conf_w;
-    bool     contactor_installed;
-    uint8_t  phase_switching_mode;
-    uint32_t switching_hysteresis_ms;
-    bool     hysteresis_wear_ok;
-    uint32_t max_current_unlimited_ma;
-    uint32_t min_current_ma;
+    uint32_t default_mode             = 0;
+    uint32_t auto_reset_hour          = 0;
+    uint32_t auto_reset_minute        = 0;
+    bool     excess_charging_enable   = false;
+    int32_t  target_power_from_grid_w = 0;
+    uint32_t guaranteed_power_w       = 0;
+    bool     contactor_installed      = false;
+    uint8_t  phase_switching_mode     = 0;
+    uint32_t switching_hysteresis_ms  = 0;
+    bool     hysteresis_wear_ok       = false;
+    uint32_t max_current_unlimited_ma = 0;
+    uint32_t min_current_ma           = 0;
 
     // Pre-calculated limits
-    int32_t  overall_min_power_w;
-    int32_t  threshold_3to1_w;
-    int32_t  threshold_1to3_w;
+    int32_t  overall_min_power_w = 0;
+    int32_t  threshold_3to1_w    = 0;
+    int32_t  threshold_1to3_w    = 0;
 };

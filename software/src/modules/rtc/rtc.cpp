@@ -70,6 +70,8 @@ void Rtc::update_system_time()
     }
 
     struct timeval t = this->get_time();
+    if (t.tv_sec == 0 && t.tv_usec == 0)
+        return;
 
     {
         std::lock_guard<std::mutex> lock{ntp.mtx};
@@ -78,6 +80,7 @@ void Rtc::update_system_time()
             return;
 
         settimeofday(&t, nullptr);
+        ntp.set_synced();
     }
 }
 
@@ -122,8 +125,6 @@ void Rtc::set_time(timeval time)
                                                    date_time.tm_wday);
     if (ret)
         logger.printfln("Setting rtc failed with code %i", ret);
-
-    ntp.set_synced();
 }
 
 struct timeval Rtc::get_time()
@@ -180,7 +181,6 @@ void Rtc::register_urls()
             return;
         }
 
-        ntp.set_synced();
         update_system_time();
     }, true);
 

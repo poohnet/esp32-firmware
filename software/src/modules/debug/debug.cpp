@@ -20,6 +20,7 @@
 #include "debug.h"
 
 #include <Arduino.h>
+#include "LittleFS.h"
 
 #include "esp_core_dump.h"
 
@@ -90,6 +91,99 @@ void Debug::register_urls()
 
         return request.endChunkedResponse();
     });
+
+#ifdef DEBUG_FS_ENABLE
+    server.on("/debug/fs/*", HTTP_GET, [this](WebServerRequest request) {
+        String path = request.uri().substring(ARRAY_SIZE("/debug/fs") - 1);
+        if (path.length() > 1 && path[path.length() - 1] == '/')
+            path = path.substring(0, path.length() - 1);
+
+        if (!LittleFS.exists(path))
+            return request.send(404, "text/plain", (String("File ") + path + " not found").c_str());
+
+        File f = LittleFS.open(path);
+        if (!f.isDirectory()) {
+            char buf[256];
+            request.beginChunkedResponse(200, "text/plain");
+            while(f.available()) {
+                int read = f.read((uint8_t *)buf, ARRAY_SIZE(buf));
+                request.sendChunk(buf, read);
+            }
+            return request.endChunkedResponse();
+        } else {
+            request.beginChunkedResponse(200, "text/html");
+            String header = String("<h1>") + f.path() + "</h1><br>";
+            request.sendChunk(header.c_str(), header.length());
+
+            if (path.length() > 1) {
+                int idx = path.lastIndexOf('/');
+                String up = String("<a href=\"/debug/fs") + path.substring(0, idx + 1) + "\">..</a><br>";
+                request.sendChunk(up.c_str(), up.length());
+            }
+
+            File file = f.openNextFile();
+            while(file) {
+                String s = String("<a href=\"/debug/fs") + file.path() + "\">"+ file.name() +"</a><br>";
+                request.sendChunk(s.c_str(), s.length());
+                file = f.openNextFile();
+            }
+
+            return request.endChunkedResponse();
+        }
+    });
+
+    server.on("/debug/fs/*", HTTP_DELETE, [this](WebServerRequest request) {
+        String path = request.uri().substring(ARRAY_SIZE("/debug/fs") - 1);
+        if (path.length() > 1 && path[path.length() - 1] == '/')
+            path = path.substring(0, path.length() - 1);
+
+        if (!LittleFS.exists(path))
+            return request.send(404, "text/plain", (String("File ") + path + " not found").c_str());
+
+        File f = LittleFS.open(path);
+        if (!f.isDirectory()) {
+            f.close();
+            LittleFS.remove(path);
+            return request.send(200, "text/plain", (String("File ") + path + " deleted").c_str());
+        } else {
+            f.close();
+            remove_directory(path.c_str());
+            return request.send(200, "text/plain", (String("Directory ") + path + " and all contents deleted").c_str());
+        }
+    });
+
+    server.on("/debug/fs/*", HTTP_PUT, [this](WebServerRequest request) {
+        String path = request.uri().substring(ARRAY_SIZE("/debug/fs") - 1);
+        bool create_directory = path.length() > 1 && path[path.length() - 1] == '/';
+        if (create_directory)
+            path = path.substring(0, path.length() - 1);
+
+        if (LittleFS.exists(path)) {
+            File f = LittleFS.open(path);
+            if (!f.isDirectory() && create_directory)
+                return request.send(400, "text/plain", (String("File ") + path + " already exists and is not a directory").c_str());
+            if (f.isDirectory() && !create_directory)
+                return request.send(400, "text/plain", (String("Directory ") + path + " already exists").c_str());
+            if (f.isDirectory())
+                return request.send(200, "text/plain", (String("Directory ") + path + " already exists").c_str());
+            else {
+                f.close();
+                LittleFS.remove(path);
+            }
+        }
+
+        if (create_directory) {
+            LittleFS.mkdir(path);
+            return request.send(200, "text/plain", (String("Directory ") + path + " created").c_str());
+        }
+
+        File f = LittleFS.open(path, "w");
+        char *payload = request.receive();
+        f.write((uint8_t *)payload, request.contentLength());
+        free(payload);
+        return request.send(200, "text/plain", (String("File ") + path + " created.").c_str());
+    });
+#endif
 }
 
 void Debug::loop()

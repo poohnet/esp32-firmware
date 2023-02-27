@@ -20,6 +20,7 @@
 import $ from "../../ts/jq";
 
 import * as API from "../../ts/api";
+import * as util from "../../ts/util";
 
 import { h, render, Fragment } from "preact";
 import { __ } from "../../ts/translation";
@@ -49,8 +50,8 @@ export class Ethernet extends ConfigComponent<'ethernet/config'> {
     }
 
     render(props: {}, state: Readonly<EthernetConfig>) {
-        if (!state)
-            return (<></>);
+        if (!util.allow_render)
+            return <></>
 
         return (
             <>
@@ -94,6 +95,7 @@ function update_ethernet_state() {
 
 export function add_event_listeners(source: API.APIEventTarget) {
     source.addEventListener('ethernet/state', update_ethernet_state);
+    source.addEventListener('ethernet/config', () => $('#status-ethernet').prop("hidden", !API.get("ethernet/config").enable_ethernet));
 }
 
 export function init() {

@@ -45,6 +45,20 @@ bool custom_uri_match(const char *ref_uri, const char *in_uri, size_t len)
     if (strncmp_with_same_len("/*", in_uri, len) == 0)
         return false;
 
+    size_t ref_len = strlen(ref_uri);
+
+    // Match other wildcard handlers if:
+    // - ref_uri is a wildcard handler (it ends in *)
+    // - ref_uri is is not the API handler
+    // - in_uri is at least as long as the wildcard handler without the *
+    // - in_uri and ref_uri are the same up to one char before the *
+    if ((ref_uri[ref_len - 1] == '*')
+     && (strncmp_with_same_len(ref_uri, "/*", 2) != 0)
+     && (strnlen(in_uri, len) >= (ref_len - 1))
+     && (strncmp(ref_uri, in_uri, MIN(ref_len - 1, len)) == 0)) {
+        return true;
+    }
+
     // Match directly registered URLs.
     if (!strncmp_with_same_len(ref_uri, in_uri, len))
         return true;
@@ -64,6 +78,10 @@ bool custom_uri_match(const char *ref_uri, const char *in_uri, size_t len)
 
     for (size_t i = 0; i < api.raw_commands.size(); i++)
         if (strncmp_with_same_len(api.raw_commands[i].path.c_str(), in_uri + 1, len - 1) == 0)
+            return true;
+
+    for (size_t i = 0; i < api.responses.size(); i++)
+        if (strncmp_with_same_len(api.responses[i].path.c_str(), in_uri + 1, len - 1) == 0)
             return true;
 
     return false;
@@ -139,6 +157,7 @@ WebServerRequestReturnProtect api_handler_put(WebServerRequest req) {
         if (strcmp(api.raw_commands[i].path.c_str(), req.uriCStr() + 1) != 0)
             continue;
 
+        // TODO: Use streamed parsing
         int bytes_written = req.receive(recv_buf, RECV_BUF_SIZE);
         if (bytes_written == -1) {
             // buffer was not large enough
@@ -151,6 +170,34 @@ WebServerRequestReturnProtect api_handler_put(WebServerRequest req) {
         String message = api.raw_commands[i].callback(recv_buf, bytes_written);
         if (message == "") {
             return req.send(200, "text/html", "");
+        }
+        return req.send(400, "text/html", message.c_str());
+    }
+
+    for (size_t i = 0; i < api.responses.size(); i++)
+    {
+        if (strcmp(api.responses[i].path.c_str(), req.uriCStr() + 1) != 0)
+            continue;
+
+        // TODO: Use streamed parsing
+        int bytes_written = req.receive(recv_buf, RECV_BUF_SIZE);
+        if (bytes_written == -1) {
+            // buffer was not large enough
+            return req.send(413);
+        } else if (bytes_written < 0) {
+            logger.printfln("Failed to receive response payload: error code %d", bytes_written);
+            return req.send(400);
+        } else if (bytes_written == 0 && api.responses[i].config->is_null()) {
+            String response;
+            bool success = api.responses[i].callback(&response);
+            return req.send(success ? 200 : 400, "text/html", response.c_str());
+        }
+
+        String message = api.responses[i].config->update_from_cstr(recv_buf, bytes_written);
+        if (message == "") {
+            String response;
+            bool success = api.responses[i].callback(&response);
+            return req.send(success ? 200 : 400, "text/html", response.c_str());
         }
         return req.send(400, "text/html", message.c_str());
     }
@@ -195,6 +242,10 @@ void Http::addState(size_t stateIdx, const StateRegistration &reg)
 }
 
 void Http::addRawCommand(size_t rawCommandIdx, const RawCommandRegistration &reg)
+{
+}
+
+void Http::addResponse(size_t responseIdx, const ResponseRegistration &reg)
 {
 }
 

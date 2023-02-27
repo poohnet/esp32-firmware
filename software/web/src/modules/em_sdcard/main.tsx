@@ -42,17 +42,10 @@ export class EMSDcard extends Component<{}, EMSDcardState> {
     }
 
     render(props: {}, state: Readonly<EMSDcardState>) {
-        if (!state || state.manufacturer_id === undefined)
+        if (!util.allow_render)
             return (<></>);
 
-        let no_card = state.manufacturer_id == 0
-                   && state.product_rev == 0
-                   && state.card_type == 0
-                   && state.sector_size == 0
-                   && state.sector_count == 0
-                   && state.sd_status == 15;
-
-        if (no_card) {
+        if (state.sd_status == 51) { // No card
             return (
                 <>
                     <PageHeader title={__("em_sdcard.content.header")} />
@@ -68,6 +61,7 @@ export class EMSDcard extends Component<{}, EMSDcardState> {
 
         let manufacturer;
         switch(state.manufacturer_id) {
+            case 0x00: manufacturer ="None"; break;
             case 0x01: manufacturer = "Panasonic"; break;
             case 0x02: manufacturer = "Toshiba"; break;
             case 0x03: manufacturer = "SanDisk"; break;
@@ -86,6 +80,7 @@ export class EMSDcard extends Component<{}, EMSDcardState> {
 
         let card_type;
         switch(state.card_type) {
+            case 0x00: card_type = "None"; break;
             case 0x01: card_type = "MMC"; break;
             case 0x02: card_type = "SD"; break;
             case 0x04: card_type = "SDSC"; break;
@@ -109,12 +104,15 @@ export class EMSDcard extends Component<{}, EMSDcardState> {
             case 31: sd_status = "ERROR_CSD_START"; break;
             case 32: sd_status = "ERROR_CSD_CMD9"; break;
             case 41: sd_status = "ERROR_COUNT_TO_HIGH"; break;
+            case 51: sd_status = "ERROR_NO_CARD"; break;
+            case 255: sd_status = "ERROR_API_FAILURE"; break;
             default: sd_status = "Unknown error code " + state.sd_status;
         }
-        
+
         let lfs_status;
         switch(state.lfs_status) {
             case   0: lfs_status = "OK"; break;
+            case 255: lfs_status = "ERROR_API_FAILURE"; break;
             case 256: lfs_status = __("em_sdcard.content.formatting"); break;
             default:  lfs_status = "ERROR " + state.lfs_status;
         }

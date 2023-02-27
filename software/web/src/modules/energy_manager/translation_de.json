@@ -5,26 +5,34 @@
             "mode_fast": "Schnell",
             "mode_off": "Aus",
             "mode_pv": "PV",
-            "mode_min_pv": "Min + PV"
+            "mode_min_pv": "Min + PV",
+            "status": "Energy Manager",
+            "error_ok": "OK",
+            "error_network": "Netzwerkfehler",
+            "error_contactor": "Schützfehler",
+            "error_internal": "Interner Fehler"
         },
         "navbar": {
             "energy_manager": "Einstellungen"
         },
         "content": {
-            "page_header": "Energiemanager-Einstellungen",
+            "page_header": "Energy Manager-Einstellungen",
 
             "default_mode": "Standard-Lademodus",
+            "auto_reset_charging_mode": "Täglich rücksetzen",
+            "auto_reset_charging_mode_desc": "Setzt den Lademodus zur angegebenen Zeit automatisch auf den Standard zurück.",
+            "auto_reset_time": "Zurücksetzen um",
 
             "header_load_management": "Dynamisches Lastmanagement",
-            "load_management_explainer": "Der Energiemanager regelt die an ihn angeschlossenen Verbraucher so, dass der maximal zulässige Strom des Gebäudeanschlusses auf keiner Phase überschritten wird. (Bald verfügbar: Diese Funktion befindet sich aktuell noch in der Entwicklung.)",
+            "load_management_explainer": "Der Energy Manager regelt die an ihn angeschlossenen Verbraucher so, dass der maximal zulässige Strom des Gebäudeanschlusses auf keiner Phase überschritten wird. (Bald verfügbar: Diese Funktion befindet sich aktuell noch in der Entwicklung.)",
 
             "header_excess_charging": "PV-Überschussladen",
             "enable_excess_charging": "Überschussladen aktivieren",
-            "enable_excess_charging_desc": "Wenn aktiviert, regelt der Energiemanager die an ihn angeschlossenen Verbraucher abhängig vom Überschuss einer vorhandenen Photovoltaikanlage. Wenn deaktiviert, wird die maximale Leistung unter Einhaltung der maximale Strombelastbarkeit der Zuleitungen erlaubt.",
-            "guaranteed_power": "Garantierte Ladeleistung",
-            "guaranteed_power_muted": "Leistung, die auch ohne Überschuss garantiert für alle angeschlossenen Wallboxen in Summe zur Verfügung steht.",
+            "enable_excess_charging_desc": "Wenn aktiviert, regelt der Energy Manager die an ihn angeschlossenen Verbraucher abhängig vom Überschuss einer vorhandenen Photovoltaikanlage. Wenn deaktiviert, wird die maximale Leistung unter Einhaltung der maximale Strombelastbarkeit der Zuleitungen erlaubt.",
+            "guaranteed_power": "Min + PV: Mindest-Ladeleistung",
+            "guaranteed_power_muted": "Leistung, die auch ohne Überschuss garantiert mindestens für alle angeschlossenen Wallboxen in Summe zur Verfügung steht.",
             "contactor_installed": "Schütz angeschlossen",
-            "contactor_installed_desc": "Der Energiemanager verfügt über ein Schütz, mit dem die von ihm verwalteten Wallboxen zwischen ein- und dreiphasigem Anschluss umgeschaltet werden können.",
+            "contactor_installed_desc": "Der Energy Manager verfügt über ein Schütz, mit dem die von ihm verwalteten Wallboxen zwischen ein- und dreiphasigem Anschluss umgeschaltet werden können.",
             "phase_switching_mode": "Phasenumschaltung",
             "fixed_one_phase": "Fest einphasig angeschlossen",
             "fixed_three_phases": "Fest dreiphasig angeschlossen",
@@ -45,8 +53,8 @@
             "relay_config_is": "Ist",
             "relay_config_then": "Dann",
             "relay_config_close": "Relais schließen",
-            "low": "Low (offen)",
-            "high": "High (geschlossen)",
+            "low": "Offen",
+            "high": "Geschlossen",
             "contactor_fail": "Ausgelöst, Schütz defekt",
             "contactor_ok": "Nicht ausgelöst, Schütz OK",
             "power_available": "Leistung verfügbar",
@@ -66,8 +74,8 @@
             "limit_max_current": "Ladestrom begrenzen",
             "limit_to_current": "Begrenzen auf",
             "input_when": "Wenn",
-            "input_low": "Eingang low (offen)",
-            "input_high": "Eingang high (geschlossen)",
+            "input_low": "Eingang offen",
+            "input_high": "Eingang geschlossen",
             "phase_switching": "Phasenumschaltung",
             "input_switch_mode": "Moduswechsel",
             "input_when_closing": "Beim Schließen des Eingangs",
@@ -75,7 +83,7 @@
             "input_switch_to": "Wechsle Modus zu",
             "input_mode_nothing": "Modus nicht wechseln",
 
-            "expert_settings": "Experteneinstellungen",
+            "header_expert_settings": "Experteneinstellungen",
             "target_power_from_grid": "Soll-Netzbezug",
             "target_power_from_grid_muted": "Sollwert für Überschussregelung",
             "hysteresis_time": "Hysterese-Zeit",
@@ -84,8 +92,8 @@
             "hysteresis_wear_accepted_desc": "Ich akzeptiere den übermäßigen Verschleiß der Ladeelektronik meines Fahrzeuges durch häufige Schaltvorgänge. Dies ermöglicht es, eine kurze Hysterese-Zeite zu verwenden."
         },
         "script": {
-            "save_failed": "Speichern der Energiemanager-Einstellungen fehlgeschlagen.",
-            "reboot_content_changed": "Energiemanager-Einstellungen",
+            "save_failed": "Speichern der Energy Manager-Einstellungen fehlgeschlagen.",
+            "reboot_content_changed": "Energy Manager-Einstellungen",
             "mode_change_failed": "Wechsel des Lademodus fehlgeschlagen."
         }
     }

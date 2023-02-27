@@ -5,7 +5,12 @@
             "mode_fast": "Fast",
             "mode_off": "Off",
             "mode_pv": "PV",
-            "mode_min_pv": "Min + PV"
+            "mode_min_pv": "Min + PV",
+            "status": "Energy Manager",
+            "error_ok": "OK",
+            "error_network": "Network error",
+            "error_contactor": "Contactor error",
+            "error_internal": "Internal error"
         },
         "navbar": {
             "energy_manager": "Settings"
@@ -14,6 +19,9 @@
             "page_header": "Energy Manager Settings",
 
             "default_mode": "Default charging mode",
+            "auto_reset_charging_mode": "Reset to default every day",
+            "auto_reset_charging_mode_desc": "Automatically set the charging mode back to the default at a specific time.",
+            "auto_reset_time": "Reset at",
 
             "header_load_management": "Dynamic load management",
             "load_management_explainer": "The Energy Manager adjusts the power consumption of devices under its control to avoid exceeding the maximum allowed current on any phase of the building's mains connection. (Coming soon: This feature is currently in development.)",
@@ -21,8 +29,8 @@
             "header_excess_charging": "PV excess charging",
             "enable_excess_charging": "Enable excess charging",
             "enable_excess_charging_desc": "When enabled, the Energy Manager will adjust the power consumption of devices under its control, depending on the power generation of an available photovoltaic system. When disabled, the maximum power within the limits of the supply lines will be allowed.",
-            "guaranteed_power": "Guaranteed charging power",
-            "guaranteed_power_muted": "Charging power that is guaranteed to be allowed for all connected chargers in total, even when not enough excess generated power is available.",
+            "guaranteed_power": "Min + PV: Minimum charging power",
+            "guaranteed_power_muted": "Charging power that is guaranteed to be allowed at least for all connected chargers in total, even when not enough excess generated power is available.",
             "contactor_installed": "Contactor installed",
             "contactor_installed_desc": "The Energy Manager is connected to a contactor that it can use to switch its managed wallboxes between 1-phase and 3-phase connection.",
             "phase_switching_mode": "Phase Switching",
@@ -75,7 +83,7 @@
             "input_switch_to": "Switch mode to",
             "input_mode_nothing": "Don't switch mode",
 
-            "expert_settings": "Expert settings",
+            "header_expert_settings": "Expert settings",
             "target_power_from_grid": "Target grid power draw",
             "target_power_from_grid_muted": "target grid draw for excess charging",
             "hysteresis_time": "Hysteresis time",

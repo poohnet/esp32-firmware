@@ -9,18 +9,17 @@
             "error": "Error",
             "configured_charging_current": "Configured charging current",
             "allowed_charging_current": "Allowed charging current",
-            "charging_current_minimum": "6 A",
-            "charging_current_maximum": "Max",
             "charge_control": "Charge control",
             "start_charging": "Start",
             "stop_charging": "Stop"
         },
         "navbar": {
-            "evse": "State",
-            "evse_settings": "Settings"
+            "evse": "Charge Status",
+            "evse_settings": "Charge Settings"
         },
         "content": {
-            "evse": "Charge Controller (EVSE)",
+            "status": "Charge Status",
+            "settings": "Charge Settings",
             "iec_state": "IEC 61851 state",
             "iec_state_a": "A (disconnected)",
             "iec_state_b": "B (connected)",
@@ -83,8 +82,6 @@
             "debug_description": "Create charge log",
             "debug_description_muted": "to diagnose charging problems",
 
-            "settings": "Settings",
-
             "auto_start_description": "Manual charge release",
             "auto_start_description_muted": "<a href=\"https://www.warp-charger.com/evcc.html?v=2\">see manual for details</a>",
             "auto_start_enable": "Requires that charges are always manually released via the web interface, the API or (depending on the button configuration) the button.",
@@ -112,7 +109,7 @@
             "slot_6": "User",
             "slot_7": "Charge manager",
             "slot_8": "External control",
-            "slot_9": "Modbus TCP",
+            "slot_9": "Modbus TCP current",
             "slot_10": "Modbus TCP clearance",
             "slot_11": "OCPP"
         },

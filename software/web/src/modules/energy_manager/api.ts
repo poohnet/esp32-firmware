@@ -1,4 +1,5 @@
 export interface state {
+    error_flags: number,
     contactor: boolean,
     led_rgb: number[],
     gpio_input_state: boolean[],
@@ -13,6 +14,8 @@ export interface state {
 
 export interface config {
     default_mode: number,
+    auto_reset_mode: boolean,
+    auto_reset_time: number,
     excess_charging_enable: boolean,
     contactor_installed: boolean,
     phase_switching_mode: number,

@@ -9,18 +9,17 @@
             "error": "Fehler",
             "configured_charging_current": "Konfigurierter Ladestrom",
             "allowed_charging_current": "Erlaubter Ladestrom",
-            "charging_current_minimum": "6 A",
-            "charging_current_maximum": "Max",
             "charge_control": "Ladesteuerung",
             "start_charging": "Start",
             "stop_charging": "Stop"
         },
         "navbar": {
-            "evse": "Status",
-            "evse_settings": "Einstellungen"
+            "evse": "Ladestatus",
+            "evse_settings": "Ladeeinstellungen"
         },
         "content": {
-            "evse": "Ladecontroller (EVSE)",
+            "status": "Ladestatus",
+            "settings": "Ladeeinstellungen",
             "iec_state": "IEC-61851-Zustand",
             "iec_state_a": "A (getrennt)",
             "iec_state_b": "B (verbunden)",
@@ -59,7 +58,7 @@
             "jumper_config_unconfigured": "Unkonfiguriert",
             "evse_version": "Hardware-Version des Ladecontrollers",
             "charging_current": "Ladestromgrenzen",
-            "charging_current_muted": "Minimum der Ladestromgrenzen",
+            "charging_current_muted": "minimum der Ladestromgrenzen",
             "reset_slot": "Freigeben",
             "low_level_state": "Low-Level-Zustand",
             "led_state": "LED-Zustand",
@@ -82,8 +81,6 @@
             "debug_stop": "Stop+Download",
             "debug_description": "Ladeprotokoll erstellen",
             "debug_description_muted": "zur Diagnose bei Ladeproblemen",
-
-            "settings": "Einstellungen",
 
             "auto_start_description": "Manuelle Ladefreigabe",
             "auto_start_description_muted": "<a href=\"{{{manual_url}}}\">siehe Betriebsanleitung für Details</a>",
@@ -112,7 +109,7 @@
             "slot_6": "Benutzer",
             "slot_7": "Lastmanagement",
             "slot_8": "Externe Steuerung",
-            "slot_9": "Modbus TCP",
+            "slot_9": "Modbus TCP-Strom",
             "slot_10": "Modbus TCP-Freigabe",
             "slot_11": "OCPP"
         },

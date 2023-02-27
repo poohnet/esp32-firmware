@@ -83,7 +83,7 @@ export class EVSE extends Component<{}, EVSEState> {
     }
 
     render(props: {}, s: Readonly<EVSEState>) {
-        if (!s || !s.slots)
+        if (!util.allow_render)
             return (<></>);
 
         let {state,
@@ -96,7 +96,7 @@ export class EVSE extends Component<{}, EVSEState> {
 
         return (
             <>
-                <PageHeader title={__("evse.content.evse")} />
+                <PageHeader title={__("evse.content.status")} />
                     <FormRow label={__("evse.content.iec_state")}>
                         <IndicatorGroup
                             value={state.iec61851_state}
@@ -429,7 +429,7 @@ class EVSESettings extends Component<{}, EVSESettingsState>
     }
     render(props: {}, s: EVSESettingsState)
     {
-        if (!s || !s.slots)
+        if (!util.allow_render)
             return (<></>);
 
         let {

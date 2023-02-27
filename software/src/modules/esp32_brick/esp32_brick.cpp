@@ -24,6 +24,7 @@
 #include "tools.h"
 #include "hal_arduino_esp32_brick/hal_arduino_esp32_brick.h"
 #include "event_log.h"
+#include "modules.h"
 #include "task_scheduler.h"
 
 #if TF_LOCAL_ENABLE != 0
@@ -85,6 +86,10 @@ void ESP32Brick::setup()
     button_pin = BUTTON;
 
     task_scheduler.scheduleWithFixedDelay([](){
+#if MODULE_WATCHDOG_AVAILABLE()
+    static int watchdog_handle = watchdog.add("esp_led_blink", "Main thread blocked");
+    watchdog.reset(watchdog_handle);
+#endif
         led_blink(BLUE_LED, 2000, 1, 0);
     }, 0, 100);
 

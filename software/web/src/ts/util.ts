@@ -179,6 +179,8 @@ const RECONNECT_TIME = 12000;
 
 export let eventTarget: API.APIEventTarget = new API.APIEventTarget();
 
+export let allow_render: boolean = false;
+
 export function setupEventSource(first: boolean, keep_as_first: boolean, continuation: (ws: WebSocket, eventTarget: API.APIEventTarget) => void) {
     if (!first) {
         add_alert("event_connection_lost", "alert-warning",  __("util.event_connection_lost_title"), __("util.event_connection_lost"))
@@ -222,6 +224,8 @@ export function setupEventSource(first: boolean, keep_as_first: boolean, continu
         for (let topic of topics) {
             API.trigger(topic, eventTarget);
         }
+
+        allow_render = true;
     }
 
     continuation(ws, eventTarget);
@@ -511,13 +515,23 @@ export async function put(url: string, payload: any, timeout_ms: number = 5000) 
 
 export const async_modal_ref: RefObject<AsyncModal> = createRef();
 
+export function isInteger(x: number) {
+    return !isNaN(x) && (x === (x | 0));
+}
+
 export function range(stopOrStart: number, stop?: number) {
     if (stop === undefined) {
-        stop = stopOrStart
-        stopOrStart = 0
+        stop = stopOrStart;
+        stopOrStart = 0;
     }
 
-    const len = (stop - stopOrStart)
+    if (!isInteger(stopOrStart))
+        throw "util.range: stopOrStart was not an integer";
+
+    if (!isInteger(stop))
+        throw "util.range: stop was not an integer";
+
+    const len = stop - stopOrStart;
     if (len <= 0)
         return [];
 
@@ -547,4 +561,13 @@ export function clamp(min: number | undefined, x: number, max: number | undefine
     if (min !== undefined)
         result = Math.max(min, result);
     return result;
+}
+
+export function leftPad(s: string | number, c: string | number, len: number) {
+    s = s.toString();
+    c = c.toString();
+    while (s.length < len) {
+        s = c + s;
+    }
+    return s.slice(-len);
 }

@@ -44,7 +44,7 @@ void WS::register_urls()
             to_send += String("{\"topic\":\"") + reg.path + String("\",\"payload\":") + reg.config->to_string_except(reg.keys_to_censor) + String("}\n");
         }
         client.send(to_send.c_str(), to_send.length());
-        for (auto callback : on_connect_callbacks) {
+        for (auto &callback : on_connect_callbacks) {
             callback(client);
         }
     });
@@ -52,8 +52,10 @@ void WS::register_urls()
     web_sockets.start("/ws");
 
     task_scheduler.scheduleWithFixedDelay([this](){
-        const char *payload = "{\"topic\": \"keep-alive\", \"payload\": \"null\"}\n";
-        web_sockets.sendToAll(payload, strlen(payload));
+        char *payload;
+        int len = asprintf(&payload, "{\"topic\": \"info/keep_alive\", \"payload\": {\"uptime\": %lu}}\n", millis());
+        if (len > 0)
+            web_sockets.sendToAllOwned(payload, len);
     }, 1000, 1000);
 }
 
@@ -75,6 +77,10 @@ void WS::addState(size_t stateIdx, const StateRegistration &reg)
 }
 
 void WS::addRawCommand(size_t rawCommandIdx, const RawCommandRegistration &reg)
+{
+}
+
+void WS::addResponse(size_t responseIdx, const ResponseRegistration &reg)
 {
 }
 

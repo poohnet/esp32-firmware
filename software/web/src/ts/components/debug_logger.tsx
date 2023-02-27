@@ -45,16 +45,9 @@ export class DebugLogger extends Component<DebugLoggerProps, DebugLoggerState>
 {
     debug_log = "";
 
-    constructor()
+    constructor(props: any)
     {
-        super();
-
-        this.props = {
-            debug: null,
-            debugHeader: null,
-            prefix: "",
-            translationPrefix: ""
-        }
+        super(props);
 
         this.state = {
             debug_running: false,
@@ -150,13 +143,13 @@ export class DebugLogger extends Component<DebugLoggerProps, DebugLoggerState>
         }
 
         //Download log in any case: Even an incomplete log can be useful for debugging.
-        util.downloadToFile(this.debug_log, "evse-debug-log", "txt", "text/plain");
+        util.downloadToFile(this.debug_log, this.props.prefix + "-debug-log", "txt", "text/plain");
     }
 
 
     render(props: DebugLoggerProps, s: DebugLoggerState)
     {
-        if (!s || !props)
+        if (!util.allow_render)
             return <></>;
 
         let {
