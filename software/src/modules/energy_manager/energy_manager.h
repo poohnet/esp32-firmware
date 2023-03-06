@@ -38,29 +38,26 @@
 #define PHASE_SWITCHING_ALWAYS_1PHASE   1
 #define PHASE_SWITCHING_ALWAYS_3PHASE   2
 
-#define RELAY_CONFIG_DISABLED           0
+#define RELAY_CONFIG_MANUAL             0
 #define RELAY_CONFIG_RULE_BASED         1
-#define RELAY_CONFIG_EXTERNAL           2
 
-#define RELAY_CONFIG_IF_INPUT3          0
-#define RELAY_CONFIG_IF_INPUT4          1
-#define RELAY_CONFIG_IF_PHASE_SWITCHING 2
-#define RELAY_CONFIG_IF_CONTACTOR_CHECK 3
-#define RELAY_CONFIG_IF_POWER_AVAILABLE 4
-#define RELAY_CONFIG_IF_GRID_DRAW       5
+#define RELAY_CONFIG_WHEN_INPUT3          0
+#define RELAY_CONFIG_WHEN_INPUT4          1
+#define RELAY_CONFIG_WHEN_PHASE_SWITCHING 2
+#define RELAY_CONFIG_WHEN_CONTACTOR_CHECK 3
+#define RELAY_CONFIG_WHEN_POWER_AVAILABLE 4
+#define RELAY_CONFIG_WHEN_GRID_DRAW       5
 
-#define RELAY_CONFIG_IS_HIGH            0
-#define RELAY_CONFIG_IS_LOW             1
-#define RELAY_CONFIG_IS_1PHASE          2
-#define RELAY_CONFIG_IS_3PHASE          3
-#define RELAY_CONFIG_IS_CONTACTOR_FAIL  4
-#define RELAY_CONFIG_IS_CONTACTOR_OK    5
-#define RELAY_CONFIG_IS_POWER_SUFFIC    6
-#define RELAY_CONFIG_IS_POWER_INSUFFIC  7
-#define RELAY_CONFIG_IS_GT0             8
-#define RELAY_CONFIG_IS_GE0             9
-#define RELAY_CONFIG_IS_LE0             10
-#define RELAY_CONFIG_IS_LT0             11
+#define RELAY_RULE_IS_HIGH            0
+#define RELAY_RULE_IS_LOW             1
+#define RELAY_RULE_IS_1PHASE          2
+#define RELAY_RULE_IS_3PHASE          3
+#define RELAY_RULE_IS_CONTACTOR_FAIL  4
+#define RELAY_RULE_IS_CONTACTOR_OK    5
+#define RELAY_RULE_IS_POWER_SUFFIC    6
+#define RELAY_RULE_IS_POWER_INSUFFIC  7
+#define RELAY_RULE_IS_GT0             8
+#define RELAY_RULE_IS_LE0             9
 
 #define INPUT_CONFIG_DISABLED           0
 #define INPUT_CONFIG_CONTACTOR_CHECK    1
@@ -104,6 +101,7 @@ typedef struct {
     bool output;
     uint16_t voltage;
     uint8_t contactor_check_state;
+    uint32_t uptime;
 } EnergyManagerAllData;
 
 struct sdcard_info {
@@ -161,13 +159,15 @@ public:
 
     bool debug = false;
 
-    ConfigRoot energy_manager_debug_state;
-    ConfigRoot energy_manager_meter_state;
-    ConfigRoot energy_manager_status_state;
-    ConfigRoot energy_manager_config;
-    ConfigRoot energy_manager_config_in_use;
-    ConfigRoot energy_manager_runtime_config;
-    ConfigRoot energy_manager_runtime_config_update;
+    ConfigRoot state;
+    ConfigRoot low_level_state;
+    ConfigRoot meter_state;
+    ConfigRoot config;
+    ConfigRoot config_in_use;
+    ConfigRoot debug_config;
+    ConfigRoot debug_config_in_use;
+    ConfigRoot charge_mode;
+    ConfigRoot charge_mode_update;
 
     EnergyManagerAllData all_data;
 
@@ -192,6 +192,7 @@ private:
     void update_io();
     void update_energy();
 
+    void start_network_check_task();
     void start_auto_reset_task();
     void schedule_auto_reset_task();
     void set_available_current(uint32_t current);

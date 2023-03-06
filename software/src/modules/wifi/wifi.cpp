@@ -653,7 +653,7 @@ void Wifi::loop()
 #if MODULE_ETHERNET_AVAILABLE()
     ethernet_connected = ethernet.get_connection_state() == EthernetState::CONNECTED;
 #endif
-    bool connected = (wifi_sta_config_in_use.get("enable_sta")->asBool() && connection_state == WifiState::CONNECTED) || ethernet_connected;
+    bool connected = (connection_state == WifiState::CONNECTED) || ethernet_connected;
 
     if (!connected && ap_fallback_only && !soft_ap_running) {
         apply_soft_ap_config_and_start();
@@ -666,7 +666,7 @@ void Wifi::loop()
     }
 }
 
-WifiState Wifi::get_connection_state()
+WifiState Wifi::get_connection_state() const
 {
     if (!wifi_sta_config_in_use.get("enable_sta")->asBool())
         return WifiState::NOT_CONFIGURED;
@@ -687,6 +687,11 @@ WifiState Wifi::get_connection_state()
             // this will only be reached with WL_SCAN_COMPLETED, but this value is never set
             return WifiState::CONNECTED;
     }
+}
+
+bool Wifi::is_sta_enabled() const
+{
+    return wifi_sta_config_in_use.get("enable_sta")->asBool();
 }
 
 int Wifi::get_ap_state()
