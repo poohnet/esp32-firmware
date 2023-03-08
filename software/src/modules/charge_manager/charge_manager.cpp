@@ -167,13 +167,13 @@ uint8_t get_charge_state(uint8_t charger_state, uint16_t supported_current, uint
 
 void ChargeManager::start_manager_task()
 {
-    std::vector<Config> &chargers = charge_manager_config_in_use.get("chargers")->asArray();
+    auto chargers = charge_manager_config_in_use.get("chargers");
 
     std::vector<String> hosts;
     std::vector<String> names;
-    for (int i = 0; i < chargers.size(); ++i) {
-        hosts.push_back(chargers[i].get("host")->asString());
-        names.push_back(chargers[i].get("name")->asString());
+    for (auto &charger : chargers) {
+        hosts.push_back(charger.get("host")->asString());
+        names.push_back(charger.get("name")->asString());
     }
 
     cm_networking.register_manager(std::move(hosts), names, [this, chargers](
@@ -187,76 +187,76 @@ void ChargeManager::start_manager_task()
             uint16_t supported_current,
             bool cp_disconnect_supported,
             bool cp_disconnected_state
-        ){
-            Config &target = charge_manager_state.get("chargers")->asArray()[client_id];
+        ) mutable {
+            auto target = charge_manager_state.get("chargers")->get(client_id);
             // Don't update if the uptimes are the same.
             // This means, that the EVSE hangs or the communication
             // is not working. As last_update will now hang too,
             // the management will stop all charging after some time.
-            if (target.get("uptime")->asUint() == uptime) {
+            if (target->get("uptime")->asUint() == uptime) {
                 logger.printfln("Received stale charger state from %s (%s). Reported EVSE uptime (%u) is the same as in the last state. Is the EVSE still reachable?",
-                    chargers[client_id].get("name")->asEphemeralCStr(), chargers[client_id].get("host")->asEphemeralCStr(),
+                    chargers->get(client_id)->get("name")->asEphemeralCStr(), chargers->get(client_id)->get("host")->asEphemeralCStr(),
                     uptime);
-                if (deadline_elapsed(target.get("last_update")->asUint() + 10000)) {
-                    target.get("state")->updateUint(5);
-                    target.get("error")->updateUint(CHARGE_MANAGER_ERROR_EVSE_UNREACHABLE);
+                if (deadline_elapsed(target->get("last_update")->asUint() + 10000)) {
+                    target->get("state")->updateUint(5);
+                    target->get("error")->updateUint(CHARGE_MANAGER_ERROR_EVSE_UNREACHABLE);
                 }
 
                 return;
             }
 
-            target.get("uptime")->updateUint(uptime);
+            target->get("uptime")->updateUint(uptime);
 
             // A charger wants to charge if:
             // - the charging time is 0 (it has not charged this vehicle yet), no other slot blocks and we are still in charger state 1 (i.e. blocked by a slot, so the charge management slot)
             // - OR the charger waits for the vehicle to start charging
             // - OR the charger is already charging
             bool wants_to_charge = (charging_time == 0 && supported_current != 0 && charger_state == 1) || charger_state == 2 || charger_state == 3;
-            target.get("wants_to_charge")->updateBool(wants_to_charge);
+            target->get("wants_to_charge")->updateBool(wants_to_charge);
 
             // A charger wants to charge and has low priority if it has already charged this vehicle and only the charge manager slot blocks.
             bool low_prio = charging_time != 0 && supported_current != 0 && charger_state == 1;
-            target.get("wants_to_charge_low_priority")->updateBool(low_prio);
+            target->get("wants_to_charge_low_priority")->updateBool(low_prio);
 
-            target.get("is_charging")->updateBool(charger_state == 3);
-            target.get("allowed_current")->updateUint(allowed_charging_current);
-            target.get("supported_current")->updateUint(supported_current);
-            target.get("cp_disconnect_supported")->updateBool(cp_disconnect_supported);
-            target.get("cp_disconnect_state")->updateBool(cp_disconnected_state);
-            target.get("last_update")->updateUint(millis());
+            target->get("is_charging")->updateBool(charger_state == 3);
+            target->get("allowed_current")->updateUint(allowed_charging_current);
+            target->get("supported_current")->updateUint(supported_current);
+            target->get("cp_disconnect_supported")->updateBool(cp_disconnect_supported);
+            target->get("cp_disconnect_state")->updateBool(cp_disconnected_state);
+            target->get("last_update")->updateUint(millis());
 
             if (error_state != 0) {
-                target.get("error")->updateUint(CHARGE_MANAGER_CLIENT_ERROR_START + error_state);
+                target->get("error")->updateUint(CHARGE_MANAGER_CLIENT_ERROR_START + error_state);
             }
 
-            auto current_error = target.get("error")->asUint();
+            auto current_error = target->get("error")->asUint();
             if (current_error < 128 || current_error == CHARGE_MANAGER_ERROR_EVSE_UNREACHABLE) {
-                target.get("error")->updateUint(0);
+                target->get("error")->updateUint(0);
             }
 
-            current_error = target.get("error")->asUint();
+            current_error = target->get("error")->asUint();
             if (current_error == 0 || current_error >= CHARGE_MANAGER_CLIENT_ERROR_START)
-                target.get("state")->updateUint(get_charge_state(charger_state,
+                target->get("state")->updateUint(get_charge_state(charger_state,
                                                                  supported_current,
                                                                  charging_time,
-                                                                 target.get("allocated_current")->asUint()));
+                                                                 target->get("allocated_current")->asUint()));
             charge_manager_state.get("uptime")->updateUint(millis());
     }, [this](uint8_t client_id, uint8_t error){
-        Config &target = charge_manager_state.get("chargers")->asArray()[client_id];
-        target.get("state")->updateUint(5);
-        target.get("error")->updateUint(error);
+        auto target = charge_manager_state.get("chargers")->get(client_id);
+        target->get("state")->updateUint(5);
+        target->get("error")->updateUint(error);
     });
 
-    uint32_t cm_send_delay = 1000 / chargers.size();
+    uint32_t cm_send_delay = 1000 / chargers->count();
 
-    task_scheduler.scheduleWithFixedDelay([this, chargers](){
+    task_scheduler.scheduleWithFixedDelay([this, chargers]() mutable {
         static int i = 0;
 
-        if (i >= chargers.size())
+        if (i >= chargers->count())
             i = 0;
 
-        Config &state = charge_manager_state.get("chargers")->asArray()[i];
-        if(cm_networking.send_manager_update(i, state.get("allocated_current")->asUint(), state.get("cp_disconnect")->asBool()))
+        auto state = charge_manager_state.get("chargers")->get(i);
+        if(cm_networking.send_manager_update(i, state->get("allocated_current")->asUint(), state->get("cp_disconnect")->asBool()))
             ++i;
 
     }, 0, cm_send_delay);
@@ -281,20 +281,20 @@ void ChargeManager::setup()
 
     max_avail_current = charge_manager_config_in_use.get("maximum_available_current")->asUint();
 
-    if(!charge_manager_config_in_use.get("enable_charge_manager")->asBool() || charge_manager_config_in_use.get("chargers")->asArray().size() == 0) {
+    if(!charge_manager_config_in_use.get("enable_charge_manager")->asBool() || charge_manager_config_in_use.get("chargers")->count() == 0) {
         initialized = true;
         return;
     }
     charge_manager_state.get("state")->updateUint(1);
 
     charge_manager_available_current.get("current")->updateUint(charge_manager_config_in_use.get("default_available_current")->asUint());
-    for (int i = 0; i < charge_manager_config_in_use.get("chargers")->asArray().size(); ++i) {
+    for (int i = 0; i < charge_manager_config_in_use.get("chargers")->count(); ++i) {
         charge_manager_state.get("chargers")->add();
         charge_manager_state.get("chargers")->get(i)->get("name")->updateString(charge_manager_config_in_use.get("chargers")->get(i)->get("name")->asString());
         idx_array[i] = i;
     }
 
-    for (int i = charge_manager_config_in_use.get("chargers")->asArray().size(); i < MAX_CLIENTS; ++i)
+    for (int i = charge_manager_config_in_use.get("chargers")->count(); i < MAX_CLIENTS; ++i)
         idx_array[i] = -1;
 
     start_manager_task();
@@ -337,13 +337,11 @@ bool ChargeManager::seen_all_chargers() {
     if (all_chargers_seen)
         return true;
 
-    std::vector<Config> &chargers = charge_manager_state.get("chargers")->asArray();
-
     // Don't claim to have seen "all" chargers when none are configured.
-    if (chargers.size() == 0)
+    if (charge_manager_state.get("chargers")->count() == 0)
         return false;
 
-    for (auto &charger : chargers) {
+    for (auto &charger : charge_manager_state.get("chargers")) {
         if (charger.get("last_update")->asUint() == 0) {
             return false;
         }
@@ -355,9 +353,7 @@ bool ChargeManager::seen_all_chargers() {
 
 bool ChargeManager::is_charging_stopped(uint32_t last_update_cutoff)
 {
-    std::vector<Config> &chargers = charge_manager_state.get("chargers")->asArray();
-
-    for (auto &charger : chargers) {
+    for (auto &charger : charge_manager_state.get("chargers")) {
         if (!a_after_b(charger.get("last_update")->asUint(), last_update_cutoff)) {
             return false;
         }
@@ -377,9 +373,7 @@ void ChargeManager::set_all_control_pilot_disconnect(bool disconnect)
 
 bool ChargeManager::are_all_control_pilot_disconnected(uint32_t last_update_cutoff)
 {
-    std::vector<Config> &chargers = charge_manager_state.get("chargers")->asArray();
-
-    for (auto &charger : chargers) {
+    for (auto &charger : charge_manager_state.get("chargers")) {
         if (!a_after_b(charger.get("last_update")->asUint(), last_update_cutoff)) {
             return false;
         }
@@ -394,9 +388,7 @@ bool ChargeManager::are_all_control_pilot_disconnected(uint32_t last_update_cuto
 
 bool ChargeManager::is_control_pilot_disconnect_supported(uint32_t last_update_cutoff)
 {
-    std::vector<Config> &chargers = charge_manager_state.get("chargers")->asArray();
-
-    for (auto &charger : chargers) {
+    for (auto &charger : charge_manager_state.get("chargers")) {
         if (!a_after_b(charger.get("last_update")->asUint(), last_update_cutoff)) {
             return false;
         }
@@ -423,8 +415,8 @@ void ChargeManager::distribute_current()
     if (verbose)
         local_log += snprintf(local_log, DISTRIBUTION_LOG_LEN - (local_log - distribution_log), "Redistributing current%c", '\0');
 
-    auto &chargers = charge_manager_state.get("chargers")->asArray();
-    auto &configs = charge_manager_config_in_use.get("chargers")->asArray();
+    auto chargers = charge_manager_state.get("chargers");
+    auto configs = charge_manager_config_in_use.get("chargers");
 
     uint32_t current_array[MAX_CLIENTS] = {0};
 
@@ -443,48 +435,48 @@ void ChargeManager::distribute_current()
         // If any EVSE is unreachable or in another error state, we set the available current to 0.
         // The distribution algorithm can then run normally and will block all chargers.
         bool unreachable_evse_found = false;
-        for (int i = 0; i < chargers.size(); ++i) {
-            auto &charger = chargers[i];
-            auto &charger_cfg = configs[i];
+        for (int i = 0; i < chargers->count(); ++i) {
+            auto charger = chargers->get(i);
+            auto charger_cfg = configs->get(i);
 
-            auto charger_error = charger.get("error")->asUint();
+            auto charger_error = charger->get("error")->asUint();
             if (charger_error != CM_NETWORKING_ERROR_NO_ERROR &&
                 charger_error != CHARGE_MANAGER_ERROR_CHARGER_UNREACHABLE &&
                 charger_error != CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE &&
                 charger_error < CHARGE_MANAGER_CLIENT_ERROR_START) {
                 unreachable_evse_found = true;
-                LOCAL_LOG("stage 0: %s (%s) reports error %u.", charger_cfg.get("name")->asEphemeralCStr(), charger_cfg.get("host")->asEphemeralCStr(), charger.get("error")->asUint());
+                LOCAL_LOG("stage 0: %s (%s) reports error %u.", charger_cfg->get("name")->asEphemeralCStr(), charger_cfg->get("host")->asEphemeralCStr(), charger->get("error")->asUint());
 
                 print_local_log = !last_print_local_log_was_error;
                 last_print_local_log_was_error = true;
             }
 
             // Charger does not respond anymore
-            if (deadline_elapsed(charger.get("last_update")->asUint() + TIMEOUT_MS)) {
+            if (deadline_elapsed(charger->get("last_update")->asUint() + TIMEOUT_MS)) {
                 unreachable_evse_found = true;
-                LOCAL_LOG("stage 0: Can't reach EVSE of %s (%s): last_update too old.",charger_cfg.get("name")->asEphemeralCStr(), charger_cfg.get("host")->asEphemeralCStr());
+                LOCAL_LOG("stage 0: Can't reach EVSE of %s (%s): last_update too old.",charger_cfg->get("name")->asEphemeralCStr(), charger_cfg->get("host")->asEphemeralCStr());
 
-                if (chargers[i].get("state")->updateUint(5) || charger_error < CHARGE_MANAGER_CLIENT_ERROR_START) {
-                    chargers[i].get("error")->updateUint(CHARGE_MANAGER_ERROR_CHARGER_UNREACHABLE);
+                if (charger->get("state")->updateUint(5) || charger_error < CHARGE_MANAGER_CLIENT_ERROR_START) {
+                    charger->get("error")->updateUint(CHARGE_MANAGER_ERROR_CHARGER_UNREACHABLE);
                     print_local_log = !last_print_local_log_was_error;
                     last_print_local_log_was_error = true;
                 }
-            } else if (chargers[i].get("error")->asUint() == CHARGE_MANAGER_ERROR_CHARGER_UNREACHABLE) {
-                chargers[i].get("error")->updateUint(CM_NETWORKING_ERROR_NO_ERROR);
+            } else if (charger->get("error")->asUint() == CHARGE_MANAGER_ERROR_CHARGER_UNREACHABLE) {
+                charger->get("error")->updateUint(CM_NETWORKING_ERROR_NO_ERROR);
             }
 
             // Charger did not update the charging current in time
-            if(charger.get("allocated_current")->asUint() < charger.get("allowed_current")->asUint() && deadline_elapsed(charger.get("last_sent_config")->asUint() + TIMEOUT_MS)) {
+            if(charger->get("allocated_current")->asUint() < charger->get("allowed_current")->asUint() && deadline_elapsed(charger->get("last_sent_config")->asUint() + TIMEOUT_MS)) {
                 unreachable_evse_found = true;
-                LOCAL_LOG("stage 0: EVSE of %s (%s) did not react in time.", charger_cfg.get("name")->asEphemeralCStr(), charger_cfg.get("host")->asEphemeralCStr());
+                LOCAL_LOG("stage 0: EVSE of %s (%s) did not react in time.", charger_cfg->get("name")->asEphemeralCStr(), charger_cfg->get("host")->asEphemeralCStr());
 
-                if (chargers[i].get("state")->updateUint(5) || charger_error < CHARGE_MANAGER_CLIENT_ERROR_START) {
-                    chargers[i].get("error")->updateUint(CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE);
+                if (charger->get("state")->updateUint(5) || charger_error < CHARGE_MANAGER_CLIENT_ERROR_START) {
+                    charger->get("error")->updateUint(CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE);
                     print_local_log = !last_print_local_log_was_error;
                     last_print_local_log_was_error = true;
                 }
-            } else if (chargers[i].get("error")->asUint() == CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE) {
-                chargers[i].get("error")->updateUint(CM_NETWORKING_ERROR_NO_ERROR);
+            } else if (charger->get("error")->asUint() == CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE) {
+                charger->get("error")->updateUint(CM_NETWORKING_ERROR_NO_ERROR);
             }
         }
 
@@ -523,13 +515,13 @@ void ChargeManager::distribute_current()
                   chargers_requesting_current == 1 ? "s" : "",
                   available_current);
 
-        std::stable_sort(idx_array, idx_array + chargers.size(), [&chargers](int left, int right) {
-            return chargers[left].get("supported_current")->asUint() < chargers[right].get("supported_current")->asUint();
+        std::stable_sort(idx_array, idx_array + chargers->count(), [&chargers](int left, int right) {
+            return chargers->get(left)->get("supported_current")->asUint() < chargers->get(right)->get("supported_current")->asUint();
         });
 
-        std::stable_sort(idx_array, idx_array + chargers.size(), [&chargers](int left, int right) {
-            bool left_charging = chargers[left].get("is_charging")->asBool();
-            bool right_charging = chargers[right].get("is_charging")->asBool();
+        std::stable_sort(idx_array, idx_array + chargers->count(), [&chargers](int left, int right) {
+            bool left_charging = chargers->get(left)->get("is_charging")->asBool();
+            bool right_charging = chargers->get(right)->get("is_charging")->asBool();
             return left_charging && !right_charging;
         });
     }
@@ -542,20 +534,20 @@ void ChargeManager::distribute_current()
         int chargers_allocated_current_to = 0;
 
         uint16_t current_to_set = charge_manager_config_in_use.get("minimum_current")->asUint();
-        for (int i = 0; i < chargers.size(); ++i) {
-            auto &charger = chargers[idx_array[i]];
+        for (int i = 0; i < chargers->count(); ++i) {
+            auto charger = chargers->get(idx_array[i]);
 
-            if (!charger.get("is_charging")->asBool() && !charger.get("wants_to_charge")->asBool()) {
+            if (!charger->get("is_charging")->asBool() && !charger->get("wants_to_charge")->asBool()) {
                 continue;
             }
 
-            auto &charger_cfg = configs[idx_array[i]];
+            auto charger_cfg = configs->get(idx_array[i]);
 
-            uint16_t supported_current = charger.get("supported_current")->asUint();
+            uint16_t supported_current = charger->get("supported_current")->asUint();
             if (supported_current < current_to_set) {
                 LOCAL_LOG("stage 0: Can't unblock %s (%s): It only supports %u mA, but %u mA is the configured minimum current.",
-                          charger_cfg.get("name")->asEphemeralCStr(),
-                          charger_cfg.get("host")->asEphemeralCStr(),
+                          charger_cfg->get("name")->asEphemeralCStr(),
+                          charger_cfg->get("host")->asEphemeralCStr(),
                           supported_current,
                           current_to_set);
                 continue;
@@ -574,8 +566,8 @@ void ChargeManager::distribute_current()
             available_current -= current_to_set;
 
             LOCAL_LOG("stage 0: Calculated target for %s (%s) of %u mA. %u mA left.",
-                      charger_cfg.get("name")->asEphemeralCStr(),
-                      charger_cfg.get("host")->asEphemeralCStr(),
+                      charger_cfg->get("name")->asEphemeralCStr(),
+                      charger_cfg->get("host")->asEphemeralCStr(),
                       current_to_set,
                       available_current);
         }
@@ -584,14 +576,14 @@ void ChargeManager::distribute_current()
             LOCAL_LOG("stage 0: %u mA still available. Recalculating targets.", available_current);
 
             int chargers_reallocated = 0;
-            for (int i = 0; i < chargers.size(); ++i) {
+            for (int i = 0; i < chargers->count(); ++i) {
                 if (current_array[idx_array[i]] == 0)
                     continue;
 
-                auto &charger = chargers[idx_array[i]];
+                auto charger = chargers->get(idx_array[i]);
                 uint16_t current_per_charger = MIN(32000, available_current / (chargers_allocated_current_to - chargers_reallocated));
 
-                uint16_t supported_current = charger.get("supported_current")->asUint();
+                uint16_t supported_current = charger->get("supported_current")->asUint();
                 // Protect against overflow.
                 if (supported_current < current_array[idx_array[i]])
                     continue;
@@ -603,10 +595,10 @@ void ChargeManager::distribute_current()
                 current_array[idx_array[i]] += current_to_add;
                 available_current -= current_to_add;
 
-                auto &charger_cfg = configs[idx_array[i]];
+                auto charger_cfg = configs->get(idx_array[i]);
                 LOCAL_LOG("stage 0: Recalculated target for %s (%s) of %u mA. %u mA left.",
-                          charger_cfg.get("name")->asEphemeralCStr(),
-                          charger_cfg.get("host")->asEphemeralCStr(),
+                          charger_cfg->get("name")->asEphemeralCStr(),
+                          charger_cfg->get("host")->asEphemeralCStr(),
                           current_array[idx_array[i]],
                           available_current);
             }
@@ -619,20 +611,20 @@ void ChargeManager::distribute_current()
             LOCAL_LOG("stage 0: %u mA still available. Attempting to wake up chargers that already charged their vehicle once.", available_current);
 
             uint16_t current_to_set = charge_manager_config_in_use.get("minimum_current")->asUint();
-            for (int i = 0; i < chargers.size(); ++i) {
-                auto &charger = chargers[idx_array[i]];
+            for (int i = 0; i < chargers->count(); ++i) {
+                auto charger = chargers->get(idx_array[i]);
 
-                if (!charger.get("wants_to_charge_low_priority")->asBool()) {
+                if (!charger->get("wants_to_charge_low_priority")->asBool()) {
                     continue;
                 }
 
-                auto &charger_cfg = configs[idx_array[i]];
+                auto charger_cfg = configs->get(idx_array[i]);
 
-                uint16_t supported_current = charger.get("supported_current")->asUint();
+                uint16_t supported_current = charger->get("supported_current")->asUint();
                 if (supported_current < current_to_set) {
                     LOCAL_LOG("stage 0: Can't unblock %s (%s): It only supports %u mA, but %u mA is the configured minimum current.",
-                              charger_cfg.get("name")->asEphemeralCStr(),
-                              charger_cfg.get("host")->asEphemeralCStr(),
+                              charger_cfg->get("name")->asEphemeralCStr(),
+                              charger_cfg->get("host")->asEphemeralCStr(),
                               supported_current,
                               current_to_set);
                     continue;
@@ -651,8 +643,8 @@ void ChargeManager::distribute_current()
                 available_current -= current_to_set;
 
                 LOCAL_LOG("stage 0: Calculated target for %s (%s) of %u mA. %u mA left.",
-                          charger_cfg.get("name")->asEphemeralCStr(),
-                          charger_cfg.get("host")->asEphemeralCStr(),
+                          charger_cfg->get("name")->asEphemeralCStr(),
+                          charger_cfg->get("host")->asEphemeralCStr(),
                           current_to_set,
                           available_current);
             }
@@ -666,27 +658,27 @@ void ChargeManager::distribute_current()
         // stage if even one charger needs to be throttled to be sure that the available current
         // is never exceeded.
         bool skip_stage_2 = false;
-        for (int i = 0; i < chargers.size(); ++i) {
-            auto &charger = chargers[i];
+        for (int i = 0; i < chargers->count(); ++i) {
+            auto charger = chargers->get(i);
 
-            auto &charger_cfg = configs[i];
+            auto charger_cfg = configs->get(i);
             uint16_t current_to_set = current_array[i];
 
-            bool will_throttle = current_to_set < charger.get("allocated_current")->asUint() || current_to_set < charger.get("allowed_current")->asUint();
+            bool will_throttle = current_to_set < charger->get("allocated_current")->asUint() || current_to_set < charger->get("allowed_current")->asUint();
 
             if (!will_throttle) {
                 continue;
             }
 
             LOCAL_LOG("stage 1: Throttled %s (%s) to %d mA.",
-                      charger_cfg.get("name")->asEphemeralCStr(),
-                      charger_cfg.get("host")->asEphemeralCStr(),
+                      charger_cfg->get("name")->asEphemeralCStr(),
+                      charger_cfg->get("host")->asEphemeralCStr(),
                       current_to_set);
 
-            if (charger.get("allocated_current")->updateUint(current_to_set)) {
+            if (charger->get("allocated_current")->updateUint(current_to_set)) {
                 print_local_log = true;
-                if (charger.get("error")->asUint() != CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE)
-                    charger.get("last_sent_config")->updateUint(millis());
+                if (charger->get("error")->asUint() != CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE)
+                    charger->get("last_sent_config")->updateUint(millis());
             }
 
             // Skip stage 2 to wait for the charger to adapt to the now smaller limit.
@@ -703,28 +695,28 @@ void ChargeManager::distribute_current()
         }
 
         if (!skip_stage_2) {
-            for (int i = 0; i < chargers.size(); ++i) {
-                auto &charger = chargers[i];
+            for (int i = 0; i < chargers->count(); ++i) {
+                auto charger = chargers->get(i);
 
-                auto &charger_cfg = configs[i];
+                auto charger_cfg = configs->get(i);
                 uint16_t current_to_set = current_array[i];
 
                 // > instead of >= to only catch chargers that were not already modified in stage 1.
-                bool will_not_throttle = current_to_set > charger.get("allocated_current")->asUint() || current_to_set > charger.get("allowed_current")->asUint();
+                bool will_not_throttle = current_to_set > charger->get("allocated_current")->asUint() || current_to_set > charger->get("allowed_current")->asUint();
 
                 if (!will_not_throttle) {
                     continue;
                 }
 
                 LOCAL_LOG("stage 2: Unthrottled %s (%s) to %d mA.",
-                          charger_cfg.get("name")->asEphemeralCStr(),
-                          charger_cfg.get("host")->asEphemeralCStr(),
+                          charger_cfg->get("name")->asEphemeralCStr(),
+                          charger_cfg->get("host")->asEphemeralCStr(),
                           current_to_set);
 
-                if (charger.get("allocated_current")->updateUint(current_to_set)) {
+                if (charger->get("allocated_current")->updateUint(current_to_set)) {
                     print_local_log = true;
-                    if (charger.get("error")->asUint() != CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE)
-                        charger.get("last_sent_config")->updateUint(millis());
+                    if (charger->get("error")->asUint() != CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE)
+                        charger->get("last_sent_config")->updateUint(millis());
                 }
             }
         } else {

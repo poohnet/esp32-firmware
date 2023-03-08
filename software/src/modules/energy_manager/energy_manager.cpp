@@ -40,6 +40,25 @@ void EnergyManager::pre_setup()
     });
 
     low_level_state = Config::Object({
+        {"power_at_meter", Config::Int32(0)},
+        {"power_available", Config::Int32(0)},
+        {"overall_min_power", Config::Int32(0)},
+        {"threshold_3to1", Config::Int32(0)},
+        {"threshold_1to3", Config::Int32(0)},
+        {"charge_manager_allocated_current", Config::Uint32(0)},
+        {"max_current_limited", Config::Uint32(0)},
+        {"uptime_past_hysteresis", Config::Bool(false)},
+        {"is_3phase", Config::Bool(false)},
+        {"wants_3phase", Config::Bool(false)},
+        {"wants_3phase_last", Config::Bool(false)},
+        {"is_on_last", Config::Bool(false)},
+        {"wants_on_last", Config::Bool(false)},
+        {"phase_state_change_blocked", Config::Bool(false)},
+        {"on_state_change_blocked", Config::Bool(false)},
+        {"charging_blocked", Config::Uint32(0)},
+        {"switching_state", Config::Uint32(0)},
+        {"consecutive_bricklet_errors", Config::Uint32(0)},
+        // Bricklet states below
         {"contactor", Config::Bool(false)},
         {"contactor_check_state", Config::Uint8(0)},
         {"input_voltage", Config::Uint16(0)},
@@ -140,8 +159,10 @@ void EnergyManager::check_debug()
 void EnergyManager::setup()
 {
     setup_energy_manager();
-    if (!device_found)
+    if (!device_found) {
+        set_error(ERROR_FLAGS_BRICKLET_MASK);
         return;
+    }
 
     // Forgets all settings when new setting is introduced: "Failed to restore persistent config config: JSON object is missing key 'input3_rule_then_limit'\nJSON object is missing key 'input4_rule_then_limit'"
     api.restorePersistentConfig("energy_manager/config", &config);
@@ -149,6 +170,7 @@ void EnergyManager::setup()
 
     if ((config_in_use.get("phase_switching_mode")->asUint() == PHASE_SWITCHING_AUTOMATIC) && !config_in_use.get("contactor_installed")->asBool()) {
         logger.printfln("energy_manager: Invalid configuration: Automatic phase switching selected but no contactor installed.");
+        rgb_led.set_status(EmRgbLed::Status::Unconfigured);
         return;
     }
 
@@ -165,8 +187,6 @@ void EnergyManager::setup()
 #endif
 
     update_all_data();
-
-    rgb_led.setup();
 
     // Set up output relay and input pins
     output = new OutputRelay(config_in_use);
@@ -219,6 +239,10 @@ void EnergyManager::setup()
         threshold_1to3_w = max_1phase_w;
     }
 
+    low_level_state.get("overall_min_power")->updateInt(overall_min_power_w);
+    low_level_state.get("threshold_3to1")->updateInt(threshold_3to1_w);
+    low_level_state.get("threshold_1to3")->updateInt(threshold_1to3_w);
+
     api.addFeature("energy_manager");
 
     // Initialize contactor check state so that the check doesn't trip immediately if the first response from the bricklet is invalid.
@@ -236,17 +260,21 @@ void EnergyManager::setup()
 
     if (max_current_unlimited_ma == 0) {
         logger.printfln("energy_manager: No maximum current configured for chargers. Disabling energy distribution.");
+        rgb_led.set_status(EmRgbLed::Status::Unconfigured);
         return;
     }
 
 #if MODULE_CHARGE_MANAGER_AVAILABLE()
     // Can't check for chargers in setup() because CM's setup() hasn't run yet to load the charger configuration.
-    task_scheduler.scheduleOnce([](){
-        if (!charge_manager.have_chargers())
+    task_scheduler.scheduleOnce([this](){
+        if (!charge_manager.have_chargers()) {
             logger.printfln("energy_manager: No chargers configured. Won't try to distribute energy.");
+            set_error(ERROR_FLAGS_BAD_CONFIG_MASK);
+        }
     }, 0);
 #else
     logger.printfln("energy_manager: Module 'Charge Manager' not available. Disabling energy distribution.");
+    rgb_led.set_status(EmRgbLed::Status::Unconfigured);
     return;
 #endif
 
@@ -256,14 +284,25 @@ void EnergyManager::setup()
 
     task_scheduler.scheduleOnce([this](){
         uptime_past_hysteresis = true;
+        low_level_state.get("uptime_past_hysteresis")->updateBool(uptime_past_hysteresis);
     }, switching_hysteresis_ms);
 
     if (config_in_use.get("auto_reset_mode")->asBool())
         start_auto_reset_task();
+
+    task_scheduler.scheduleOnce([this](){
+        if (excess_charging_enable && em_meter_config.config_in_use.get("meter_source")->asUint() == 0) {
+            set_error(ERROR_FLAGS_BAD_CONFIG_MASK);
+            logger.printfln("energy_manager: Excess charging enabled but no meter configured.");
+        }
+    }, 0);
 }
 
 void EnergyManager::register_urls()
 {
+    // Always export state so that the status page can show an error when no bricklet was found.
+    api.addState("energy_manager/state", &state, {}, 1000);
+
     if (!device_found)
         return;
 
@@ -295,7 +334,6 @@ void EnergyManager::register_urls()
 #if MODULE_DEBUG_AVAILABLE()
     api.addPersistentConfig("energy_manager/debug_config", &debug_config, {}, 1000);
 #endif
-    api.addState("energy_manager/state", &state, {}, 1000);
     api.addState("energy_manager/low_level_state", &low_level_state, {}, 1000);
     api.addState("energy_manager/meter_state", &meter_state, {}, 1000);
 
@@ -358,9 +396,11 @@ void EnergyManager::update_all_data()
     // Update states derived from all_data
     is_3phase   = contactor_installed ? all_data.contactor_value : phase_switching_mode == PHASE_SWITCHING_ALWAYS_3PHASE;
     have_phases = 1 + is_3phase * 2;
+    low_level_state.get("is_3phase")->updateBool(is_3phase);
     state.get("phases_switched")->updateUint(have_phases);
 
     power_at_meter_w = all_data.energy_meter_type ? all_data.power : meter.values.get("power")->asFloat(); // watt
+    low_level_state.get("power_at_meter")->updateInt(power_at_meter_w);
 
     if (contactor_installed) {
         if ((all_data.contactor_check_state & 1) == 0) {
@@ -420,7 +460,9 @@ void EnergyManager::set_error(uint32_t error_mask)
 {
     error_flags |= error_mask;
     state.get("error_flags")->updateUint(error_flags);
-    update_status_led();
+
+    if (device_found)
+        update_status_led();
 }
 
 void EnergyManager::check_bricklet_reachable(int rc) {
@@ -433,9 +475,9 @@ void EnergyManager::check_bricklet_reachable(int rc) {
         }
     } else {
         if (rc == TF_E_TIMEOUT) {
-            logger.printfln("energy_manager: get_all_data_1() timed out.");
+            logger.printfln("energy_manager: bricklet access timed out.");
         } else {
-            logger.printfln("energy_manager: get_all_data_1() returned error %d.", rc);
+            logger.printfln("energy_manager: bricklet access returned error %d.", rc);
         }
         if (bricklet_reachable && ++consecutive_bricklet_errors >= 8) {
             bricklet_reachable = false;
@@ -443,6 +485,7 @@ void EnergyManager::check_bricklet_reachable(int rc) {
             logger.printfln("energy_manager: Bricklet is unreachable.");
         }
     }
+    low_level_state.get("consecutive_bricklet_errors")->updateUint(consecutive_bricklet_errors);
 }
 
 void EnergyManager::update_io()
@@ -556,6 +599,7 @@ void EnergyManager::update_energy()
     if (switching_state != prev_state) {
         logger.printfln("energy_manager: now in state %d", (int)switching_state);
         prev_state = switching_state;
+        low_level_state.get("switching_state")->updateUint(static_cast<uint32_t>(switching_state));
     }
 
     if (!bricklet_reachable) {
@@ -580,6 +624,10 @@ void EnergyManager::update_energy()
 
         const bool     is_on = is_on_last;
         const uint32_t charge_manager_allocated_power_w = 230 * have_phases * charge_manager_allocated_current_ma / 1000; // watt
+
+        low_level_state.get("charge_manager_allocated_current")->updateUint(charge_manager_allocated_current_ma);
+        low_level_state.get("max_current_limited")->updateUint(max_current_limited_ma);
+        low_level_state.get("charging_blocked")->updateUint(charging_blocked.combined);
 
         if (charging_blocked.combined) {
             if (is_on) {
@@ -674,12 +722,23 @@ void EnergyManager::update_energy()
         // Need to get the time here instead of using deadline_elapsed(), to avoid stopping the charge when the phase switch deadline check fails but the start/stop deadline check succeeds.
         uint32_t time_now = millis();
 
+        low_level_state.get("power_available")->updateInt(power_available_w);
+        low_level_state.get("wants_3phase")->updateBool(wants_3phase);
+        low_level_state.get("wants_3phase_last")->updateBool(wants_3phase_last);
+        low_level_state.get("is_on_last")->updateBool(is_on_last);
+        low_level_state.get("wants_on_last")->updateBool(wants_on_last);
+
         // Remember last decision change to start hysteresis time.
         if (wants_3phase != wants_3phase_last) {
             logger.printfln("energy_manager: wants_3phase decision changed to %i", wants_3phase);
             phase_state_change_blocked_until = time_now + switching_hysteresis_ms;
             wants_3phase_last = wants_3phase;
         }
+
+        bool phase_state_change_is_blocked = a_after_b(phase_state_change_blocked_until, time_now);
+        bool on_state_change_is_blocked = a_after_b(on_state_change_blocked_until, time_now);
+        low_level_state.get("phase_state_change_blocked")->updateBool(phase_state_change_is_blocked);
+        low_level_state.get("on_state_change_blocked")->updateBool(on_state_change_is_blocked);
 
         // Check if phase switching is allowed right now.
         bool switch_phases = false;
@@ -696,11 +755,11 @@ void EnergyManager::update_energy()
                 // Just switched modes. Allow immediate switching.
                 logger.printfln("energy_manager: Free phase switch to %s after changing modes. available=%i", wants_3phase ? "3 phases" : "1 phase", power_available_w);
                 switch_phases = true;
-            } else if (!is_on && a_after_b(time_now, on_state_change_blocked_until) && a_after_b(time_now, phase_state_change_blocked_until - switching_hysteresis_ms/2)) {
+            } else if (!is_on && !on_state_change_is_blocked && a_after_b(time_now, phase_state_change_blocked_until - switching_hysteresis_ms/2)) {
                 // On/off deadline passed and at least half of the phase switching deadline passed.
                 logger.printfln("energy_manager: Free phase switch to %s while power is off. available=%i", wants_3phase ? "3 phases" : "1 phase", power_available_w);
                 switch_phases = true;
-            } else if (!a_after_b(time_now, phase_state_change_blocked_until)) {
+            } else if (phase_state_change_is_blocked) {
                 //logger.printfln("energy_manager: Phase switch wanted but decision changed too recently. Have to wait another %ums.", phase_state_change_blocked_until - time_now);
             } else {
                 logger.printfln("energy_manager wants phase change to %s: available=%i", wants_3phase ? "3 phases" : "1 phase", power_available_w);
@@ -732,7 +791,7 @@ void EnergyManager::update_energy()
 
             // Check if switching on/off is allowed right now.
             if (wants_on != is_on) {
-                if (a_after_b(time_now, on_state_change_blocked_until)) {
+                if (!on_state_change_is_blocked) {
                     // Start/stop allowed
                     logger.printfln("energy_manager: Switch %s", wants_on ? "on" : "off");
                 } else if (!uptime_past_hysteresis) {
@@ -740,6 +799,7 @@ void EnergyManager::update_energy()
                     logger.printfln("energy_manager: Free switch-%s during start-up period.", wants_on ? "on" : "off");
                     // Only one immediate switch on/off allowed; mark as used.
                     uptime_past_hysteresis = true;
+                    low_level_state.get("uptime_past_hysteresis")->updateBool(uptime_past_hysteresis);
                 } else if (just_switched_mode) {
                     // Just switched modes. Allow immediate switching.
                     logger.printfln("energy_manager: Free switch-%s after changing modes.", wants_on ? "on" : "off");
@@ -860,12 +920,12 @@ void EnergyManager::set_output(bool output)
         logger.printfln("energy_manager: Failed to set output relay: error %i", result);
 }
 
-void EnergyManager::set_rgb_led(uint8_t r, uint8_t g, uint8_t b)
+void EnergyManager::set_rgb_led(uint8_t pattern, uint16_t hue)
 {
-    int rc = tf_warp_energy_manager_set_rgb_value(&device, r, g, b);
+    int rc = tf_warp_energy_manager_set_led_state(&device, pattern, hue);
 
     // Don't check if bricklet is reachable because the setter call won't tell us.
 
     if (rc != TF_E_OK)
-        logger.printfln("energy_manager: Failed to set RGB LED values: error %i. Continuing anyway.", rc);
+        logger.printfln("energy_manager: Failed to set LED state: error %i. Continuing anyway.", rc);
 }

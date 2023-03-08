@@ -76,12 +76,14 @@
 #define ERROR_FLAGS_BRICKLET_MASK       (1 << ERROR_FLAGS_BRICKLET_BIT_POS)
 #define ERROR_FLAGS_CONTACTOR_BIT_POS   16
 #define ERROR_FLAGS_CONTACTOR_MASK      (1 << ERROR_FLAGS_CONTACTOR_BIT_POS)
+#define ERROR_FLAGS_BAD_CONFIG_BIT_POS  2
+#define ERROR_FLAGS_BAD_CONFIG_MASK     (1 << ERROR_FLAGS_BAD_CONFIG_BIT_POS)
 #define ERROR_FLAGS_NETWORK_BIT_POS     1
 #define ERROR_FLAGS_NETWORK_MASK        (1 << ERROR_FLAGS_NETWORK_BIT_POS)
 
 #define ERROR_FLAGS_ALL_INTERNAL_MASK   (ERROR_FLAGS_SDCARD_MASK | ERROR_FLAGS_BRICKLET_MASK)
-#define ERROR_FLAGS_ALL_ERRORS_MASK     (ERROR_FLAGS_ALL_INTERNAL_MASK | ERROR_FLAGS_CONTACTOR_MASK)
-#define ERROR_FLAGS_ALL_WARNINGS_MASK   (ERROR_FLAGS_NETWORK_MASK)
+#define ERROR_FLAGS_ALL_ERRORS_MASK     (0xFFFF0000u)
+#define ERROR_FLAGS_ALL_WARNINGS_MASK   (0x0000FFFF)
 
 typedef struct {
     bool contactor_value;
@@ -155,7 +157,7 @@ public:
     bool format_sdcard();
     uint16_t get_energy_meter_detailed_values(float *ret_values);
     void set_output(bool output);
-    void set_rgb_led(uint8_t r, uint8_t g, uint8_t b);
+    void set_rgb_led(uint8_t pattern, uint16_t hue);
 
     bool debug = false;
 

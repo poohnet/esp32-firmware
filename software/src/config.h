@@ -519,6 +519,17 @@ struct Config {
 
             explicit operator Config*(){return conf;}
 
+            // Allowing to call begin and end directly on
+            // the wrapper makes it easier to use
+            // range-based for loops.
+            std::vector<Config>::iterator begin() {
+                return conf->begin();
+            }
+
+            std::vector<Config>::iterator end() {
+                return conf->end();
+            }
+
         private:
             Config *conf;
 
@@ -629,6 +640,24 @@ struct Config {
         return children.size();
     }
 
+    std::vector<Config>::iterator begin() {
+        if (!this->is<Config::ConfArray>()) {
+            logger.printfln("Tried to get count of a node that is not an array!");
+            delay(100);
+            return std::vector<Config>::iterator();
+        }
+        return this->asArray().begin();
+    }
+
+    std::vector<Config>::iterator end() {
+        if (!this->is<Config::ConfArray>()) {
+            logger.printfln("Tried to get count of a node that is not an array!");
+            delay(100);
+            return std::vector<Config>::iterator();
+        }
+        return this->asArray().end();
+    }
+
     template<typename ConfigT>
     ConfigT *get() {
         if (!this->is<ConfigT>()) {
@@ -664,8 +693,12 @@ struct Config {
 
     const bool &asBool() const;
 
+private:
+    // This is a gigantic footgun: The reference is invalidated after the module setup,
+    // because of the ConfSlot array shrinkToFit calls.
     std::vector<Config> &asArray();
 
+public:
     template<typename T, typename ConfigT>
     bool update_value(T value) {
         if (!this->is<ConfigT>()) {

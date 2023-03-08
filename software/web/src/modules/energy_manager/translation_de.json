@@ -6,11 +6,17 @@
             "mode_off": "Aus",
             "mode_pv": "PV",
             "mode_min_pv": "Min + PV",
+            "phase_switching": "Phasenumschaltung",
+            "one_phase": "Einphasig",
+            "three_phase":"Dreiphasig",
             "status": "Energy Manager",
             "error_ok": "OK",
             "error_network": "Netzwerkfehler",
             "error_contactor": "Schützfehler",
-            "error_internal": "Interner Fehler"
+            "error_config": "Ungültige Konfiguration",
+            "error_internal": "Interner Fehler",
+
+            "no_bricklet": "Interner Fehler, Bricklet nicht gefunden"
         },
         "navbar": {
             "energy_manager": "Einstellungen"

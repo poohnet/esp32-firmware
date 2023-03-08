@@ -34,6 +34,8 @@
 // full green
 #define HUE_EXPORT   120
 // full magenta
+#define HUE_UNCONFIG 300
+// full magenta
 #define HUE_UNKNOWN  300
 
 // should be a power of 2
@@ -48,6 +50,7 @@ public:
         OK = 0,
         Warning = 1,
         Error = 2,
+        Unconfigured = 3,
     };
     enum class GridBalance {
         Export = 0,
@@ -56,21 +59,13 @@ public:
     };
 
     EmRgbLed();
-    void setup();
     void set_status(Status status);
     void update_grid_balance(GridBalance balance);
 
 private:
     void update_led();
-    void set_led_hsv(uint32_t H, float v);
 
     Status status;
     bool have_grid_balance;
     uint32_t hue_balance;
-
-    float value_breathing[100];
-    int32_t breathing_pos;
-    int32_t breathing_step;
-
-    uint32_t blink_counter;
 };
