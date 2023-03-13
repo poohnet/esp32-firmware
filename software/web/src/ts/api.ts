@@ -24,7 +24,7 @@ import $ from "./jq";
 
 export {type ConfigMap as getType, type Modules};
 
-type EventMap = {
+export type EventMap = {
     [key in keyof ConfigMap]: MessageEvent<Readonly<ConfigMap[key]>>;
 }
 
@@ -77,6 +77,10 @@ export class APIEventTarget implements EventTarget {
 
 export function trigger<T extends keyof ConfigMap>(topic: T, event_source: APIEventTarget) {
     event_source.dispatchEvent(new MessageEvent<Readonly<ConfigMap[T]>>(topic, {'data': get(topic)}));
+}
+
+export function trigger_unchecked<T extends keyof ConfigMap>(topic: string, event_source: APIEventTarget) {
+    event_source.dispatchEvent(new MessageEvent<Readonly<ConfigMap[T]>>(topic, {'data': get(topic as any)}));
 }
 
 export function save<T extends keyof ConfigMap>(topic: T, payload: ConfigMap[T], error_string: string, reboot_string?: string) {

@@ -26,7 +26,7 @@ import { h, render, Fragment, Component} from "preact";
 import { __, translate_unchecked } from "../../ts/translation";
 import { PageHeader } from "../../ts/components/page_header";
 
-
+import { ConfigComponent } from "src/ts/components/config_component";
 import { IndicatorGroup } from "../../ts/components/indicator_group";
 import { FormRow } from "../../ts/components/form_row";
 import { FormSeparator } from "../../ts/components/form_separator";
@@ -37,7 +37,9 @@ import { Button} from "react-bootstrap";
 import { InputSelect } from "src/ts/components/input_select";
 import { CollapsedSection } from "src/ts/components/collapsed_section";
 import { EVSE_SLOT_EXTERNAL, EVSE_SLOT_GLOBAL } from "../evse_common/api";
-import { DebugLogger } from "../../ts/components/debug_logger"
+import { DebugLogger } from "../../ts/components/debug_logger";
+import { ConfigForm } from "src/ts/components/config_form";
+import { InputFloat } from "src/ts/components/input_float";
 
 interface EVSEState {
     state: API.getType['evse/state'];
@@ -54,7 +56,11 @@ interface EVSESSettingsState {
     ev_wakeup: API.getType['evse/ev_wakeup'];
     boost_mode: API.getType['evse/boost_mode'];
     auto_start_charging: API.getType['evse/auto_start_charging'];
+    meter_abs: number
+    evse_uptime: number
 }
+
+type ChargeConditionConfig = API.getType["charge_condition/config"];
 
 let toDisplayCurrent = (x: number) => util.toLocaleFixed(x / 1000.0, 3) + " A"
 
@@ -63,23 +69,23 @@ export class EVSEV2 extends Component<{}, EVSEState> {
     constructor() {
         super();
 
-        util.eventTarget.addEventListener('evse/state', () => {
+        util.addApiEventListener('evse/state', () => {
             this.setState({state: API.get('evse/state')});
         });
 
-        util.eventTarget.addEventListener('evse/low_level_state', () => {
+        util.addApiEventListener('evse/low_level_state', () => {
             this.setState({ll_state: API.get('evse/low_level_state')});
         });
 
-        util.eventTarget.addEventListener('evse/hardware_configuration', () => {
+        util.addApiEventListener('evse/hardware_configuration', () => {
             this.setState({hardware_cfg: API.get('evse/hardware_configuration')});
         });
 
-        util.eventTarget.addEventListener('evse/slots', () => {
+        util.addApiEventListener('evse/slots', () => {
             this.setState({slots: API.get('evse/slots')});
         });
 
-        util.eventTarget.addEventListener('evse/control_pilot_disconnect', () => {
+        util.addApiEventListener('evse/control_pilot_disconnect', () => {
             this.setState({control_pilot_disconnect: API.get('evse/control_pilot_disconnect')});
         });
     }
@@ -390,7 +396,6 @@ export class EVSEV2 extends Component<{}, EVSEState> {
                             <Button variant="primary" className="form-control rounded-left" onClick={() => API.call('evse/reflash', {}, "")}>{__("evse.content.reflash_evse")}</Button>
                         </div>
                         </FormRow>
-
                     </CollapsedSection>
             </>
         )
@@ -399,37 +404,69 @@ export class EVSEV2 extends Component<{}, EVSEState> {
 
 render(<EVSEV2 />, $('#evse')[0]);
 
-class EVSEV2Settings extends Component<{}, EVSESSettingsState>
+class EVSEV2Settings extends ConfigComponent<"charge_condition/config", {}, EVSESSettingsState>
 {
     constructor()
     {
-        super();
+        super("charge_condition/config",
+            __("evse.script.save_failed"),
+            __("evse.script.reboot_content_changed"));
 
-        util.eventTarget.addEventListener('evse/gpio_configuration', () => {
+        util.addApiEventListener('evse/gpio_configuration', () => {
             this.setState({gpio_cfg: API.get('evse/gpio_configuration')});
         });
 
-        util.eventTarget.addEventListener('evse/button_configuration', () => {
+        util.addApiEventListener('evse/button_configuration', () => {
             this.setState({button_cfg: API.get('evse/button_configuration')});
         });
 
-        util.eventTarget.addEventListener('evse/ev_wakeup', () => {
+        util.addApiEventListener('evse/ev_wakeup', () => {
             this.setState({ev_wakeup: API.get('evse/ev_wakeup')});
         });
 
-        util.eventTarget.addEventListener('evse/boost_mode', () => {
+        util.addApiEventListener('evse/boost_mode', () => {
             this.setState({boost_mode: API.get('evse/boost_mode')});
         });
 
-        util.eventTarget.addEventListener('evse/auto_start_charging', () => {
+        util.addApiEventListener('evse/auto_start_charging', () => {
             this.setState({auto_start_charging: API.get('evse/auto_start_charging')});
         });
-        util.eventTarget.addEventListener('evse/slots', () => {
+        util.addApiEventListener('evse/slots', () => {
             this.setState({slots: API.get('evse/slots')});
+        })
+
+        util.addApiEventListener("meter/values", () => {
+            this.setState({meter_abs: API.get("meter/values").energy_abs});
+        })
+
+        util.addApiEventListener("evse/low_level_state", () => {
+            this.setState({evse_uptime: API.get("evse/low_level_state").uptime});
         })
     }
 
-    render(props: {}, s: Readonly<EVSESSettingsState>)
+    override async sendSave(t: "charge_condition/config", cfg: EVSESSettingsState & ChargeConditionConfig): Promise<void> {
+        await API.save('evse/auto_start_charging', {"auto_start_charging": this.state.auto_start_charging.auto_start_charging}, __("evse.script.save_failed"));
+        await API.save('evse/external_enabled', {"enabled": this.state.slots[EVSE_SLOT_EXTERNAL].active}, __("evse.script.save_failed"));
+        await API.save('evse/button_configuration', {"button": this.state.button_cfg.button}, __("evse.script.save_failed"));
+        await API.save('evse/gpio_configuration', this.state.gpio_cfg, __("evse.script.gpio_configuration_failed"));
+        await API.save('evse/ev_wakeup', {"enabled": this.state.ev_wakeup.enabled}, __("evse.script.save_failed"));
+        await API.save('evse/boost_mode', {"enabled": this.state.boost_mode.enabled}, __("evse.script.save_failed"));
+        super.sendSave(t, cfg);
+    }
+
+    //TODO: Substitute hardcoded values after evse-reset-api is available.
+
+    override async sendReset(t: "charge_condition/config"): Promise<void> {
+        await API.save('evse/auto_start_charging', {"auto_start_charging": true}, __("evse.script.save_failed"));
+        await API.save('evse/external_enabled', {"enabled": false}, __("evse.script.save_failed"));
+        await API.save('evse/button_configuration', {"button": 2}, __("evse.script.save_failed"));
+        await API.save('evse/gpio_configuration', {"input": 0, "output": 1, "shutdown_input": 0}, __("evse.script.gpio_configuration_failed"));
+        await API.save('evse/ev_wakeup', {"enabled": true}, __("evse.script.save_failed"));
+        await API.save('evse/boost_mode', {"enabled": false}, __("evse.script.save_failed"));
+        super.sendReset(t);
+    }
+
+    render(props: {}, s: EVSESSettingsState & ChargeConditionConfig)
     {
         if (!util.allow_render)
             return <></>;
@@ -442,24 +479,29 @@ class EVSEV2Settings extends Component<{}, EVSESSettingsState>
             boost_mode,
             auto_start_charging} = s;
 
-        return <>
-                    <PageHeader title={__("evse.content.settings")}/>
+        const has_meter = API.hasFeature("meter");
 
+        const energy_settings = <FormRow label={__("charge_condition.content.energy_limit")}>
+                <InputFloat value={s.energy_limit_kwh}
+                            onValue={(v) => this.setState({energy_limit_kwh: v})}
+                            digits={3} min={0} max={100000} unit={"kwh"}/>
+            </FormRow>;
+
+        return <>
+                <ConfigForm id="evse_settings" title={__("evse.content.settings")} isModified={this.isModified()} onSave={this.save} onReset={this.reset} onDirtyChange={(d) => this.ignore_updates = d}>
                     <FormRow label={__("evse.content.auto_start_description")} label_muted={__("evse.content.auto_start_description_muted")}>
                         <Switch desc={__("evse.content.auto_start_enable")}
                                 checked={!auto_start_charging.auto_start_charging}
-                                onClick={async () => {
-                                    let inverted = !auto_start_charging.auto_start_charging;
-                                    await API.save('evse/auto_start_charging', {"auto_start_charging": inverted}, __("evse.script.save_failed"));
-                                }}/>
+                                onClick={async () => this.setState({auto_start_charging: {...auto_start_charging, auto_start_charging: !auto_start_charging.auto_start_charging}})}/>
                     </FormRow>
 
                     <FormRow label={__("evse.content.external_description")} label_muted={__("evse.content.external_description_muted")}>
                         <Switch desc={__("evse.content.external_enable")}
                                 checked={slots[EVSE_SLOT_EXTERNAL].active}
                                 onClick={async () => {
-                                    let inverted = !slots[EVSE_SLOT_EXTERNAL].active;
-                                    await API.save('evse/external_enabled', {"enabled": inverted}, __("evse.script.save_failed"));
+                                    let tmp = slots;
+                                    slots[EVSE_SLOT_EXTERNAL].active = !slots[EVSE_SLOT_EXTERNAL].active;
+                                    this.setState({slots: tmp});
                                 }}/>
                     </FormRow>
 
@@ -473,7 +515,6 @@ class EVSEV2Settings extends Component<{}, EVSESSettingsState>
                                 value={button_cfg.button}
                                 onValue={async (v) => {
                                     this.setState({button_cfg: {button: parseInt(v)}});
-                                    await API.save('evse/button_configuration', {"button": parseInt(v)}, __("evse.script.save_failed"))
                                 }}
                         />
                     </FormRow>
@@ -486,11 +527,9 @@ class EVSEV2Settings extends Component<{}, EVSESSettingsState>
                                     ]}
                                 value={gpio_cfg.shutdown_input}
                                 onValue={async (v) => {
-                                    let cfg = {...API.get('evse/gpio_configuration')};
+                                    let cfg = gpio_cfg;
                                     cfg.shutdown_input = parseInt(v);
                                     this.setState({gpio_cfg: cfg});
-                                    await API.save('evse/gpio_configuration', cfg,
-                                        __("evse.script.gpio_configuration_failed"));
                                 }}
                         />
                     </FormRow>
@@ -502,11 +541,9 @@ class EVSEV2Settings extends Component<{}, EVSESSettingsState>
                                     ]}
                                 value={gpio_cfg.input}
                                 onValue={async (v) => {
-                                    let cfg = {...API.get('evse/gpio_configuration')};
+                                    let cfg = gpio_cfg;
                                     cfg.input = parseInt(v);
                                     this.setState({gpio_cfg: cfg});
-                                    await API.save('evse/gpio_configuration', cfg,
-                                        __("evse.script.gpio_configuration_failed"));
                                 }}
                         />
                     </FormRow>
@@ -519,11 +556,9 @@ class EVSEV2Settings extends Component<{}, EVSESSettingsState>
                                     ]}
                                 value={gpio_cfg.output}
                                 onValue={async (v) => {
-                                    let cfg = {...API.get('evse/gpio_configuration')};
+                                    let cfg = gpio_cfg;
                                     cfg.output = parseInt(v);
                                     this.setState({gpio_cfg: cfg});
-                                    await API.save('evse/gpio_configuration', cfg,
-                                        __("evse.script.gpio_configuration_failed"));
                                 }}
                         />
                     </FormRow>
@@ -531,20 +566,34 @@ class EVSEV2Settings extends Component<{}, EVSESSettingsState>
                     <FormRow label={__("evse.content.ev_wakeup_desc")} label_muted={__("evse.content.ev_wakeup_desc_muted")}>
                         <Switch desc={__("evse.content.ev_wakeup")}
                                 checked={ev_wakeup.enabled}
-                                onClick={async () => {
-                                    let inverted = !ev_wakeup.enabled;
-                                    await API.save('evse/ev_wakeup', {"enabled": inverted}, __("evse.script.save_failed"));
-                                }}/>
+                                onClick={async () => this.setState({ev_wakeup: {enabled: !ev_wakeup.enabled}})}/>
                     </FormRow>
 
                     <FormRow label={__("evse.content.boost_mode_desc")} label_muted={__("evse.content.boost_mode_desc_muted")}>
                         <Switch desc={__("evse.content.boost_mode")}
                                 checked={boost_mode.enabled}
-                                onClick={async () => {
-                                    let inverted = !boost_mode.enabled;
-                                    await API.save('evse/boost_mode', {"enabled": inverted}, __("evse.script.save_failed"));
-                                }}/>
+                                onClick={async () => this.setState({boost_mode: {enabled: !boost_mode.enabled}})}/>
                     </FormRow>
+
+                    <FormRow label={__("charge_condition.content.duration_limit")}>
+                        <InputSelect items={[
+                            ["0", __("charge_condition.content.unlimited")],
+                            ["1", __("charge_condition.content.min15")],
+                            ["2", __("charge_condition.content.min30")],
+                            ["3", __("charge_condition.content.min45")],
+                            ["4", __("charge_condition.content.h1")],
+                            ["5", __("charge_condition.content.h2")],
+                            ["6", __("charge_condition.content.h3")],
+                            ["7", __("charge_condition.content.h4")],
+                            ["8", __("charge_condition.content.h6")],
+                            ["9", __("charge_condition.content.h8")],
+                            ["10", __("charge_condition.content.h12")]
+                        ]}
+                        value={s.duration_limit}
+                        onValue={(v) => this.setState({duration_limit: Number(v)})}/>
+                    </FormRow>
+                    {has_meter ? energy_settings : <></>}
+                </ConfigForm>
         </>;
     }
 }

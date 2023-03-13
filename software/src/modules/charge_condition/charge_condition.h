@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2022 Olaf Lüke <olaf@tinkerforge.com>
+ * Copyright (C) 2023 Frederic Henrichs <frederic@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,39 +17,29 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "em_meter_config.h"
+#pragma once
 
-//#include "bindings/errors.h"
+#include "config.h"
 
-#include "api.h"
-#include "event_log.h"
-#include "modules.h"
-
-void EMMeterConfig::pre_setup()
+class ChargeCondition
 {
-    // States
-    config = Config::Object({
-        {"meter_source", Config::Uint8(0)}    });
-}
+private:
 
-void EMMeterConfig::setup()
-{
-    api.restorePersistentConfig("energy_manager/meter_config", &config);
+public:
+    ChargeCondition(){}
+    void pre_setup();
+    void setup();
+    void register_urls();
+    void loop();
 
-    config_in_use = config;
+    ConfigRoot config;
+    ConfigRoot config_in_use;
+    ConfigRoot state;
 
-    if (config_in_use.get("meter_source")->asUint() == 100) {
-        meter.updateMeterState(2, METER_TYPE_CUSTOM_BASIC);
-    }
+    ConfigRoot override_duration;
+    ConfigRoot override_energy;
 
-    initialized = true;
-}
-
-void EMMeterConfig::register_urls()
-{
-    api.addPersistentConfig("energy_manager/meter_config", &config, {}, 1000);
-}
-
-void EMMeterConfig::loop()
-{
-}
+    uint32_t duration_left;
+    uint32_t energy_left;
+    bool initialized = false;
+};

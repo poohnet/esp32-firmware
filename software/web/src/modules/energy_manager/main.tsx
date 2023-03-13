@@ -19,23 +19,23 @@
 
 import $ from "../../ts/jq";
 
-import * as util from "../../ts/util";
 import * as API from "../../ts/api";
-
-import { h, render, Fragment, Component} from "preact";
+import * as util from "../../ts/util";
 import { __ } from "../../ts/translation";
-import { ConfigComponent } from "src/ts/components/config_component";
-import { FormRow } from "src/ts/components/form_row";
-import { Switch } from "src/ts/components/switch";
-import { IndicatorGroup } from "src/ts/components/indicator_group";
-import { InputSelect } from "src/ts/components/input_select";
-import { InputFloat } from "src/ts/components/input_float";
-import { InputNumber } from "src/ts/components/input_number";
-import { InputTime } from "src/ts/components/input_time";
-import { ConfigForm } from "src/ts/components/config_form";
-import { FormSeparator } from "src/ts/components/form_separator";
-import { Button, ButtonGroup, Collapse } from "react-bootstrap";
-import { CheckCircle, Circle, XCircle } from "react-feather";
+
+import { h, render, Fragment, Component } from "preact";
+import { Button, ButtonGroup, Collapse  } from "react-bootstrap";
+import { CheckCircle, Circle            } from "react-feather";
+import { ConfigComponent } from "../../ts/components/config_component";
+import { ConfigForm      } from "../../ts/components/config_form";
+import { FormRow         } from "../../ts/components/form_row";
+import { FormSeparator   } from "../../ts/components/form_separator";
+import { IndicatorGroup  } from "../../ts/components/indicator_group";
+import { InputFloat      } from "../../ts/components/input_float";
+import { InputNumber     } from "../../ts/components/input_number";
+import { InputSelect     } from "../../ts/components/input_select";
+import { InputTime       } from "../../ts/components/input_time";
+import { Switch          } from "../../ts/components/switch";
 
 type StringStringTuple = [string, string];
 
@@ -49,15 +49,15 @@ export class EnergyManagerStatus extends Component<{}, EnergyManagerAllData> {
     constructor() {
         super();
 
-        util.eventTarget.addEventListener('energy_manager/state', () => {
+        util.addApiEventListener('energy_manager/state', () => {
             this.setState({status: API.get('energy_manager/state')});
         });
 
-        util.eventTarget.addEventListener('energy_manager/config', () => {
+        util.addApiEventListener('energy_manager/config', () => {
             this.setState({config: API.get('energy_manager/config')});
         });
 
-        util.eventTarget.addEventListener('energy_manager/charge_mode', () => {
+        util.addApiEventListener('energy_manager/charge_mode', () => {
             this.setState({charge_mode: API.get('energy_manager/charge_mode')});
         });
     }
@@ -82,43 +82,47 @@ export class EnergyManagerStatus extends Component<{}, EnergyManagerAllData> {
         }
 
         let error_flags_ok        = d.status.error_flags == 0;
-        let error_flags_internal  = d.status.error_flags & 0xFF000000;
+        let error_flags_config    = d.status.error_flags & 0x80000000;
+        let error_flags_internal  = d.status.error_flags & 0x7F000000;
         let error_flags_contactor = d.status.error_flags & 0x00010000;
-        let error_flags_config    = d.status.error_flags & 0x00000004;
         let error_flags_network   = d.status.error_flags & 0x00000002;
 
         return <>
             <FormRow label={__("energy_manager.status.mode")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
-                <div class="input-group">
+                <ButtonGroup className="flex-wrap m-n1" style="width: calc(100% + 0.5rem);">
                     <Button
-                        className="form-control mr-2 rounded-right"
-                        variant={d.config.excess_charging_enable ? (d.charge_mode.mode == 2 ? "success" : "primary") : "secondary"}
-                        disabled={!d.config.excess_charging_enable || d.charge_mode.mode == 2}
-                        onClick={() => this.change_mode(2)}>
-                        {!d.config.excess_charging_enable ? <Circle size="20"/> : (d.charge_mode.mode == 2 ? <CheckCircle size="20"/> : <Circle size="20"/>)} <span style="vertical-align: text-top;">{__("energy_manager.status.mode_pv")}</span>
-                    </Button>
-                    <Button
-                        className="form-control mr-2 rounded-left rounded-right"
-                        variant={d.config.excess_charging_enable ? (d.charge_mode.mode == 3 ? "success" : "primary") : "secondary"}
-                        disabled={!d.config.excess_charging_enable || d.charge_mode.mode == 3}
-                        onClick={() => this.change_mode(3)}>
-                        {!d.config.excess_charging_enable ? <Circle size="20"/> : (d.charge_mode.mode == 3 ? <CheckCircle size="20"/> : <Circle size="20"/>)} <span style="vertical-align: text-top;">{__("energy_manager.status.mode_min_pv")}</span>
-                    </Button>
-                    <Button
-                        className="form-control mr-2 rounded-left rounded-right"
-                        variant={d.charge_mode.mode == 0 ? "success" : "primary"}
-                        disabled={d.charge_mode.mode == 0}
-                        onClick={() => this.change_mode(0)}>
-                        {d.charge_mode.mode == 0 ? <CheckCircle size="20"/> : <Circle size="20"/>} <span style="vertical-align: text-top;">{__("energy_manager.status.mode_fast")}</span>
-                    </Button>
-                    <Button
-                        className="form-control rounded-left"
+                        style="display: flex;align-items: center;justify-content: center;"
+                        className="m-1 rounded-left"
                         variant={d.charge_mode.mode == 1 ? "success" : "primary"}
                         disabled={d.charge_mode.mode == 1}
                         onClick={() => this.change_mode(1)}>
-                        {d.charge_mode.mode == 1 ? <CheckCircle size="20"/> : <Circle size="20"/>} <span style="vertical-align: text-top;">{__("energy_manager.status.mode_off")}</span>
+                        {d.charge_mode.mode == 1 ? <CheckCircle size="20"/> : <Circle size="20"/>} <span>&nbsp;&nbsp;</span><span>{__("energy_manager.status.mode_off")}</span>
                     </Button>
-                </div>
+                    <Button
+                        style="display: flex;align-items: center;justify-content: center;"
+                        className="m-1 rounded-right"
+                        variant={d.config.excess_charging_enable ? (d.charge_mode.mode == 2 ? "success" : "primary") : "secondary"}
+                        disabled={!d.config.excess_charging_enable || d.charge_mode.mode == 2}
+                        onClick={() => this.change_mode(2)}>
+                        {!d.config.excess_charging_enable ? <Circle size="20"/> : (d.charge_mode.mode == 2 ? <CheckCircle size="20"/> : <Circle size="20"/>)} <span>&nbsp;&nbsp;</span><span>{__("energy_manager.status.mode_pv")}</span>
+                    </Button>
+                    <Button
+                        style="display: flex;align-items: center;justify-content: center;"
+                        className="m-1 rounded-left rounded-right"
+                        variant={d.config.excess_charging_enable ? (d.charge_mode.mode == 3 ? "success" : "primary") : "secondary"}
+                        disabled={!d.config.excess_charging_enable || d.charge_mode.mode == 3}
+                        onClick={() => this.change_mode(3)}>
+                        {!d.config.excess_charging_enable ? <Circle size="20"/> : (d.charge_mode.mode == 3 ? <CheckCircle size="20"/> : <Circle size="20"/>)} <span>&nbsp;&nbsp;</span><span>{__("energy_manager.status.mode_min_pv")}</span>
+                    </Button>
+                    <Button
+                        style="display: flex;align-items: center;justify-content: center;"
+                        className="m-1 rounded-left rounded-right"
+                        variant={d.charge_mode.mode == 0 ? "success" : "primary"}
+                        disabled={d.charge_mode.mode == 0}
+                        onClick={() => this.change_mode(0)}>
+                        {d.charge_mode.mode == 0 ? <CheckCircle size="20"/> : <Circle size="20"/>} <span>&nbsp;&nbsp;</span><span>{__("energy_manager.status.mode_fast")}</span>
+                    </Button>
+                </ButtonGroup>
             </FormRow>
             <FormRow label={__("energy_manager.status.phase_switching")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
                 <IndicatorGroup
@@ -139,16 +143,16 @@ export class EnergyManagerStatus extends Component<{}, EnergyManagerAllData> {
                         {__("energy_manager.status.error_network")}
                     </Button>
                     <Button disabled
-                        variant={(error_flags_config ? "" : "outline-") + "warning"}>
-                        {__("energy_manager.status.error_config")}
-                    </Button>
-                    <Button disabled
                         variant={(error_flags_contactor ? "" : "outline-") + "danger"}>
                         {__("energy_manager.status.error_contactor")}
                     </Button>
                     <Button disabled
                         variant={(error_flags_internal ? "" : "outline-") + "danger"}>
                         {__("energy_manager.status.error_internal")}
+                    </Button>
+                    <Button disabled
+                        variant={(error_flags_config ? "" : "outline-") + "danger"}>
+                        {__("energy_manager.status.error_config")}
                     </Button>
                 </ButtonGroup>
             </FormRow>
@@ -163,17 +167,19 @@ interface DebugMode {
 }
 
 export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, DebugMode & API.getType['energy_manager/debug_config']> {
+    old_input4_rule_then = -1;
+
     constructor() {
         super('energy_manager/config',
             __("energy_manager.script.save_failed"),
             __("energy_manager.script.reboot_content_changed"));
 
-        util.eventTarget.addEventListener('info/modules', () => {
+        util.addApiEventListener('info/modules', () => {
             this.setState({debug_mode: !!((API.get('info/modules') as any).debug)})
         });
 
 
-        util.eventTarget.addEventListener('energy_manager/debug_config', () => {
+        util.addApiEventListener('energy_manager/debug_config', () => {
             this.setState({...API.get('energy_manager/debug_config')});
         });
     }
@@ -182,7 +188,6 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
         if (this.state.debug_mode) {
             await API.save('energy_manager/debug_config', {
                     hysteresis_time: this.state.hysteresis_time,
-                    target_power_from_grid: this.state.target_power_from_grid
                 }, __("energy_manager.script.save_failed"));
         }
         await super.sendSave(t, cfg);
@@ -205,6 +210,10 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
             mode_list_for_inputs.push([tuple[0], __("energy_manager.content.input_switch_to") + " " + tuple[1]]);
         }
         mode_list_for_inputs.push(["255", __("energy_manager.content.input_mode_nothing")]);
+
+        // Remember previous input4_rule_then setting so that it can be restored after toggling the contactor installed setting multiple times.
+        if (this.old_input4_rule_then < 0)
+            this.old_input4_rule_then = this.state.input4_rule_then == 1 ? 0 : this.state.input4_rule_then;
 
         return (
             <>
@@ -248,21 +257,55 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                                 onClick={this.toggle('excess_charging_enable')}/>
                     </FormRow>
 
-                    <FormRow label={__("energy_manager.content.guaranteed_power")} label_muted={__("energy_manager.content.guaranteed_power_muted")}>
-                        <InputFloat
-                            unit="kW"
-                            value={s.guaranteed_power}
-                            onValue={this.set('guaranteed_power')}
-                            digits={3}
-                            min={0}
-                            max={22000}
-                            />
-                    </FormRow>
+                    <Collapse in={s.excess_charging_enable}>
+                        <div>
+                            <FormRow label={__("energy_manager.content.guaranteed_power")} label_muted={__("energy_manager.content.guaranteed_power_muted")}>
+                                <InputFloat
+                                    unit="kW"
+                                    value={s.guaranteed_power}
+                                    onValue={this.set('guaranteed_power')}
+                                    digits={3}
+                                    min={0}
+                                    max={22000}
+                                />
+                            </FormRow>
+
+                            {s.debug_mode ?
+                                <FormRow label={__("energy_manager.content.target_power_from_grid")} label_muted={__("energy_manager.content.target_power_from_grid_muted")}>
+                                    <InputFloat
+                                        unit="kW"
+                                        value={s.target_power_from_grid}
+                                        onValue={this.set('target_power_from_grid')}
+                                        digits={3}
+                                        min={-43470}
+                                        max={345000}
+                                    />
+                                </FormRow>
+                            : <>
+                                <FormRow label={__("energy_manager.content.control_behavior")} label_muted={__("energy_manager.content.control_behavior_muted")}>
+                                    <InputSelect
+                                        items={[
+                                            ["-200", __("energy_manager.content.target_power_n200")],
+                                            ["-100", __("energy_manager.content.target_power_n100")],
+                                            [ "-50", __("energy_manager.content.target_power_n50" )],
+                                            [   "0", __("energy_manager.content.target_power_0"   )],
+                                            [  "50", __("energy_manager.content.target_power_p50" )],
+                                            [ "100", __("energy_manager.content.target_power_p100")],
+                                            [ "200", __("energy_manager.content.target_power_p200")],
+                                        ]}
+                                        value={s.target_power_from_grid}
+                                        onValue={(v) => this.setState({target_power_from_grid: parseInt(v)})}
+                                    />
+                                </FormRow>
+                            </>}
+                        </div>
+                    </Collapse>
 
                     <FormRow label={__("energy_manager.content.contactor_installed")}>
                         <Switch desc={__("energy_manager.content.contactor_installed_desc")}
                                 checked={s.contactor_installed}
-                                onClick={() => this.setState({contactor_installed: !this.state.contactor_installed, input4_rule_then: this.state.contactor_installed ? this.state.input4_rule_then : 1})}/>
+                                onClick={() => this.setState({contactor_installed: !this.state.contactor_installed, input4_rule_then: this.state.contactor_installed ? this.old_input4_rule_then : 1})} // input4_rule_then setting inverted because it checks the not-yet-toggled state of contactor_installed.
+                        />
                     </FormRow>
 
                     <FormRow label={__("energy_manager.content.phase_switching_mode")}>
@@ -490,17 +533,6 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
 
                     {s.debug_mode ? <>
                         <FormSeparator heading={__("energy_manager.content.header_expert_settings")} />
-                        <FormRow label={__("energy_manager.content.target_power_from_grid")} label_muted={__("energy_manager.content.target_power_from_grid_muted")}>
-                            <InputFloat
-                                unit="kW"
-                                value={s.target_power_from_grid}
-                                onValue={this.set('target_power_from_grid')}
-                                digits={3}
-                                min={-43470}
-                                max={345000}
-                            />
-                        </FormRow>
-
                         <FormRow label={__("energy_manager.content.hysteresis_time")} label_muted={__("energy_manager.content.hysteresis_time_muted")}>
                             <InputNumber
                                 unit="min"
