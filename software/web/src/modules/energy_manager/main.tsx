@@ -198,16 +198,15 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
             return <></>
 
         let mode_list: StringStringTuple[] = [];
-        if (s.excess_charging_enable) {
-            mode_list.push(["2", __("energy_manager.status.mode_pv")]);
-            mode_list.push(["3", __("energy_manager.status.mode_min_pv")]);
-        }
-        mode_list.push(["0", __("energy_manager.status.mode_fast")]);
+
         mode_list.push(["1", __("energy_manager.status.mode_off")]);
+        mode_list.push([s.excess_charging_enable ? "2" : "disabled", __("energy_manager.status.mode_pv")]);
+        mode_list.push([s.excess_charging_enable ? "3" : "disabled", __("energy_manager.status.mode_min_pv")]);
+        mode_list.push(["0", __("energy_manager.status.mode_fast")]);
 
         let mode_list_for_inputs: StringStringTuple[] = [];
         for (let tuple of mode_list) {
-            mode_list_for_inputs.push([tuple[0], __("energy_manager.content.input_switch_to") + " " + tuple[1]]);
+            mode_list_for_inputs.push([tuple[0], __("energy_manager.content.input_switch_to_prefix") + tuple[1] + __("energy_manager.content.input_switch_to_suffix")]);
         }
         mode_list_for_inputs.push(["255", __("energy_manager.content.input_mode_nothing")]);
 
@@ -219,7 +218,7 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
             <>
                 <ConfigForm id="energy_manager_config_form" title={__("energy_manager.content.page_header")} isModified={this.isModified()} onSave={() => this.save()} onReset={this.reset} onDirtyChange={(d) => this.ignore_updates = d}>
 
-                    <FormRow label={__("energy_manager.content.default_mode")}>
+                    <FormRow label={__("energy_manager.content.default_mode")} label_muted={__("energy_manager.content.default_mode_muted")}>
                         <InputSelect
                             required
                             items={mode_list}
@@ -243,15 +242,8 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                         </div>
                     </Collapse>
 
-                    <FormSeparator heading={__("energy_manager.content.header_load_management")} />
-                    <FormRow label="">
-                        <div class="pt-3 pb-4">
-                            {__("energy_manager.content.load_management_explainer")}
-                        </div>
-                    </FormRow>
-
                     <FormSeparator heading={__("energy_manager.content.header_excess_charging")} />
-                    <FormRow label={__("energy_manager.content.enable_excess_charging")}>
+                    <FormRow label={__("energy_manager.content.enable_excess_charging")} label_muted={__("energy_manager.content.enable_excess_charging_muted")}>
                         <Switch desc={__("energy_manager.content.enable_excess_charging_desc")}
                                 checked={s.excess_charging_enable}
                                 onClick={this.toggle('excess_charging_enable')}/>
@@ -265,8 +257,9 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                                     value={s.guaranteed_power}
                                     onValue={this.set('guaranteed_power')}
                                     digits={3}
-                                    min={0}
+                                    min={230 * 6 * (s.phase_switching_mode == 2 ? 3 : 1)}
                                     max={22000}
+                                    showMinMax
                                 />
                             </FormRow>
 
@@ -321,7 +314,21 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                                 ]
                             }
                             value={s.phase_switching_mode}
-                            onValue={(v) => this.setState({phase_switching_mode: parseInt(v)})}/>
+                            onValue={(v) => {
+                                this.setState({phase_switching_mode: parseInt(v)});
+                                if (v == "2") {
+                                    this.setState({guaranteed_power: Math.max(this.state.guaranteed_power, 230 * 6 * 3)});
+                                } else if (this.state.guaranteed_power == (230 * 6 * 3)) {
+                                    this.setState({guaranteed_power: Math.max(230 * 6, API.get("energy_manager/config").guaranteed_power)});
+                                }
+                                }}/>
+                    </FormRow>
+
+                    <FormSeparator heading={__("energy_manager.content.header_load_management")} />
+                    <FormRow label="">
+                        <div class="pt-3 pb-4">
+                            {__("energy_manager.content.load_management_explainer")}
+                        </div>
                     </FormRow>
 
                     <FormSeparator heading={__("energy_manager.content.relay")}/>

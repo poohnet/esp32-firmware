@@ -22,15 +22,14 @@
             "sdm_none": "No meter",
             "sdm_630": "SDM630",
             "sdm_72dmv2": "SDM72DM V2",
-            "sdm_72ctm": "SDM72CTM",
             "sdm_630mctv2": "SDM630MCT V2",
             "sdm_details": "Show energy meter details",
             "sdm_available": "Connected Meter",
             "sdm_power": "Power draw",
             "sdm_energy_import": "Import",
-            "sdm_energy_import_muted": "Total draw from grid",
+            "sdm_energy_import_muted": "",
             "sdm_energy_export": "Export",
-            "sdm_energy_export_muted": "Total feed to grid",
+            "sdm_energy_export_muted": "",
 
             "generic_details": "Show generic energy meter details"
         },
