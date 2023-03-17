@@ -212,7 +212,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
                                         end_timestamp_min: end.getTime() / 1000 / 60,
                                         user_filter: parseInt(state.user_filter),
                                         letterhead: state.pdf_text
-                                    }, "lalala");
+                                    }, __("charge_tracker.script.download_charge_log_failed"));
                                     util.downloadToFile(pdf, "charge-log", "pdf", "application/pdf");
                                 } finally {
                                     this.setState({show_spinner: false});
@@ -357,7 +357,7 @@ function update_last_charges() {
         </div>`
     }).reverse();
 
-    $('#status-charge_tracker').prop("hidden", charges.length == 0);
+    $('#status-charge_tracker-last-charges').prop("hidden", charges.length == 0);
     $('#charge_tracker_status_last_charges').html(last_charges_html.join(""));
     feather.replace();
 }

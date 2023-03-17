@@ -262,6 +262,7 @@ def main():
     build_flags = env.GetProjectOption("build_flags")
     frontend_debug = env.GetProjectOption("custom_frontend_debug") == "true"
     web_only = env.GetProjectOption("custom_web_only") == "true"
+    monitor_speed = env.GetProjectOption("monitor_speed")
 
     is_release = len(subprocess.run(["git", "tag", "--contains", "HEAD"], check=True, capture_output=True).stdout) > 0
     is_dirty = len(subprocess.run(["git", "diff"], check=True, capture_output=True).stdout) > 0
@@ -368,13 +369,8 @@ def main():
         f.write('const char *build_timestamp_hex_str(void);\n')
         f.write('const char *build_version_full_str(void);\n')
         f.write('const char *build_info_str(void);\n')
-
-    with open(os.path.join('src', 'build.cpp'), 'w', encoding='utf-8') as f:
-        f.write('#include "build.h"\n')
-        f.write('uint32_t build_timestamp(void) {{ return {}; }}\n'.format(timestamp))
-        f.write('const char *build_timestamp_hex_str(void) {{ return "{:x}"; }}\n'.format(timestamp))
-        f.write('const char *build_version_full_str(void) {{ return "{}.{}.{}-{:x}"; }}\n'.format(*version, timestamp))
-        f.write('const char *build_info_str(void) {{ return "git url: {}, git branch: {}, git commit id: {}"; }}\n'.format(git_url, branch_name, git_commit_id))
+        f.write('const char *build_filename_str(void);')
+        f.write('const char *build_commit_id_str(void);')
 
     firmware_basename = '{}_firmware{}_{}_{:x}{}'.format(
         name,
@@ -383,6 +379,15 @@ def main():
         timestamp,
         dirty_suffix,
     )
+    with open(os.path.join('src', 'build.cpp'), 'w', encoding='utf-8') as f:
+        f.write('#include "build.h"\n')
+        f.write('uint32_t build_timestamp(void) {{ return {}; }}\n'.format(timestamp))
+        f.write('const char *build_timestamp_hex_str(void) {{ return "{:x}"; }}\n'.format(timestamp))
+        f.write('const char *build_version_full_str(void) {{ return "{}.{}.{}-{:x}"; }}\n'.format(*version, timestamp))
+        f.write('const char *build_info_str(void) {{ return "git url: {}, git branch: {}, git commit id: {}"; }}\n'.format(git_url, branch_name, git_commit_id))
+        f.write('const char *build_filename_str(void){{return "{}"; }}\n'.format(firmware_basename))
+        f.write('const char *build_commit_id_str(void){{return "{}"; }}\n'.format(git_commit_id))
+
 
     with open(os.path.join(env.subst('$BUILD_DIR'), 'firmware_basename'), 'w', encoding='utf-8') as f:
         f.write(firmware_basename)
@@ -423,7 +428,8 @@ def main():
         '{{{module_loop}}}': '\n    '.join(['{}.loop();'.format(x.under) for x in backend_modules]),
         '{{{display_name}}}': display_name,
         '{{{display_name_upper}}}': display_name.upper(),
-        '{{{module_init_config}}}': ',\n        '.join('{{"{0}", Config::Bool({0}.initialized)}}'.format(x.under) for x in backend_modules if not x.under.startswith("hidden_"))
+        '{{{module_init_config}}}': ',\n        '.join('{{"{0}", Config::Bool({0}.initialized)}}'.format(x.under) for x in backend_modules if not x.under.startswith("hidden_")),
+        '{{{monitor_speed}}}': str(monitor_speed),
     })
 
 

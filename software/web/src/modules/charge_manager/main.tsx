@@ -90,7 +90,7 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
         });
 
         util.addApiEventListener('info/modules', () => {
-            this.setState({energyManagerMode: !!((API.get('info/modules') as any).energy_manager)})
+            this.setState({energyManagerMode: !!((API.get('info/modules') as any).energy_manager) && !((API.get('info/modules') as any).evse_v2) && !((API.get('info/modules') as any).evse)})
         });
     }
 
@@ -123,6 +123,14 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
         document.getElementById("charge_manager_config_form").dispatchEvent(new Event('input'));
     }
 
+    override async isSaveAllowed(cfg: config): Promise<boolean> {
+        for (let i = 0; i < cfg.chargers.length; i++)
+            for (let a = i + 1; a < cfg.chargers.length; a++)
+                if (cfg.chargers[a].host == cfg.chargers[i].host)
+                    return false;
+        return true;
+    }
+
     override async sendSave(t: "charge_manager/config", cfg: config) {
         const modal = util.async_modal_ref.current;
         let illegal_chargers = "";
@@ -141,6 +149,7 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
             yes_variant: "danger"
         }))
             return;
+
         await API.save_maybe('evse/management_enabled', {"enabled": this.state.managementEnabled}, translate_unchecked("charge_manager.script.save_failed"));
         await super.sendSave(t, cfg);
     }
@@ -346,6 +355,19 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
                     />
             </FormRow>
 
+        const check_host = (host: string, idx: number): string => {
+            let ret: string;
+            state.chargers.forEach((charger, i) => {
+                if (charger.host == host && idx != i)
+                {
+                    ret = __("charge_manager.content.host_exists");
+                    return;
+                }
+            });
+
+            return ret;
+        }
+
         let chargers = <FormRow label={__("charge_manager.content.managed_boxes")}>
                 <div class="row row-cols-1 row-cols-md-2">
                 {state.chargers.map((c, i) => (
@@ -354,7 +376,7 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
                         <div class="card-header d-flex justify-content-between align-items-center">
                             {charger_symbol}
                             <Button variant="outline-dark" size="sm"
-                                    style={c.host == "127.0.0.1" ? "visibility: hidden;" : ""}
+                                    style={!state.energyManagerMode && c.host == "127.0.0.1" ? "visibility: hidden;" : ""}
                                     onClick={() => {
                                         this.setState({chargers: state.chargers.filter((v, idx) => idx != i)});
                                         this.hackToAllowSave();} }>
@@ -372,7 +394,9 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
                                 <InputText value={c.host}
                                         onValue={(v) => this.setCharger(i, {host: v})}
                                         maxLength={64}
-                                        required/>
+                                        required
+                                        class={check_host(c.host, i) != undefined ? "is-invalid" : ""}
+                                        invalidFeedback={check_host(c.host, i)}/>
                             </FormGroup>
                         </Card.Body>
                     </Card>
@@ -405,7 +429,9 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
                                 <InputText value={state.newCharger.host}
                                         onValue={(v) => this.setState({newCharger: {...state.newCharger, host: v}})}
                                         maxLength={64}
-                                        required/>
+                                        required
+                                        class={check_host(state.newCharger.host, -1) != undefined ? "is-invalid" : ""}
+                                        invalidFeedback={check_host(state.newCharger.host, -1)}/>
                             </FormGroup>
                             <FormGroup label={__("charge_manager.content.add_charger_modal_found")}>
                                 <ListGroup>
@@ -552,11 +578,11 @@ export class ChargeManagerStatus extends Component<{}, ChargeManagerStatusState>
                 c_info = translate_unchecked(`charge_manager.script.charge_error_${c.error}`);
             }
 
+            const name_link = state.config.chargers[i].host == "127.0.0.1" ? c.name : <a target="_blank" rel="noopener noreferrer" href={"http://" + state.config.chargers[i].host}>{c.name}</a>
+
             return  <div class="card">
                         <h5 class="card-header">
-                            <a target="_blank" rel="noopener noreferrer" href={ state.config.chargers[i].host != "127.0.0.1" ? "http://" + state.config.chargers[i].host : "#"}>
-                                {c.name}
-                            </a>
+                            {name_link}
                         </h5>
                         <div class={"card-body " + c_body_classes}>
                             <h5 class="card-title">{c_state}</h5>

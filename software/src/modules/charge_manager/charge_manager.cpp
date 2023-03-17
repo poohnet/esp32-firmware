@@ -96,6 +96,13 @@ void ChargeManager::pre_setup()
             return "default_available_current can not be greater than maximum_available_current";
 #endif
 
+        auto chargers = conf.get("chargers");
+
+        for (size_t i = 0; i < chargers->count(); i++)
+            for (size_t a = i + 1; a < chargers->count(); a++)
+                if (chargers->get(i)->get("host")->asString() == chargers->get(a)->get("host")->asString())
+                    return "there must not be two chargers with the same hostname or ip-address";
+
         return "";
     }};
 
@@ -107,6 +114,7 @@ void ChargeManager::pre_setup()
             {},
             new Config{Config::Object({
                 {"name", Config::Str("", 0, 32)},
+                {"uid", Config::Uint32(0)},
                 {"last_update", Config::Uint32(0)},
                 {"uptime", Config::Uint32(0)},
                 {"supported_current", Config::Uint16(0)}, // maximum current supported by the charger
@@ -123,7 +131,12 @@ void ChargeManager::pre_setup()
                 {"allocated_current", Config::Uint16(0)}, // last current limit send to the charger
 
                 {"state", Config::Uint8(0)}, // 0 - no vehicle, 1 - user blocked, 2 - manager blocked, 3 - car blocked, 4 - charging, 5 - error, 6 - charged
-                {"error", Config::Uint8(0)} // 0 - okay, 1 - unreachable, 2 - FW mismatch, 3 - not managed
+                {"error", Config::Uint8(0)}, // 0 - okay, 1 - unreachable, 2 - FW mismatch, 3 - not managed
+
+                {"charger_state", Config::Uint8(0)},
+                {"meter_supported", Config::Bool(false)},
+                {"power_total", Config::Float(0)},
+                {"energy_abs", Config::Float(0)},
             })},
             0, MAX_CLIENTS, Config::type_id<Config::ConfObject>()
         )}
@@ -176,27 +189,16 @@ void ChargeManager::start_manager_task()
         names.push_back(charger.get("name")->asString());
     }
 
-    cm_networking.register_manager(std::move(hosts), names, [this, chargers](
-            uint8_t client_id,
-            uint8_t iec61851_state,
-            uint8_t charger_state,
-            uint8_t error_state,
-            uint32_t uptime,
-            uint32_t charging_time,
-            uint16_t allowed_charging_current,
-            uint16_t supported_current,
-            bool cp_disconnect_supported,
-            bool cp_disconnected_state
-        ) mutable {
+    cm_networking.register_manager(std::move(hosts), names, [this, chargers](uint8_t client_id, cm_state_v1 *state) mutable {
             auto target = charge_manager_state.get("chargers")->get(client_id);
             // Don't update if the uptimes are the same.
             // This means, that the EVSE hangs or the communication
             // is not working. As last_update will now hang too,
             // the management will stop all charging after some time.
-            if (target->get("uptime")->asUint() == uptime) {
+            if (target->get("uptime")->asUint() == state->evse_uptime) {
                 logger.printfln("Received stale charger state from %s (%s). Reported EVSE uptime (%u) is the same as in the last state. Is the EVSE still reachable?",
                     chargers->get(client_id)->get("name")->asEphemeralCStr(), chargers->get(client_id)->get("host")->asEphemeralCStr(),
-                    uptime);
+                    state->evse_uptime);
                 if (deadline_elapsed(target->get("last_update")->asUint() + 10000)) {
                     target->get("state")->updateUint(5);
                     target->get("error")->updateUint(CHARGE_MANAGER_ERROR_EVSE_UNREACHABLE);
@@ -205,28 +207,33 @@ void ChargeManager::start_manager_task()
                 return;
             }
 
-            target->get("uptime")->updateUint(uptime);
+            target->get("uid")->updateUint(state->esp32_uid);
+            target->get("uptime")->updateUint(state->evse_uptime);
 
             // A charger wants to charge if:
             // - the charging time is 0 (it has not charged this vehicle yet), no other slot blocks and we are still in charger state 1 (i.e. blocked by a slot, so the charge management slot)
             // - OR the charger waits for the vehicle to start charging
             // - OR the charger is already charging
-            bool wants_to_charge = (charging_time == 0 && supported_current != 0 && charger_state == 1) || charger_state == 2 || charger_state == 3;
+            bool wants_to_charge = (state->charging_time == 0 && state->supported_current != 0 && state->charger_state == 1) || state->charger_state == 2 || state->charger_state == 3;
             target->get("wants_to_charge")->updateBool(wants_to_charge);
 
             // A charger wants to charge and has low priority if it has already charged this vehicle and only the charge manager slot blocks.
-            bool low_prio = charging_time != 0 && supported_current != 0 && charger_state == 1;
+            bool low_prio = state->charging_time != 0 && state->supported_current != 0 && state->charger_state == 1;
             target->get("wants_to_charge_low_priority")->updateBool(low_prio);
 
-            target->get("is_charging")->updateBool(charger_state == 3);
-            target->get("allowed_current")->updateUint(allowed_charging_current);
-            target->get("supported_current")->updateUint(supported_current);
-            target->get("cp_disconnect_supported")->updateBool(cp_disconnect_supported);
-            target->get("cp_disconnect_state")->updateBool(cp_disconnected_state);
+            target->get("is_charging")->updateBool(state->charger_state == 3);
+            target->get("allowed_current")->updateUint(state->allowed_charging_current);
+            target->get("supported_current")->updateUint(state->supported_current);
+            target->get("cp_disconnect_supported")->updateBool(CM_FEATURE_FLAGS_CP_DISCONNECT_IS_SET(state->feature_flags));
+            target->get("cp_disconnect_state")->updateBool(CM_STATE_FLAGS_CP_DISCONNECTED_IS_SET(state->state_flags));
             target->get("last_update")->updateUint(millis());
+            target->get("charger_state")->updateUint(state->charger_state);
+            target->get("meter_supported")->updateBool(CM_FEATURE_FLAGS_METER_IS_SET(state->feature_flags));
+            target->get("power_total")->updateFloat(state->power_total);
+            target->get("energy_abs")->updateFloat(state->energy_abs);
 
-            if (error_state != 0) {
-                target->get("error")->updateUint(CHARGE_MANAGER_CLIENT_ERROR_START + error_state);
+            if (state->error_state != 0) {
+                target->get("error")->updateUint(CHARGE_MANAGER_CLIENT_ERROR_START + state->error_state);
             }
 
             auto current_error = target->get("error")->asUint();
@@ -236,10 +243,10 @@ void ChargeManager::start_manager_task()
 
             current_error = target->get("error")->asUint();
             if (current_error == 0 || current_error >= CHARGE_MANAGER_CLIENT_ERROR_START)
-                target->get("state")->updateUint(get_charge_state(charger_state,
-                                                                 supported_current,
-                                                                 charging_time,
-                                                                 target->get("allocated_current")->asUint()));
+                target->get("state")->updateUint(get_charge_state(state->charger_state,
+                                                                  state->supported_current,
+                                                                  state->charging_time,
+                                                                  target->get("allocated_current")->asUint()));
             charge_manager_state.get("uptime")->updateUint(millis());
     }, [this](uint8_t client_id, uint8_t error){
         auto target = charge_manager_state.get("chargers")->get(client_id);

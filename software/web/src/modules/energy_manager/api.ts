@@ -13,7 +13,9 @@ export interface low_level_state {
     is_on_last: boolean,
     wants_on_last: boolean,
     phase_state_change_blocked: boolean,
+    phase_state_change_delay: number,
     on_state_change_blocked: boolean,
+    on_state_change_delay: number,
     charging_blocked: number,
     switching_state: number,
     consecutive_bricklet_errors: number,
@@ -69,6 +71,46 @@ export interface debug_config {
 
 export interface charge_mode {
     mode: number
+}
+
+export interface history_wallbox_5min_changed {
+    uid: number,
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    flags: number,
+    power: number
+}
+
+export interface history_wallbox_daily_changed {
+    uid: number,
+    year: number,
+    month: number,
+    day: number,
+    energy: number
+}
+
+export interface history_energy_manager_5min_changed {
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    flags: number,
+    power_grid: number,
+    power_general: number[]
+}
+
+export interface history_energy_manager_daily_changed {
+    year: number,
+    month: number,
+    day: number,
+    energy_grid_in: number,
+    energy_grid_out: number,
+    energy_general_in: number[],
+    energy_general_out: number[]
 }
 
 export type debug_header = string;

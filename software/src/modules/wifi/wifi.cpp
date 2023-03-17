@@ -88,7 +88,7 @@ void Wifi::pre_setup()
             )
         },
         {"bssid_lock", Config::Bool(false)},
-        {"passphrase", Config::Str("", 8, 64)},
+        {"passphrase", Config::Str("", 0, 64)},
         {"ip", Config::Str("0.0.0.0", 7, 15)},
         {"gateway", Config::Str("0.0.0.0", 7, 15)},
         {"subnet", Config::Str("0.0.0.0", 7, 15)},
@@ -236,7 +236,8 @@ void Wifi::apply_soft_ap_config_and_start()
 
     int counter = 0;
     while (ip != WiFi.softAPIP()) {
-        WiFi.softAPConfig(ip, gateway, subnet);
+        if (!WiFi.softAPConfig(ip, gateway, subnet))
+            logger.printfln("WiFi.softAPConfig() failed. Try different Access Point settings.");
         ++counter;
     }
     logger.printfln("Had to configure soft AP IP address %d times.", counter);

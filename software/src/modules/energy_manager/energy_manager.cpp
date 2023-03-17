@@ -27,6 +27,9 @@
 #include "task_scheduler.h"
 #include "tools.h"
 #include "web_server.h"
+#include "build.h"
+
+#include "musl_libc_timegm.h"
 
 void EnergyManager::pre_setup()
 {
@@ -54,7 +57,9 @@ void EnergyManager::pre_setup()
         {"is_on_last", Config::Bool(false)},
         {"wants_on_last", Config::Bool(false)},
         {"phase_state_change_blocked", Config::Bool(false)},
+        {"phase_state_change_delay", Config::Uint32(0)},
         {"on_state_change_blocked", Config::Bool(false)},
+        {"on_state_change_delay", Config::Uint32(0)},
         {"charging_blocked", Config::Uint32(0)},
         {"switching_state", Config::Uint32(0)},
         {"consecutive_bricklet_errors", Config::Uint32(0)},
@@ -81,7 +86,7 @@ void EnergyManager::pre_setup()
         {"auto_reset_time", Config::Uint(0, 0, 1439)},
         {"excess_charging_enable", Config::Bool(false)},
         {"target_power_from_grid", Config::Int32(0)}, // in watt
-        {"guaranteed_power", Config::Uint(1380, 1380, 22080)}, // in watt
+        {"guaranteed_power", Config::Uint(1380, 0, 22080)}, // in watt
         {"contactor_installed", Config::Bool(false)},
         {"phase_switching_mode", Config::Uint8(PHASE_SWITCHING_AUTOMATIC)},
         {"relay_config", Config::Uint8(0)},
@@ -121,6 +126,35 @@ void EnergyManager::pre_setup()
         {"mode", Config::Uint(0, 0, 3)},
     });
     charge_mode_update = charge_mode;
+
+    // history
+    history_wallbox_5min = Config::Object({
+        {"uid", Config::Uint32(0)},
+        // date in UTC to avoid DST overlap problems
+        {"year", Config::Uint(0, 2000, 2255)},
+        {"month", Config::Uint(0, 1, 12)},
+        {"day", Config::Uint(0, 1, 31)},
+    });
+
+    history_wallbox_daily = Config::Object({
+        {"uid", Config::Uint32(0)},
+        // date in local time to have the days properly aligned
+        {"year", Config::Uint(0, 2000, 2255)},
+        {"month", Config::Uint(0, 1, 12)},
+    });
+
+    history_energy_manager_5min = Config::Object({
+        // date in UTC to avoid DST overlap problems
+        {"year", Config::Uint(0, 2000, 2255)},
+        {"month", Config::Uint(0, 1, 12)},
+        {"day", Config::Uint(0, 1, 31)},
+    });
+
+    history_energy_manager_daily = Config::Object({
+        // date in local time to have the days properly aligned
+        {"year", Config::Uint(0, 2000, 2255)},
+        {"month", Config::Uint(0, 1, 12)},
+    });
 }
 
 void EnergyManager::apply_defaults()
@@ -189,6 +223,8 @@ void EnergyManager::setup()
 #endif
 
     update_all_data();
+
+    task_scheduler.scheduleWithFixedDelay([this](){collect_data_points();}, 10000, 10000);
 
     // Set up output relay and input pins
     output = new OutputRelay(config_in_use);
@@ -298,6 +334,17 @@ void EnergyManager::setup()
             logger.printfln("energy_manager: Excess charging enabled but no meter configured.");
         }
     }, 0);
+
+    struct timeval time = get_time();
+    if (time.tv_sec != 0) {
+        settimeofday(&time, nullptr);
+
+        auto now = millis();
+        auto secs = now / 1000;
+        auto ms = now % 1000;
+        logger.printfln("Set system time from Energy Manager Bricklet at %lu,%03lu", secs, ms);
+    } else
+        logger.printfln("Energy Manager Bricklet has no time set!");
 }
 
 void EnergyManager::register_urls()
@@ -307,6 +354,24 @@ void EnergyManager::register_urls()
 
     if (!device_found)
         return;
+
+    server.on("/em/set", HTTP_GET, [this](WebServerRequest request) {
+        timeval tv;
+        gettimeofday(&tv, NULL);
+
+        set_time(tv);
+        return request.send(200, "ok");
+    });
+
+    server.on("/em/get", HTTP_GET, [this](WebServerRequest request) {
+        timeval tv = get_time();
+        timeval tv2;
+        gettimeofday(&tv2, NULL);
+
+        logger.printfln("%li", tv.tv_sec);
+        logger.printfln("%li", tv2.tv_sec);
+        return request.send(200, "ok");
+    });
 
 #if MODULE_WS_AVAILABLE()
     server.on("/energy_manager/start_debug", HTTP_GET, [this](WebServerRequest request) {
@@ -357,7 +422,17 @@ void EnergyManager::register_urls()
         logger.printfln("energy_manager: Switched mode %i->%i", old_mode, mode);
     }, false);
 
+    api.addResponse("energy_manager/history_wallbox_5min", &history_wallbox_5min, {}, [this](IChunkedResponse *response, Ownership *ownership, uint32_t owner_id){history_wallbox_5min_response(response, ownership, owner_id);});
+    api.addResponse("energy_manager/history_wallbox_daily", &history_wallbox_daily, {}, [this](IChunkedResponse *response, Ownership *ownership, uint32_t owner_id){history_wallbox_daily_response(response, ownership, owner_id);});
+    api.addResponse("energy_manager/history_energy_manager_5min", &history_energy_manager_5min, {}, [this](IChunkedResponse *response, Ownership *ownership, uint32_t owner_id){history_energy_manager_5min_response(response, ownership, owner_id);});
+    api.addResponse("energy_manager/history_energy_manager_daily", &history_energy_manager_daily, {}, [this](IChunkedResponse *response, Ownership *ownership, uint32_t owner_id){history_energy_manager_daily_response(response, ownership, owner_id);});
+
     this->DeviceModule::register_urls();
+
+    //update system time every 10 minutes from energy manager bricklet
+    task_scheduler.scheduleWithFixedDelay([this]() {
+        update_system_time();
+    }, 1000 * 60 * 10, 1000 * 60 * 10);
 }
 
 void EnergyManager::loop()
@@ -433,7 +508,12 @@ void EnergyManager::update_all_data_struct()
         &all_data.uptime
     );
 
-    check_bricklet_reachable(rc);
+    check_bricklet_reachable(rc, "update_all_data_struct");
+
+    if (rc == TF_E_OK) {
+        all_data.last_update = millis();
+        all_data.is_valid = true;
+    }
 }
 
 void EnergyManager::update_status_led()
@@ -469,7 +549,7 @@ void EnergyManager::set_error(uint32_t error_mask)
         update_status_led();
 }
 
-void EnergyManager::check_bricklet_reachable(int rc) {
+void EnergyManager::check_bricklet_reachable(int rc, const char *context) {
     if (rc == TF_E_OK) {
         consecutive_bricklet_errors = 0;
         if (!bricklet_reachable) {
@@ -479,14 +559,14 @@ void EnergyManager::check_bricklet_reachable(int rc) {
         }
     } else {
         if (rc == TF_E_TIMEOUT) {
-            logger.printfln("energy_manager: bricklet access timed out.");
+            logger.printfln("energy_manager (%s): Bricklet access timed out.", context);
         } else {
-            logger.printfln("energy_manager: bricklet access returned error %d.", rc);
+            logger.printfln("energy_manager (%s): Bricklet access returned error %d.", context, rc);
         }
         if (bricklet_reachable && ++consecutive_bricklet_errors >= 8) {
             bricklet_reachable = false;
             set_error(ERROR_FLAGS_BRICKLET_MASK);
-            logger.printfln("energy_manager: Bricklet is unreachable.");
+            logger.printfln("energy_manager (%s): Bricklet is unreachable.", context);
         }
     }
     low_level_state.get("consecutive_bricklet_errors")->updateUint(consecutive_bricklet_errors);
@@ -749,7 +829,9 @@ void EnergyManager::update_energy()
         bool phase_state_change_is_blocked = a_after_b(phase_state_change_blocked_until, time_now);
         bool on_state_change_is_blocked = a_after_b(on_state_change_blocked_until, time_now);
         low_level_state.get("phase_state_change_blocked")->updateBool(phase_state_change_is_blocked);
+        low_level_state.get("phase_state_change_delay")->updateUint(phase_state_change_is_blocked ? phase_state_change_blocked_until - time_now : 0);
         low_level_state.get("on_state_change_blocked")->updateBool(on_state_change_is_blocked);
+        low_level_state.get("on_state_change_delay")->updateUint(on_state_change_is_blocked ? on_state_change_blocked_until - time_now : 0);
 
         // Check if phase switching is allowed right now.
         bool switch_phases = false;
@@ -887,7 +969,7 @@ bool EnergyManager::get_sdcard_info(struct sdcard_info *data)
     // Product name retrieved from the SD card is an unterminated 5-character string, so we have to terminate it here.
     data->product_name[sizeof(data->product_name) - 1] = 0;
 
-    check_bricklet_reachable(rc);
+    check_bricklet_reachable(rc, "get_sdcard_info");
 
     if (rc != TF_E_OK) {
         set_error(ERROR_FLAGS_SDCARD_MASK);
@@ -906,7 +988,7 @@ bool EnergyManager::format_sdcard()
     uint8_t ret_format_status;
     int rc = tf_warp_energy_manager_format_sd(&device, 0x4223ABCD, &ret_format_status);
 
-    check_bricklet_reachable(rc);
+    check_bricklet_reachable(rc, "format_sdcard");
 
     return rc == TF_E_OK && ret_format_status == TF_WARP_ENERGY_MANAGER_FORMAT_STATUS_OK;
 }
@@ -916,7 +998,7 @@ uint16_t EnergyManager::get_energy_meter_detailed_values(float *ret_values)
     uint16_t len = 0;
     int rc = tf_warp_energy_manager_get_energy_meter_detailed_values(&device, ret_values, &len);
 
-    check_bricklet_reachable(rc);
+    check_bricklet_reachable(rc, "get_energy_meter_detailed_values");
 
     return rc == TF_E_OK ? len : 0;
 }
@@ -939,4 +1021,105 @@ void EnergyManager::set_rgb_led(uint8_t pattern, uint16_t hue)
 
     if (rc != TF_E_OK)
         logger.printfln("energy_manager: Failed to set LED state: error %i. Continuing anyway.", rc);
+}
+
+void EnergyManager::set_time(const timeval &tv)
+{
+    tm date_time;
+    gmtime_r(&tv.tv_sec, &date_time);
+
+    date_time.tm_year -= 100;
+    date_time.tm_mday -= 1;
+
+    int ret = tf_warp_energy_manager_set_date_time(&device,
+                                                    date_time.tm_sec,
+                                                    date_time.tm_min,
+                                                    date_time.tm_hour,
+                                                    date_time.tm_mday,
+                                                    date_time.tm_wday,
+                                                    date_time.tm_mon,
+                                                    date_time.tm_year);
+
+    if (ret)
+        logger.printfln("Setting datetime on energy-manager-bricklet failed with code %i", ret);
+}
+
+struct timeval EnergyManager::get_time()
+{
+    tm date_time;
+    timeval time;
+
+    uint8_t tm_sec;
+    uint8_t tm_min;
+    uint8_t tm_hour;
+    uint8_t tm_mday;
+    uint8_t tm_wday;
+    uint8_t tm_mon;
+    uint16_t tm_year;
+
+    int ret = tf_warp_energy_manager_get_date_time(&device,
+                                                    &tm_sec,
+                                                    &tm_min,
+                                                    &tm_hour,
+                                                    &tm_mday,
+                                                    &tm_wday,
+                                                    &tm_mon,
+                                                    &tm_year);
+
+    if (ret)
+    {
+        logger.printfln("getting datetime on energy-manager-bricklet failed with code %i", ret);
+        time.tv_sec = 0;
+        time.tv_usec = 0;
+        return time;
+    }
+
+    date_time.tm_sec = tm_sec;
+    date_time.tm_min = tm_min;
+    date_time.tm_hour = tm_hour;
+    date_time.tm_mday = tm_mday + 1;
+    date_time.tm_wday = tm_wday;
+    date_time.tm_mon = tm_mon;
+    date_time.tm_year = tm_year + 100;
+
+    time.tv_sec = timegm(&date_time);
+    time.tv_usec = 0;
+
+    if (time.tv_sec < build_timestamp())
+    {
+        struct timeval tmp;
+        tmp.tv_sec = 0;
+        tmp.tv_usec = 0;
+        return tmp;
+    }
+
+    return time;
+}
+
+void EnergyManager::update_system_time()
+{
+    // We have to make sure, we don't try to update the system clock
+    // while Energy Manager also sets the clock.
+    // To prevent this, we skip updating the system clock if NTP
+    // did update it while we were fetching the current time from the EM.
+
+    uint32_t count;
+    {
+        std::lock_guard<std::mutex> lock{ntp.mtx};
+        count = ntp.sync_counter;
+    }
+
+    struct timeval t = this->get_time();
+    if (t.tv_sec == 0 && t.tv_usec == 0)
+        return;
+
+    {
+        std::lock_guard<std::mutex> lock{ntp.mtx};
+        if (count != ntp.sync_counter)
+            // NTP has just updated the system time. We assume that this time is more accurate the the EMs.
+            return;
+
+        settimeofday(&t, nullptr);
+        ntp.set_synced();
+    }
 }

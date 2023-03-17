@@ -60,7 +60,7 @@
             "charging_current": "Charging current limits",
             "charging_current_muted": "minimum of the charging current limits",
             "reset_slot": "Release",
-            "low_level_state": "Low level state",
+            "low_level_state": "Low-level state",
             "led_state": "LED state",
             "led_state_off": "Off",
             "led_state_on": "On",
@@ -112,8 +112,7 @@
             "slot_9": "Modbus TCP current",
             "slot_10": "Modbus TCP clearance",
             "slot_11": "OCPP",
-            "slot_12": "Lalala",
-            "slot_13": "Time restriction"
+            "slot_12": "Energy/Time limit"
         },
         "script": {
             "error_code": "Error code",
@@ -154,8 +153,7 @@
             "slot_9": "Modbus TCP",
             "slot_10": "Modbus TCP clearance",
             "slot_11": "OCPP",
-            "slot_12": "Lalala",
-            "slot_13": "Time restriction",
+            "slot_12": "Energy/Time limit",
             "reboot_content_changed": "Charge Settings"
         }
     }
