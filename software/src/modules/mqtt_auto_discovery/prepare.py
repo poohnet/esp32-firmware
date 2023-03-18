@@ -119,7 +119,7 @@ Entity(True, Component.SENSOR, Feature.EVSE, "chargerstate", "evse/state", "Fahr
      "icon": "mdi:ev-plug-type2"},
     {}),
 
-Entity(True, Component.NUMBER, Feature.EVSE, "globalcurrent", "evse/global_current", "Konfigurierter Ladestrom", "Configured charging current",
+Entity(True, Component.NUMBER, Feature.EVSE, "globalcurrent", "evse/external_current", "Konfigurierter Ladestrom", "Configured charging current",
     {"value_template":"{{value_json.current}}",
      "unit_of_measurement":"mA",
      "min": 6000,
@@ -128,16 +128,6 @@ Entity(True, Component.NUMBER, Feature.EVSE, "globalcurrent", "evse/global_curre
      "mode": "box",
      "icon": "mdi:gauge"},
     {}),
-
-Entity(True, Component.SWITCH, Feature.EVSE, "autocharge", "evse/auto_start_charging", "Ladevorgang automatisch starten", "Start charging automatically",
-    {"value_template":"{{value_json.auto_start_charging}}",
-     "state_on":"true",
-     "state_off":"false",
-     "payload_on":"true",
-     "payload_off":"false",
-     "icon": "mdi:ev-plug-type2"},
-    {"state_on":"True",
-     "state_off":"False"}),
 
 Entity(True, Component.BUTTON, Feature.EVSE, "startcharge", "evse/start_charging", "Ladevorgang starten", "Start charging",
     {"payload_press": "null",   # for Home Assistant

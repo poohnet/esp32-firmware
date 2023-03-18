@@ -244,10 +244,20 @@ def hyphenate_translation(translation, parent_key=None):
 
     return {key: (hyphenate(value) if isinstance(value, str) else hyphenate_translation(value, parent_key=parent_key + [key])) for key, value in translation.items()}
 
+def repair_rtc_dir():
+    path = os.path.abspath("src/modules/rtc")
+    try:
+        os.remove(path + "/real_time_clock_v2_bricklet_firmware_bin.digest")
+        os.remove(path + "/real_time_clock_v2_bricklet_firmware_bin.embedded.cpp")
+        os.remove(path + "/real_time_clock_v2_bricklet_firmware_bin.embedded.h")
+    except:
+        pass
+
 def main():
     if env.IsCleanTarget():
         return
 
+    repair_rtc_dir()
     subprocess.check_call([env.subst('$PYTHONEXE'), "-u", "update_packages.py"])
 
     # Add build flags

@@ -111,12 +111,15 @@ interface UplotWrapperProps {
     id: string;
     class: string;
     sidebar_id: string;
-    y_min: number;
-    y_max: number;
+    y_min?: number;
+    y_max?: number;
+    y_diff_min?: number;
+    y_step?: number;
 }
 
 class UplotWrapper extends Component<UplotWrapperProps, {}> {
     uplot: uPlot;
+    data: UplotData;
     pending_data: UplotData;
     visible: boolean = false;
     div_ref = createRef();
@@ -212,17 +215,24 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             scales: {
                 y: {
                     range: {
-                        max: {
-                            soft: this.props.y_max,
-                            mode: (this.props.y_max !== undefined ? 1 : 3) as uPlot.Range.SoftMode,
-                        },
                         min: {
-                            soft: this.props.y_min,
-                            mode: (this.props.y_min !== undefined ? 1 : 3) as uPlot.Range.SoftMode,
+                            mode: 1 as uPlot.Range.SoftMode,
+                        },
+                        max: {
+                            mode: 1 as uPlot.Range.SoftMode,
                         },
                     },
                 },
             },
+            plugins: [
+                {
+                    hooks: {
+                        setSeries: (self: uPlot, seriesIdx: number, opts: uPlot.Series) => {
+                            this.update_internal_data();
+                        },
+                    },
+                },
+            ],
         };
 
         let div = this.div_ref.current;
@@ -259,15 +269,78 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
         return <div><div ref={this.div_ref} id={props.id} class={props.class} /></div>;
     }
 
+    update_internal_data() {
+        let y_min: number = this.props.y_min;
+        let y_max: number = this.props.y_max;
+
+        for (let i = 0; i < this.data.samples.length; ++i) {
+            let value = this.data.samples[i];
+
+            if (value !== null) {
+                if (y_min === undefined || value < y_min) {
+                    y_min = value;
+                }
+
+                if (y_max === undefined || value > y_max) {
+                    y_max = value;
+                }
+            }
+        }
+
+        if (y_min === undefined && y_max === undefined) {
+            y_min = 0;
+            y_max = 0;
+        }
+        else if (y_min === undefined) {
+            y_min = y_max;
+        }
+        else if (y_max === undefined) {
+            y_max = y_min;
+        }
+
+        let y_diff_min = this.props.y_diff_min;
+
+        if (y_diff_min !== undefined) {
+            let y_diff = y_max - y_min;
+
+            if (y_diff < y_diff_min) {
+                let y_center = y_min + y_diff / 2;
+
+                let new_y_min = Math.floor(y_center - y_diff_min / 2);
+                let new_y_max = Math.ceil(y_center + y_diff_min / 2);
+
+                if (new_y_min < 0 && y_min >= 0) {
+                    // avoid negative range, if actual minimum is positive
+                    y_min = 0;
+                    y_max = y_diff_min;
+                } else {
+                    y_min = new_y_min;
+                    y_max = new_y_max;
+                }
+            }
+        }
+
+        let y_step = this.props.y_step;
+
+        if (y_step !== undefined) {
+            y_min = Math.floor(y_min / y_step) * y_step;
+            y_max = Math.ceil(y_max / y_step) * y_step;
+        }
+
+        this.uplot.setScale('y', {min: y_min, max: y_max});
+        this.uplot.setData([this.data.timestamps, this.data.samples]);
+    }
+
     set_data(data: UplotData) {
         if (!this.uplot || !this.visible) {
             this.pending_data = data;
             return;
         }
 
+        this.data = data;
         this.pending_data = undefined;
 
-        this.uplot.setData([data.timestamps, data.samples]);
+        this.update_internal_data();
     }
 }
 
@@ -451,7 +524,12 @@ export class Meter extends Component<{}, MeterState> {
                                     </div>
                                 </div>
                             </div>
-                            <UplotWrapper ref={this.uplot_wrapper_ref} id="meter_chart" class="meter-chart" sidebar_id="meter" y_min={undefined} y_max={undefined} />
+                            <UplotWrapper ref={this.uplot_wrapper_ref}
+                                          id="meter_chart"
+                                          class="meter-chart"
+                                          sidebar_id="meter"
+                                          y_diff_min={100}
+                                          y_step={10} />
                         </div>
                         <div class="col-lg-6 col-xl-4">
                             <div class="row mb-3 pt-3">
@@ -523,7 +601,7 @@ export class Meter extends Component<{}, MeterState> {
                     {API.hasFeature("meter_all_values") ?
                     <CollapsedSection colClasses="col-xl-10" label={__("meter.content.detailed_values")}>
                         {
-                        entries.filter(e => e.meter_types.indexOf(state.state.type) > 0).map(e => <FormRow label={e.name} label_muted={e.desc} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                        entries.filter(e => e.meter_types.indexOf(state.state.type) >= 0).map(e => <FormRow label={e.name} label_muted={e.desc} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
                             {e.three_phase ? <div class="row">
                                 <div class="mb-1 col-12 col-sm-4">
                                     <OutputFloat value={this.state.all_values[e.i + 0]} digits={e.digits} scale={0} unit={e.unit}/>
@@ -580,7 +658,12 @@ export class StatusMeterChart extends Component<{}, {}> {
     render(props: {}, state: {}) {
         return (
             <>
-                <UplotWrapper ref={this.uplot_wrapper_ref} id="status_meter_chart" class="status-meter-chart" sidebar_id="status" y_min={0} y_max={1500} />
+                <UplotWrapper ref={this.uplot_wrapper_ref}
+                              id="status_meter_chart"
+                              class="status-meter-chart"
+                              sidebar_id="status"
+                              y_min={0}
+                              y_max={1500} />
             </>
         )
     }
