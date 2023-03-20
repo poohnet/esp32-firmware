@@ -1,0 +1,35 @@
+{
+    "sem20": {
+        "status": {
+            "power_history": "Verlauf Verbrauch/Einspeisung"
+        },
+        "navbar": {
+            "sem20": "SMA Energy Meter 2.0"
+        },
+        "content": {
+            "sem20":            "SMA Energy Meter 2.0",
+            "bezug":            "Bezug",
+            "einspeisung":      "Einspeisung",
+            "sonstiges":        "Sonstiges",
+            "wirkleistung":     "Wirkleistung",
+            "blindleistung":    "Blindleistung",
+            "scheinleistung":   "Scheinleistung",
+            "leistungsfaktor":  "Leistungsfaktor",
+            "spannung":         "Spannung",
+            "strom":            "Strom",
+            "netzfrequenz":     "Netzfrequenz",
+            "aktuell":          "aktueller Mittelwert",
+            "zaehler":          "Zählerstand",
+            "history":          "Verlauf (48 h)",
+            "live":             "Live",
+            "statistics":       "Statistiken"
+        },
+        "script": {
+            "time": "Uhrzeit",
+            "time_legend_format": "{DD}.{MM}.{YYYY} {HH}:{mm}:{ss}",
+            "time_long_date_format": "{DD}.{MM}.{YYYY}",
+            "time_short_date_format": "{DD}.{MM}.",
+            "power": "Leistung"
+        }
+    }
+}
