@@ -27,7 +27,7 @@
 #include "web_server.h"
 
 // How many hours to keep the coarse history for
-#define HISTORY_HOURS 48
+#define HISTORY_HOURS 24
 // How many minutes to keep the fine history for.
 // This also controls the coarseness of the coarse history.
 // For example 4 means that we accumulate 4 minutes of samples
