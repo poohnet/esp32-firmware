@@ -346,8 +346,8 @@
 - Fix RTC time handling
 - Fix charged energy register in Modbus/TCP Keba emulation mode
 
-2023-03-16: 2.1.1 (f7d5e161)
-- Add MQTT auto discovery
+2023-03-16: 2.1.1 (854dbe3c)
+- Add MQTT auto discovery for Home Assistant and compatible systems
 - Add time and energy limits for charging
 - Add core dump to debug report
 - Scale meter graphs to always span at least 100 W
@@ -364,5 +364,7 @@
 - Make managed chargers on status page clickable links
 - Check if configured charger hosts have duplicates
 - Filter out mDNS responses not created by WARP Chargers
-- Resolve .local hostnames via
+- Resolve .local hostnames via mDNS scan
 - Remove stale RSSI and IP values if WiFi connection is lost
+- Fix charge log stopping after 60 seconds
+- Improve MQTT error messages

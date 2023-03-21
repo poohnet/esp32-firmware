@@ -408,8 +408,9 @@ void Users::setup()
             this->start_charging(0, 32000, CHARGE_TRACKER_AUTH_TYPE_NONE, Config::ConfVariant{});
     }
 
-    task_scheduler.scheduleWithFixedDelay([this](){
-        static uint8_t last_charger_state = get_charger_state();
+    auto outer_charger_state = get_charger_state();
+    task_scheduler.scheduleWithFixedDelay([this, outer_charger_state](){
+        static uint8_t last_charger_state = outer_charger_state;
 
         uint8_t charger_state = get_charger_state();
         if (charger_state == last_charger_state)
@@ -773,7 +774,7 @@ void Users::register_urls()
     server.on("/users/all_usernames", HTTP_GET, [this](WebServerRequest request) {
         //std::lock_guard<std::mutex> lock{records_mutex};
         size_t len = MAX_PASSIVE_USERS * USERNAME_ENTRY_LENGTH;
-        auto buf = std::unique_ptr<char[]>(new char[len]);
+        auto buf = heap_alloc_array<char>(len);
         if (buf == nullptr) {
             return request.send(507);
         }
