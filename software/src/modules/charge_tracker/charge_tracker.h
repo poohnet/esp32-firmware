@@ -60,7 +60,6 @@ public:
     ConfigRoot state;
 
     ConfigRoot config;
-    ConfigRoot electricity_price_update;
 
     std::mutex records_mutex;
     std::mutex pdf_mutex;

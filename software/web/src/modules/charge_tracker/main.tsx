@@ -33,7 +33,7 @@ import { InputText } from "../../ts/components/input_text";
 import { InputDate } from "../../ts/components/input_date";
 import { Button, Collapse, ListGroup, ListGroupItem, Spinner } from "react-bootstrap";
 import { InputSelect } from "src/ts/components/input_select";
-import { BatteryCharging, Calendar, Clock, DollarSign, Download, User } from "react-feather";
+import { BatteryCharging, Calendar, Clock, Download, User } from "react-feather";
 import { getAllUsernames } from "../users/main";
 import { ConfigComponent } from "src/ts/components/config_component";
 import { ConfigForm } from "src/ts/components/config_form";
@@ -89,7 +89,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
         } as any
     }
 
-    get_last_charges(charges: typeof this.state.last_charges) {
+    get_last_charges(charges: typeof this.state.last_charges, price: number) {
         let users_config = API.get('users/config');
 
         return charges.map(c => {
@@ -104,19 +104,18 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
             }
 
             let icon = <svg class="feather feather-wallet mr-1" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>
-            let price_div = <div>{icon}<span style="vertical-align: middle;">{util.toLocaleFixed(c.electricity_price / 100 * c.energy_charged / 100, 2)} €</span></div>
+            let price_div = <div>{icon}<span style="vertical-align: middle;">{util.toLocaleFixed(price / 100 * c.energy_charged / 100, 2)} €</span></div>
 
             return <ListGroupItem>
                 <div class="row">
                     <div class="col">
                         <div class="mb-2"><User/><span class="ml-1" style="vertical-align: middle;">{display_name}</span></div>
-                        <div class="mb-2"><Calendar/><span class="ml-1" style="vertical-align: middle;">{util.timestamp_min_to_date(c.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
-                        <div class="mb-2"><Clock/><span class="ml-1" style="vertical-align: middle;">{util.format_timespan(c.charge_duration)}</span></div>
+                        <div><Calendar/><span class="ml-1" style="vertical-align: middle;">{util.timestamp_min_to_date(c.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
                     </div>
                     <div class="col-auto">
                         <div class="mb-2"><BatteryCharging/><span class="ml-1" style="vertical-align: middle;">{c.energy_charged === null ? "N/A" : util.toLocaleFixed(c.energy_charged, 3)} kWh</span></div>
-                        <div class="mb-2"><DollarSign/><span class="ml-1" style="vertical-align: middle;">{c.electricity_price === null ? "N/A" : util.toLocaleFixed(c.electricity_price / 100, 2)} ct/kWh</span></div>
-                        {c.electricity_price > 0 && c.energy_charged != null ? price_div : <></>}
+                        <div class="mb-2"><Clock/><span class="ml-1" style="vertical-align: middle;">{util.format_timespan(c.charge_duration)}</span></div>
+                        {price > 0 && c.energy_charged != null ? price_div : <></>}
                     </div>
                 </div>
             </ListGroupItem>}).reverse();
@@ -254,7 +253,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
                                     end = new Date(Date.now());
 
                                 try {
-                                    await downloadChargeLog(state.csv_flavor, parseInt(state.user_filter), start, end);
+                                    await downloadChargeLog(state.csv_flavor, parseInt(state.user_filter), start ,end, state.electricity_price);
                                 } finally {
                                     this.setState({show_spinner: false});
                                 }
@@ -302,7 +301,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
 
                 <FormRow label={__("charge_tracker.content.last_charges")} label_muted={__("charge_tracker.content.last_charges_desc")}>
                     <ListGroup>
-                        {this.get_last_charges(state.last_charges ?? [])}
+                        {this.get_last_charges(state.last_charges ?? [], state.electricity_price)}
                     </ListGroup>
                 </FormRow>
             </>
@@ -314,8 +313,9 @@ render(<ChargeTracker/>, $('#charge_tracker')[0]);
 
 let x = <svg class="feather feather-credit-card" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>
 
-function show_charge_cost(charged: number, price: number)
+function show_charge_cost(charged: number)
 {
+    let price = API.get("charge_tracker/config").electricity_price;
     if (price > 0 && charged != null)
     {
         let icon = '<svg class="feather feather-wallet mr-1" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>'
@@ -346,13 +346,12 @@ function update_last_charges() {
         <div class="row">
             <div class="col">
                 <div class="mb-2"><span class="mr-1" data-feather="user"></span><span style="vertical-align: middle;">${display_name}</span></div>
-                <div class="mb-2"><span class="mr-1" data-feather="calendar"></span><span style="vertical-align: middle;">${util.timestamp_min_to_date(user.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
-                <div class="mb-2"><span class="mr-1" data-feather="clock"></span><span style="vertical-align: middle;">${util.format_timespan(user.charge_duration)}</span></div>
+                <div><span class="mr-1" data-feather="calendar"></span><span style="vertical-align: middle;">${util.timestamp_min_to_date(user.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
             </div>
             <div class="col-auto">
                 <div class="mb-2"><span class="mr-1" data-feather="battery-charging"></span><span style="vertical-align: middle;">${user.energy_charged === null ? "N/A" : util.toLocaleFixed(user.energy_charged, 3)} kWh</span></div>
-                <div class="mb-2"><span class="mr-1" data-feather="dollar-sign"></span><span style="vertical-align: middle;">${user.electricity_price === null ? "N/A" : util.toLocaleFixed(user.electricity_price / 100, 2)} ct/kWh</span></div>
-                ${show_charge_cost(user.energy_charged, user.electricity_price)}
+                <div class="mb-2"><span class="mr-1" data-feather="clock"></span><span style="vertical-align: middle;">${util.format_timespan(user.charge_duration)}</span></div>
+                ${show_charge_cost(user.energy_charged)}
             </div>
         </div>
         </div>`
@@ -527,7 +526,7 @@ function update_current_charge() {
 
     time_charging = Math.floor(time_charging / 1000);
 
-    let price = cc.electricity_price;
+    let price = API.get("charge_tracker/config").electricity_price;
 
     if (filtered.length == 0)
         $('#users_status_charging_user').html(__("charge_tracker.script.deleted_user"));
@@ -536,7 +535,6 @@ function update_current_charge() {
     else
         $('#users_status_charging_user').html(user_display_name);
     $('#users_status_charging_time').html(util.format_timespan(time_charging));
-    $('#users_status_electricity_price').html(cc.electricity_price == null ? "N/A ct/kWh" : util.toLocaleFixed(cc.electricity_price / 100, 2) + " ct/kWh");
     $('#users_status_charged_energy').html(cc.meter_start == null ? "N/A kWh" : util.toLocaleFixed(energy_charged, 3) + " kWh");
     $('#users_status_charging_start').html(util.timestamp_min_to_date(cc.timestamp_minutes, __("charge_tracker.script.unknown_charge_start")));
     if (price > 0 && cc.meter_start != null)
