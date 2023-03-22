@@ -33,9 +33,9 @@ void Meter::pre_setup()
     });
 
     values = Config::Object({
-        {"power", Config::Float(0.0)},
-        {"energy_rel", Config::Float(0.0)},
-        {"energy_abs", Config::Float(0.0)},
+        {"power", Config::Float(NAN)},
+        {"energy_rel", Config::Float(NAN)},
+        {"energy_abs", Config::Float(NAN)},
     });
 
     phases = Config::Object({
@@ -48,7 +48,7 @@ void Meter::pre_setup()
     });
 
     all_values = Config::Array({},
-        new Config{Config::Float(0)},
+        new Config{Config::Float(NAN)},
         0, METER_ALL_VALUES_COUNT, Config::type_id<Config::ConfFloat>());
 
     last_reset = Config::Object({
@@ -118,7 +118,8 @@ void Meter::updateMeterAllValues(float values[METER_ALL_VALUES_COUNT])
         return;
 
     for (int i = 0; i < METER_ALL_VALUES_COUNT; ++i)
-        all_values.get(i)->updateFloat(values[i]);
+        if (!isnan(values[i]))
+            all_values.get(i)->updateFloat(values[i]);
 }
 
 void Meter::registerResetCallback(std::function<void(void)> cb)
