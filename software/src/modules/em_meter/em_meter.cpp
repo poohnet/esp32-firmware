@@ -42,9 +42,7 @@ void EMMeter::pre_setup()
 
 void EMMeter::updateMeterValues()
 {
-    meter.updateMeterValues(energy_manager.all_data.power,
-                            0,
-                            0);
+    meter.updateMeterValues(energy_manager.all_data.power, 0, 0);
 
     errors.get("local_timeout")->updateUint(energy_manager.all_data.error_count[0]);
     errors.get("global_timeout")->updateUint(energy_manager.all_data.error_count[1]);
@@ -59,7 +57,6 @@ void EMMeter::setupEM(bool update_module_initialized)
     energy_manager.update_all_data();
 
     uint8_t meter_type = energy_manager.all_data.energy_meter_type;
-
     if (meter_type == 0) {
         task_scheduler.scheduleOnce([this](){
             this->setupEM(true);
@@ -67,23 +64,31 @@ void EMMeter::setupEM(bool update_module_initialized)
         return;
     }
 
-    meter.updateMeterState(2, meter_type);
-
     // We _have_ to update the meter values here:
     // Other modules may in their setup check if the meter feature is available
     // and if so, read the meter values.
+    float result[METER_ALL_VALUES_COUNT] = {0};
+    if (energy_manager.get_energy_meter_detailed_values(result) != METER_ALL_VALUES_COUNT) {
+        task_scheduler.scheduleOnce([this](){
+            this->setupEM(true);
+        }, 3000);
+        return;
+    }
+
+    meter.updateMeterState(2, meter_type);
     updateMeterValues();
+    meter.updateMeterAllValues(result);
 
     task_scheduler.scheduleWithFixedDelay([this](){
         this->updateMeterValues();
     }, 500, 500);
 
     task_scheduler.scheduleWithFixedDelay([this](){
-        float result[METER_ALL_VALUES_COUNT] = {0};
-        if (energy_manager.get_energy_meter_detailed_values(result) < METER_ALL_VALUES_COUNT)
+        float inner_result[METER_ALL_VALUES_COUNT] = {0};
+        if (energy_manager.get_energy_meter_detailed_values(inner_result) != METER_ALL_VALUES_COUNT)
             return;
 
-        meter.updateMeterAllValues(result);
+        meter.updateMeterAllValues(inner_result);
     }, 1000, 1000);
 
     bool triple_true[3] = {true, true, true};
@@ -97,9 +102,6 @@ void EMMeter::setupEM(bool update_module_initialized)
 
 void EMMeter::setup()
 {
-    initialized = false;
-    hardware_available = false;
-
     if (!energy_manager.initialized) {
         // If the Energy Manager is not initialized, we will never be able to reach the energy meter.
         return;
@@ -111,8 +113,4 @@ void EMMeter::setup()
 void EMMeter::register_urls()
 {
     api.addState("meter/error_counters", &errors, {}, 1000);
-}
-
-void EMMeter::loop()
-{
 }

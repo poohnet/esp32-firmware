@@ -39,67 +39,66 @@ interface DetailedViewEntry {
     name: string,
     desc: string,
     three_phase: boolean,
-    unit: string,
-    meter_types: number[]
+    unit: string
     digits: 0|1|2|3
 }
 
-function entry(name: string, three_phase: boolean, unit: string, meter_types: (2|3|4|5|200)[], digits: 0|1|2|3) : DetailedViewEntry {
-    return {i: 0, name: translate_unchecked(`meter.content.detailed_${name}`), desc: translate_unchecked(`meter.content.detailed_${name}_desc`), three_phase: three_phase, unit: unit, meter_types: meter_types, digits: digits}
+function entry(name: string, three_phase: boolean, unit: string, digits: 0|1|2|3) : DetailedViewEntry {
+    return {i: 0, name: translate_unchecked(`meter.content.detailed_${name}`), desc: translate_unchecked(`meter.content.detailed_${name}_desc`), three_phase: three_phase, unit: unit, digits: digits}
 }
 
 const entries: DetailedViewEntry[] = [
-    entry("line_to_neutral_volts",             true,  "V",     [2, 3, 5, 200], 1),
-    entry("current",                           true,  "A",     [2, 3, 5, 200], 3),
-    entry("power",                             true,  "W",     [2, 3, 4, 5, 200], 0),
-    entry("volt_amps",                         true,  "VA",    [2, 3, 5, 200], 0),
-    entry("volt_amps_reactive",                true,  "var",   [2, 3, 5, 200], 0),
-    entry("power_factor",                      true,  "",      [2, 3, 5, 200], 3),
-    entry("phase_angle",                       true,  "°",     [2, 5, 200],  1),
-    entry("average_line_to_neutral_volts",     false, "V",     [2, 5, 200],  1),
-    entry("average_line_current",              false, "A",     [2, 3, 5, 200], 3),
-    entry("sum_of_line_currents",              false, "A",     [2, 3, 5, 200], 3),
-    entry("total_system_power",                false, "W",     [2, 3, 4, 5, 200], 0),
-    entry("total_system_volt_amps",            false, "VA",    [2, 3, 5, 200], 0),
-    entry("total_system_var",                  false, "var",   [2, 3, 5, 200], 0),
-    entry("total_system_power_factor",         false, "",      [2, 3, 5, 200], 3),
-    entry("total_system_phase_angle",          false, "°",     [2, 5, 200],  1),
-    entry("frequency_of_supply_voltages",      false, "Hz",    [2, 3, 5, 200], 3),
-    entry("total_import_kwh",                  false, "kWh",   [2, 3, 4, 5, 200], 3),
-    entry("total_export_kwh",                  false, "kWh",   [2, 3, 4, 5, 200], 3),
-    entry("total_import_kvarh",                false, "kvarh", [2, 5, 200],  3),
-    entry("total_export_kvarh",                false, "kvarh", [2, 5, 200],  3),
-    entry("total_vah",                         false, "kVAh",  [2, 5, 200],  3),
-    entry("ah",                                false, "Ah",    [2, 5, 200],  3),
-    entry("total_system_power_demand",         false, "W",     [2, 5, 200],  0),
-    entry("maximum_total_system_power_demand", false, "W",     [2, 5, 200],  0),
-    entry("total_system_va_demand",            false, "VA",    [2, 5, 200],  0),
-    entry("maximum_total_system_va_demand",    false, "VA",    [2, 5, 200],  0),
-    entry("neutral_current_demand",            false, "A",     [2, 5, 200],  3),
-    entry("maximum_neutral_current_demand",    false, "A",     [2, 5, 200],  3),
-    entry("line1_to_line2_volts",              false, "V",     [2, 3, 5, 200], 1),
-    entry("line2_to_line3_volts",              false, "V",     [2, 3, 5, 200], 1),
-    entry("line3_to_line1_volts",              false, "V",     [2, 3, 5, 200], 1),
-    entry("average_line_to_line_volts",        false, "V",     [2, 3, 5, 200], 1),
-    entry("neutral_current",                   false, "A",     [2, 3, 5, 200], 3),
-    entry("ln_volts_thd",                      true,  "%",     [2, 5, 200],  1),
-    entry("current_thd",                       true,  "%",     [2, 5, 200],  1),
-    entry("average_line_to_neutral_volts_thd", false, "%",     [2, 5, 200],  1),
-    entry("average_line_current_thd",          false, "%",     [2, 5, 200],  1),
-    entry("current_demand",                    true,  "A",     [2, 5, 200],  3),
-    entry("maximum_current_demand",            true,  "A",     [2, 5, 200],  3),
-    entry("line1_to_line2_volts_thd",          false, "%",     [2, 5, 200],  1),
-    entry("line2_to_line3_volts_thd",          false, "%",     [2, 5, 200],  1),
-    entry("line3_to_line1_volts_thd",          false, "%",     [2, 5, 200],  1),
-    entry("average_line_to_line_volts_thd",    false, "%",     [2, 5, 200],  1),
-    entry("total_kwh_sum",                     false, "kWh",   [2, 3, 4, 5, 200], 3),
-    entry("total_kvarh_sum",                   false, "kvarh", [2, 3, 5, 200], 3),
-    entry("import_kwh",                        true,  "kWh",   [2, 5, 200],  3),
-    entry("export_kwh",                        true,  "kWh",   [2, 5, 200],  3),
-    entry("total_kwh",                         true,  "kWh",   [2, 5, 200],  3),
-    entry("import_kvarh",                      true,  "kvarh", [2, 5, 200],  3),
-    entry("export_kvarh",                      true,  "kvarh", [2, 5, 200],  3),
-    entry("total_kvarh",                       true,  "kvarh", [2, 5, 200],  3)
+    entry("line_to_neutral_volts",             true,  "V",     1),
+    entry("current",                           true,  "A",     3),
+    entry("power",                             true,  "W",     0),
+    entry("volt_amps",                         true,  "VA",    0),
+    entry("volt_amps_reactive",                true,  "var",   0),
+    entry("power_factor",                      true,  "",      3),
+    entry("phase_angle",                       true,  "°",     1),
+    entry("average_line_to_neutral_volts",     false, "V",     1),
+    entry("average_line_current",              false, "A",     3),
+    entry("sum_of_line_currents",              false, "A",     3),
+    entry("total_system_power",                false, "W",     0),
+    entry("total_system_volt_amps",            false, "VA",    0),
+    entry("total_system_var",                  false, "var",   0),
+    entry("total_system_power_factor",         false, "",      3),
+    entry("total_system_phase_angle",          false, "°",     1),
+    entry("frequency_of_supply_voltages",      false, "Hz",    3),
+    entry("total_import_kwh",                  false, "kWh",   3),
+    entry("total_export_kwh",                  false, "kWh",   3),
+    entry("total_import_kvarh",                false, "kvarh", 3),
+    entry("total_export_kvarh",                false, "kvarh", 3),
+    entry("total_vah",                         false, "kVAh",  3),
+    entry("ah",                                false, "Ah",    3),
+    entry("total_system_power_demand",         false, "W",     0),
+    entry("maximum_total_system_power_demand", false, "W",     0),
+    entry("total_system_va_demand",            false, "VA",    0),
+    entry("maximum_total_system_va_demand",    false, "VA",    0),
+    entry("neutral_current_demand",            false, "A",     3),
+    entry("maximum_neutral_current_demand",    false, "A",     3),
+    entry("line1_to_line2_volts",              false, "V",     1),
+    entry("line2_to_line3_volts",              false, "V",     1),
+    entry("line3_to_line1_volts",              false, "V",     1),
+    entry("average_line_to_line_volts",        false, "V",     1),
+    entry("neutral_current",                   false, "A",     3),
+    entry("ln_volts_thd",                      true,  "%",     1),
+    entry("current_thd",                       true,  "%",     1),
+    entry("average_line_to_neutral_volts_thd", false, "%",     1),
+    entry("average_line_current_thd",          false, "%",     1),
+    entry("current_demand",                    true,  "A",     3),
+    entry("maximum_current_demand",            true,  "A",     3),
+    entry("line1_to_line2_volts_thd",          false, "%",     1),
+    entry("line2_to_line3_volts_thd",          false, "%",     1),
+    entry("line3_to_line1_volts_thd",          false, "%",     1),
+    entry("average_line_to_line_volts_thd",    false, "%",     1),
+    entry("total_kwh_sum",                     false, "kWh",   3),
+    entry("total_kvarh_sum",                   false, "kvarh", 3),
+    entry("import_kwh",                        true,  "kWh",   3),
+    entry("export_kwh",                        true,  "kWh",   3),
+    entry("total_kwh",                         true,  "kWh",   3),
+    entry("import_kvarh",                      true,  "kvarh", 3),
+    entry("export_kvarh",                      true,  "kvarh", 3),
+    entry("total_kvarh",                       true,  "kvarh", 3)
 ];
 
 interface UplotData {
@@ -173,15 +172,16 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             series: [
                 {
                     label: __("meter.script.time"),
-                    value: __("meter.script.time_legend_format"),
+                    value: (self: uPlot, rawValue: number) => rawValue !== null ? util.timestamp_sec_to_date(rawValue) : null,
                 },
                 {
                     show: true,
                     pxAlign: 0,
                     spanGaps: false,
                     label: __("meter.script.power"),
-                    value: (self: uPlot, rawValue: number) => rawValue !== null ? rawValue + " W" : null,
-                    stroke: "#007bff",
+                    value: (self: uPlot, rawValue: number) => rawValue !== null ? util.toLocaleFixed(rawValue) + " W" : null,
+                    stroke: "rgb(0, 123, 255)",
+                    fill: "rgb(0, 123, 255, 0.1)",
                     width: 2,
                 },
             ],
@@ -198,18 +198,48 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                         3600 * 12,
                         3600 * 24,
                     ],
-                    // [0]:   minimum num secs in found axis split (tick incr)
-                    // [1]:   default tick format
-                    // [2-7]: rollover tick formats
-                    // [8]:   mode: 0: replace [1] -> [2-7], 1: concat [1] + [2-7]
-                    values: [
-                        // tick incr  default      year                                             month  day                                               hour  min   sec   mode
-                        [3600,        "{HH}:{mm}", "\n" + __("meter.script.time_long_date_format"), null,  "\n" + __("meter.script.time_short_date_format"), null, null, null, 1],
-                        [60,          "{HH}:{mm}", null,                                            null,  null,                                             null, null, null, 1],
-                    ],
+                    values: (self: uPlot, splits: number[], axisIdx: number, foundSpace: number, foundIncr: number) => {
+                        let values: string[] = new Array(splits.length);
+                        let last_year: string = null;
+                        let last_month_and_day: string = null;
+
+                        for (let i = 0; i < splits.length; ++i) {
+                            let date = new Date(splits[i] * 1000);
+                            let value = date.toLocaleString([], {hour: '2-digit', minute: '2-digit'});
+
+                            if (foundIncr >= 3600) {
+                                let year = date.toLocaleString([], {year: 'numeric'});
+                                let month_and_day = date.toLocaleString([], {month: '2-digit', day: '2-digit'});
+
+                                if (year != last_year) {
+                                    value += '\n' + date.toLocaleString([], {year: 'numeric', month: '2-digit', day: '2-digit'});
+                                    last_year = year;
+                                    last_month_and_day = month_and_day;
+                                }
+
+                                if (month_and_day != last_month_and_day) {
+                                    value += '\n' + date.toLocaleString([], {month: '2-digit', day: '2-digit'});
+                                    last_month_and_day = month_and_day;
+                                }
+                            }
+
+                            values[i] = value;
+                        }
+
+                        return values;
+                    },
                 },
                 {
                     size: 55,
+                    values: (self: uPlot, splits: number[]) => {
+                        let values: string[] = new Array(splits.length);
+
+                        for (let i = 0; i < splits.length; ++i) {
+                            values[i] = util.toLocaleFixed(splits[i]); // FIXME: assuming that no fractional part is necessary
+                        }
+
+                        return values;
+                    },
                 }
             ],
             scales: {
@@ -605,7 +635,7 @@ export class Meter extends Component<{}, MeterState> {
                     {API.hasFeature("meter_all_values") ?
                     <CollapsedSection colClasses="col-xl-10" label={__("meter.content.detailed_values")}>
                         {
-                        entries.filter(e => e.meter_types.indexOf(state.state.type) >= 0).map(e => <FormRow label={e.name} label_muted={e.desc} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                        entries.filter(e => this.state.all_values[e.i] != null).map(e => <FormRow label={e.name} label_muted={e.desc} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
                             {e.three_phase ? <div class="row">
                                 <div class="mb-1 col-12 col-sm-4">
                                     <OutputFloat value={this.state.all_values[e.i + 0]} digits={e.digits} scale={0} unit={e.unit}/>

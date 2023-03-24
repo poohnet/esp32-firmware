@@ -72,10 +72,11 @@ interface UplotWrapperProps {
     id: string;
     class: string;
     sidebar_id: string;
+    marker_width_reduction: number;
     y_min?: number;
     y_max?: number;
     y_step?: number;
-    marker_width_reduction: number;
+    default_fill?: boolean;
 }
 
 // https://seaborn.pydata.org/tutorial/color_palettes.html#qualitative-color-palettes
@@ -166,7 +167,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             series: [
                 {
                     label: __("em_energy_analysis.script.time"),
-                    value: __("em_energy_analysis.script.time_legend_format"),
+                    value: (self: uPlot, rawValue: number) => rawValue !== null ? util.timestamp_min_to_date((rawValue / 60), '???') : null,
                 },
             ],
             axes: [
@@ -183,17 +184,27 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                         3600 * 12,
                         3600 * 24,
                     ],
-                    // [0]:   minimum num secs in found axis split (tick incr)
-                    // [1]:   default tick format
-                    // [2-7]: rollover tick formats
-                    // [8]:   mode: 0: replace [1] -> [2-7], 1: concat [1] + [2-7]
-                    values: [
-                        // tick incr  default      year  month  day   hour  min   sec   mode
-                        [60,          "{HH}:{mm}", null, null,  null, null, null, null, 1],
-                    ],
+                    values: (self: uPlot, splits: number[]) => {
+                        let values: string[] = new Array(splits.length);
+
+                        for (let i = 0; i < splits.length; ++i) {
+                            values[i] = (new Date(splits[i] * 1000)).toLocaleString([], {hour: '2-digit', minute: '2-digit'});
+                        }
+
+                        return values;
+                    },
                 },
                 {
                     size: 55,
+                    values: (self: uPlot, splits: number[]) => {
+                        let values: string[] = new Array(splits.length);
+
+                        for (let i = 0; i < splits.length; ++i) {
+                            values[i] = util.toLocaleFixed(splits[i]); // FIXME: assuming that no fractional part is necessary
+                        }
+
+                        return values;
+                    },
                 }
             ],
             scales: {
@@ -282,9 +293,9 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             pxAlign: 0,
             spanGaps: false,
             label: __("em_energy_analysis.script.power") + (name ? ' ' + name: ''),
-            value: (self: uPlot, rawValue: number, seriesIdx: number, idx: number | null) => rawValue !== null ? this.data.values[seriesIdx][idx] + " W" : null,
+            value: (self: uPlot, rawValue: number, seriesIdx: number, idx: number | null) => rawValue !== null ? util.toLocaleFixed(this.data.values[seriesIdx][idx]) + " W" : null, // FIXME: assuming that no fractional part is necessary
             stroke: strokes[(i - 1) % strokes.length],
-            fill: fills[(i - 1) % fills.length],
+            fill: this.data.stacked[i] || this.props.default_fill ? fills[(i - 1) % fills.length] : undefined,
             width: 2,
         };
     }
@@ -472,9 +483,10 @@ export class EMEnergyAnalysisStatusChart extends Component<{}, {force_render: nu
                               id="em_energy_analysis_status_chart"
                               class="em-energy-analysis-status-chart"
                               sidebar_id="status"
+                              marker_width_reduction={8}
                               y_min={0}
                               y_max={1500}
-                              marker_width_reduction={8} />
+                              default_fill={true} />
             </>
         )
     }
@@ -1042,13 +1054,13 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             this.uplot_wrapper_ref.current.set_loading();
         }
 
-        this.update_wallbox_5min_cache_all(this.state.current_5min_date)
+        this.update_energy_manager_5min_cache(this.state.current_5min_date)
             .then((success: boolean) => {
                 if (!success) {
                     return Promise.resolve(false);
                 }
 
-                return this.update_energy_manager_5min_cache(this.state.current_5min_date);
+                return this.update_wallbox_5min_cache_all(this.state.current_5min_date);
             })
             .then((success: boolean) => {
                 if (!success) {
@@ -1115,10 +1127,10 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                                       id="em_energy_analysis_chart"
                                       class="em-energy-analysis-chart"
                                       sidebar_id="em-energy-analysis"
+                                      marker_width_reduction={30}
                                       y_min={0}
                                       y_max={100}
-                                      y_step={10}
-                                      marker_width_reduction={30} />
+                                      y_step={10} />
                     </div>
                 </div>
                 <FormRow label={__("em_energy_analysis.content.date")} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">

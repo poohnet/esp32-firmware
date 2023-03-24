@@ -910,8 +910,3 @@ search_done:
         return request.endChunkedResponse();
     });
 }
-
-
-void ChargeTracker::loop()
-{
-}

@@ -29,8 +29,18 @@ class IBaseChunkedResponse
 {
 public:
     virtual void begin(bool success) = 0;
-    virtual bool write(const char *buf, size_t buf_size) = 0;
     virtual void end(String error) = 0;
+    virtual void alive() = 0;
+
+    bool write(const char *buf, size_t buf_size = std::numeric_limits<size_t>::max()) {
+        if (buf_size == std::numeric_limits<size_t>::max())
+            buf_size = strlen(buf);
+
+        return write_impl(buf, buf_size);
+    }
+
+protected:
+    virtual bool write_impl(const char *buf, size_t buf_size) = 0;
 };
 
 class QueuedChunkedResponse : public IBaseChunkedResponse
@@ -39,10 +49,13 @@ public:
     QueuedChunkedResponse(IBaseChunkedResponse *internal, uint32_t timeout_ms) : internal(internal), timeout_ms(timeout_ms) {}
 
     void begin(bool success);
-    bool write(const char *buf, size_t buf_size);
     void end(String error);
+    void alive();
 
     String wait();
+
+protected:
+    bool write_impl(const char *buf, size_t buf_size);
 
 private:
     bool call(std::function<bool(void)> local_function);
@@ -63,15 +76,11 @@ private:
     std::condition_variable condition;
 };
 
-class IChunkedResponse
+class IChunkedResponse : public IBaseChunkedResponse
 {
 public:
-    virtual void begin(bool success) = 0;
-    virtual bool write(const char *buf, size_t buf_size) = 0;
-    bool writen(const char *string) { return write(string, strlen(string)); }
     virtual bool writef(const char *fmt, ...) = 0;
     virtual bool flush() = 0;
-    virtual void end(String error) = 0;
 
     void *metadata = nullptr;
 };
@@ -82,10 +91,13 @@ public:
     BufferedChunkedResponse(IBaseChunkedResponse *internal) : internal(internal) {};
 
     void begin(bool success);
-    bool write(const char *buf, size_t buf_size);
     bool writef(const char *fmt, ...);
     bool flush();
     void end(String error);
+    void alive();
+
+protected:
+    bool write_impl(const char *buf, size_t buf_size);
 
 private:
     size_t pending_free();

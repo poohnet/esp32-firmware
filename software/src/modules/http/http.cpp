@@ -40,7 +40,20 @@ public:
         request->beginChunkedResponse(success ? 200 : 400, "text/plain");
     }
 
-    bool write(const char *buf, size_t buf_size)
+    void alive()
+    {
+
+    }
+
+    void end(String error)
+    {
+        if (error == "") {
+            request->endChunkedResponse();
+        }
+    }
+
+protected:
+    bool write_impl(const char *buf, size_t buf_size)
     {
         int result = request->sendChunk(buf, buf_size);
 
@@ -51,13 +64,6 @@ public:
         }
 
         return true;
-    }
-
-    void end(String error)
-    {
-        if (error == "") {
-            request->endChunkedResponse();
-        }
     }
 
 private:
@@ -287,10 +293,6 @@ void Http::register_urls()
     server.on("/*", HTTP_GET, [this](WebServerRequest request){return api_handler_get(request);});
     server.on("/*", HTTP_PUT, [this](WebServerRequest request){return api_handler_put(request);});
     server.on("/*", HTTP_POST, [this](WebServerRequest request){return api_handler_put(request);});
-}
-
-void Http::loop()
-{
 }
 
 void Http::addCommand(size_t commandIdx, const CommandRegistration &reg)
