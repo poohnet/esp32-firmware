@@ -548,6 +548,16 @@ function update_current_charge() {
         $('#current_charge_price_div').prop('hidden', true);
 }
 
+function update_config() {
+    let config = API.get('charge_tracker/config');
+
+    if (!config.electricity_price) {
+        return;
+    }
+
+    $('#status_current_price').val(util.toLocaleFixed(config.electricity_price / 100, 2) + " ct/kWh");
+}
+
 export function init() {
 
 }
@@ -555,6 +565,7 @@ export function init() {
 export function add_event_listeners(source: API.APIEventTarget) {
     source.addEventListener('charge_tracker/last_charges', update_last_charges);
     source.addEventListener('charge_tracker/current_charge', update_current_charge);
+    source.addEventListener('charge_tracker/config', update_config);
     source.addEventListener('evse/low_level_state', update_current_charge);
     source.addEventListener('meter/values', update_current_charge);
     source.addEventListener('users/config', update_current_charge);
