@@ -203,8 +203,8 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
         let mode_list: StringStringTuple[] = [];
 
         mode_list.push(["1", __("energy_manager.status.mode_off")]);
-        mode_list.push([s.excess_charging_enable ? "2" : "disabled", __("energy_manager.status.mode_pv")]);
-        mode_list.push([s.excess_charging_enable ? "3" : "disabled", __("energy_manager.status.mode_min_pv")]);
+        mode_list.push([s.excess_charging_enable ? "2" : "2-disabled", __("energy_manager.status.mode_pv")]);
+        mode_list.push([s.excess_charging_enable ? "3" : "3-disabled", __("energy_manager.status.mode_min_pv")]);
         mode_list.push(["0", __("energy_manager.status.mode_fast")]);
 
         let mode_list_for_inputs: StringStringTuple[] = [];
@@ -294,6 +294,19 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                                     />
                                 </FormRow>
                             </>}
+
+                            <FormRow label={__("energy_manager.content.cloud_filter")} label_muted={__("energy_manager.content.cloud_filter_muted")}>
+                                <InputSelect
+                                    items={[
+                                        ["0", __("energy_manager.content.cloud_filter_off")],
+                                        ["1", __("energy_manager.content.cloud_filter_light")],
+                                        ["2", __("energy_manager.content.cloud_filter_medium")],
+                                        ["3", __("energy_manager.content.cloud_filter_strong")],
+                                    ]}
+                                    value={s.cloud_filter_mode}
+                                    onValue={(v) => this.setState({cloud_filter_mode: parseInt(v)})}
+                                />
+                            </FormRow>
                         </div>
                     </Collapse>
 
