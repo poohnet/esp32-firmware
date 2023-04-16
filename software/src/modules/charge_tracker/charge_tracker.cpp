@@ -577,8 +577,6 @@ void ChargeTracker::register_urls()
     api.addState("charge_tracker/last_charges", &last_charges, {}, 1000);
     api.addState("charge_tracker/current_charge", &current_charge, {}, 1000);
     api.addState("charge_tracker/state", &state, {}, 1000);
-    api.addState("charge_tracker/config", &config, {}, 1000);
-
     api.addRawCommand("charge_tracker/remove_all_charges", [this](char *c, size_t s) -> String {
         StaticJsonDocument<16> doc;
 
