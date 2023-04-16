@@ -93,6 +93,17 @@
 #define ERROR_FLAGS_ALL_ERRORS_MASK         (0x7FFF0000)
 #define ERROR_FLAGS_ALL_WARNINGS_MASK       (0x0000FFFF)
 
+#define CONFIG_ERROR_FLAGS_NO_CM_BIT_POS            4
+#define CONFIG_ERROR_FLAGS_NO_CM_MASK               (1 << CONFIG_ERROR_FLAGS_NO_CM_BIT_POS)
+#define CONFIG_ERROR_FLAGS_EXCESS_NO_METER_BIT_POS  3
+#define CONFIG_ERROR_FLAGS_EXCESS_NO_METER_MASK     (1 << CONFIG_ERROR_FLAGS_EXCESS_NO_METER_BIT_POS)
+#define CONFIG_ERROR_FLAGS_NO_CHARGERS_BIT_POS      2
+#define CONFIG_ERROR_FLAGS_NO_CHARGERS_MASK         (1 << CONFIG_ERROR_FLAGS_NO_CHARGERS_BIT_POS)
+#define CONFIG_ERROR_FLAGS_NO_MAX_CURRENT_BIT_POS   1
+#define CONFIG_ERROR_FLAGS_NO_MAX_CURRENT_MASK      (1 << CONFIG_ERROR_FLAGS_NO_MAX_CURRENT_BIT_POS)
+#define CONFIG_ERROR_FLAGS_PHASE_SWITCHING_BIT_POS  0
+#define CONFIG_ERROR_FLAGS_PHASE_SWITCHING_MASK     (1 << CONFIG_ERROR_FLAGS_PHASE_SWITCHING_BIT_POS)
+
 typedef struct {
     uint32_t last_update;
     bool is_valid;
@@ -150,6 +161,7 @@ public:
     void pre_setup();
     void setup();
     void register_urls();
+    void register_events();
     void loop();
 
     // Called in energy_manager_meter setup
@@ -195,6 +207,7 @@ public:
     } charging_blocked               = {0};
 
     uint32_t error_flags             = 0;
+    uint32_t config_error_flags      = 0;
     bool     contactor_check_tripped = false;
     bool     is_3phase               = false;
     bool     wants_on_last           = false;
@@ -205,6 +218,7 @@ private:
     void clr_error(uint32_t error_mask);
     void set_error(uint32_t error_mask);
     bool is_error(uint32_t error_bit_pos);
+    void set_config_error(uint32_t config_error_mask);
     void check_bricklet_reachable(int rc, const char *context);
     void update_all_data_struct();
     void update_io();
@@ -268,6 +282,7 @@ private:
     // Pre-calculated data
     float    cloud_filter_coefficient = 0;
 
+    void update_history_meter_power_average(float power);
     void collect_data_points();
     void history_wallbox_5min_response(IChunkedResponse *response, Ownership *response_ownership, uint32_t response_owner_id);
     void history_wallbox_daily_response(IChunkedResponse *response, Ownership *response_ownership, uint32_t response_owner_id);
@@ -286,4 +301,10 @@ private:
     ConfigRoot history_wallbox_daily;
     ConfigRoot history_energy_manager_5min;
     ConfigRoot history_energy_manager_daily;
+    bool history_meter_available = false;
+    float history_meter_power_value = NAN; // W
+    uint32_t history_meter_power_timestamp;
+    double history_meter_power_sum = 0;
+    uint32_t history_meter_power_sum_duration = 0;
+    int32_t history_power_grid = INT32_MAX; // W
 };

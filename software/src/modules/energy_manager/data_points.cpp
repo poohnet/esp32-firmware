@@ -22,12 +22,46 @@
 #include <Arduino.h>
 #include <sys/time.h>
 #include <time.h>
+
 #include "event_log.h"
 #include "modules.h"
 
 #define MAX_DATA_AGE 30000 // milliseconds
 #define DATA_INTERVAL_5MIN 5 // minutes
 
+void EnergyManager::register_events()
+{
+    event.addStateUpdate("meter/state", {"state"}, [this](Config *config){
+        history_meter_available = config->asUint() == 2;
+    });
+
+    event.addStateUpdate("meter/values", {"power"}, [this](Config *config){
+        update_history_meter_power_average(config->asFloat()); // FIXME: could this be NaN?
+    });
+}
+
+void EnergyManager::update_history_meter_power_average(float power)
+{
+    uint32_t now = millis();
+
+    if (!isnan(history_meter_power_value)) {
+        uint32_t duration;
+
+        if (now >= history_meter_power_timestamp) {
+            duration = now - history_meter_power_timestamp;
+        } else {
+            duration = UINT32_MAX - history_meter_power_timestamp + now;
+        }
+
+        history_meter_power_sum += (double)history_meter_power_value * duration;
+        history_meter_power_sum_duration += duration;
+    }
+
+    history_meter_power_value = power;
+    history_meter_power_timestamp = now;
+}
+
+// FIXME: integrate power over time to record energy for meters that only report power
 void EnergyManager::collect_data_points()
 {
     struct timeval tv;
@@ -45,7 +79,7 @@ void EnergyManager::collect_data_points()
     int current_5min_slot = utc.tm_min / 5;
 
     if (current_5min_slot != last_history_5min_slot) {
-        for (const auto &charger : charge_manager.charge_manager_state.get("chargers")) {
+        for (auto &charger : charge_manager.charge_manager_state.get("chargers")) {
             uint32_t last_update = charger.get("last_update")->asUint();
 
             if (!deadline_elapsed(last_update + MAX_DATA_AGE)) {
@@ -56,9 +90,17 @@ void EnergyManager::collect_data_points()
                 uint16_t power = UINT16_MAX;
 
                 if (charger.get("meter_supported")->asBool()) {
-                    power = clamp<uint64_t>(0,
-                                            roundf(charger.get("power_total")->asFloat()),
-                                            UINT16_MAX - 1); // W
+                    float power_total_sum = charger.get("power_total_sum")->asFloat();
+                    uint32_t power_total_count = charger.get("power_total_count")->asUint();
+
+                    charger.get("power_total_sum")->updateFloat(0);
+                    charger.get("power_total_count")->updateUint(0);
+
+                    if (power_total_count > 0) {
+                        power = clamp<uint64_t>(0,
+                                                roundf(power_total_sum / power_total_count),
+                                                UINT16_MAX - 1); // W
+                    }
                 }
 
                 set_wallbox_5min_data_point(&utc, &local, uid, flags, power);
@@ -67,7 +109,6 @@ void EnergyManager::collect_data_points()
 
         if (all_data.is_valid && !deadline_elapsed(all_data.last_update + MAX_DATA_AGE)) {
             uint8_t flags = 0; // bit 0 = 1p/3p, bit 1-2 = input, bit 3 = output, bit 7 = no data (read only)
-            int32_t power_grid = INT32_MAX; // W
             int32_t power_general[6] = {INT32_MAX, INT32_MAX, INT32_MAX, INT32_MAX, INT32_MAX, INT32_MAX}; // W
 
             flags |= is_3phase         ? 0b0001 : 0;
@@ -76,15 +117,22 @@ void EnergyManager::collect_data_points()
             flags |= all_data.output   ? 0b1000 : 0;
 
             // FIXME: how to tell if meter data is stale?
-            if (meter.state.get("state")->asUint() == 2) {
-                power_grid = clamp<int64_t>(INT32_MIN,
-                                            roundf(meter.values.get("power")->asFloat()),
-                                            INT32_MAX - 1); // W
+            if (history_meter_available) {
+                update_history_meter_power_average(history_meter_power_value);
+
+                if (history_meter_power_sum_duration > 0) {
+                    history_power_grid = clamp<int64_t>(INT32_MIN,
+                                                        roundf(history_meter_power_sum / history_meter_power_sum_duration),
+                                                        INT32_MAX - 1); // W
+
+                    history_meter_power_sum = 0;
+                    history_meter_power_sum_duration = 0;
+                }
             }
 
             // FIXME: fill power_general
 
-            set_energy_manager_5min_data_point(&utc, &local, flags, power_grid, power_general);
+            set_energy_manager_5min_data_point(&utc, &local, flags, history_power_grid, power_general);
         }
 
         last_history_5min_slot = current_5min_slot;
@@ -802,6 +850,23 @@ static void wallbox_daily_data_points_handler(TF_WARPEnergyManager *device,
     }
 }
 
+static int days_per_month(int year, int month)
+{
+    if (month == 2) {
+        if ((year % 400) == 0 || ((year % 100) != 0 && (year % 4) == 0)) {
+            return 29;
+        }
+
+        return 28;
+    }
+
+    if (month == 4 || month == 6 || month == 9 || month == 11) {
+        return 30;
+    }
+
+    return 31;
+}
+
 void EnergyManager::history_wallbox_daily_response(IChunkedResponse *response,
                                                    Ownership *response_ownership,
                                                    uint32_t response_owner_id)
@@ -813,7 +878,7 @@ void EnergyManager::history_wallbox_daily_response(IChunkedResponse *response,
     uint8_t month = history_wallbox_daily.get("month")->asUint();
 
     uint8_t status;
-    int rc = tf_warp_energy_manager_get_sd_wallbox_daily_data_points(&device, uid, year, month, 1, 31, &status);
+    int rc = tf_warp_energy_manager_get_sd_wallbox_daily_data_points(&device, uid, year, month, 1, days_per_month(2000 + year, month), &status);
 
     //logger.printfln("history_wallbox_daily_response: u%u %d-%02d",
     //                uid, 2000 + year, month);
@@ -1223,7 +1288,7 @@ void EnergyManager::history_energy_manager_daily_response(IChunkedResponse *resp
     uint8_t month = history_energy_manager_daily.get("month")->asUint();
 
     uint8_t status;
-    int rc = tf_warp_energy_manager_get_sd_energy_manager_daily_data_points(&device, year, month, 1, 31, &status);
+    int rc = tf_warp_energy_manager_get_sd_energy_manager_daily_data_points(&device, year, month, 1, days_per_month(2000 + year, month), &status);
 
     //logger.printfln("history_energy_manager_daily_response: %d-%02d",
     //                2000 + year, month);

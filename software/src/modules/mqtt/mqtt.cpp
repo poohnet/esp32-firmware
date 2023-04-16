@@ -63,6 +63,8 @@ void Mqtt::pre_setup()
 
     mqtt_state = Config::Object({
         {"connection_state", Config::Int(0)},
+        {"connection_start", Config::Uint(0)},
+        {"connection_end", Config::Uint32(0)},
         {"last_error", Config::Int(0)}
     });
 }
@@ -147,6 +149,9 @@ void Mqtt::wifiAvailable()
 
 void Mqtt::onMqttConnect()
 {
+    last_connected_ms = millis();
+    mqtt_state.get("connection_start")->updateUint(last_connected_ms);
+    was_connected = true;
     logger.printfln("MQTT: Connected to broker.");
     this->mqtt_state.get("connection_state")->updateInt((int)MqttConnectionState::CONNECTED);
 
@@ -166,6 +171,9 @@ void Mqtt::onMqttConnect()
 #if MODULE_MQTT_METER_AVAILABLE()
     mqtt_meter.onMqttConnect();
 #endif
+#if MODULE_EM_PV_FAKER_AVAILABLE()
+    em_pv_faker.onMqttConnect();
+#endif
 #if MODULE_MQTT_AUTO_DISCOVERY_AVAILABLE()
     mqtt_auto_discovery.onMqttConnect();
 #endif
@@ -180,12 +188,27 @@ void Mqtt::onMqttDisconnect()
 {
     this->mqtt_state.get("connection_state")->updateInt((int)MqttConnectionState::NOT_CONNECTED);
     logger.printfln("MQTT: Disconnected from broker.");
+    if (was_connected) {
+        was_connected = false;
+        uint32_t now = millis();
+        uint32_t connected_for = now - last_connected_ms;
+        mqtt_state.get("connection_end")->updateUint(now);
+        if (connected_for < 0x7FFFFFFF) {
+            logger.printfln("MQTT: Was connected for %u seconds.", connected_for / 1000);
+        } else {
+            logger.printfln("MQTT: Was connected for a long time.");
+        }
+    }
 }
 
 void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain)
 {
 #if MODULE_MQTT_METER_AVAILABLE()
     if (mqtt_meter.onMqttMessage(topic, topic_len, data, data_len, retain))
+        return;
+#endif
+#if MODULE_EM_PV_FAKER_AVAILABLE()
+    if (em_pv_faker.onMqttMessage(topic, topic_len, data, data_len, retain))
         return;
 #endif
 #if MODULE_MQTT_AUTO_DISCOVERY_AVAILABLE()
@@ -402,7 +425,7 @@ void Mqtt::setup()
     mqtt_cfg.username = mqtt_config_in_use.get("broker_username")->asEphemeralCStr();
     mqtt_cfg.password = mqtt_config_in_use.get("broker_password")->asEphemeralCStr();
     mqtt_cfg.buffer_size = MQTT_RECV_BUFFER_SIZE;
-    mqtt_cfg.network_timeout_ms = 100;
+    mqtt_cfg.network_timeout_ms = 1000;
 
     client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, this);

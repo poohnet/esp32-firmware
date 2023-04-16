@@ -25,22 +25,19 @@ import { JSXInternal } from "preact/src/jsx";
 import { Button, ButtonGroup } from "react-bootstrap";
 import { Minus, Plus } from "react-feather";
 
-interface InputFloatProps {
-    idContext?: Context<string>
-    value: number
-    onValue: (value: number) => void
-    digits: number
-    unit: string
-    min: number
-    max: number
-    showMinMax?: boolean
-}
-
 interface InputFloatReadonlyProps {
     idContext?: Context<string>
     value: number
     digits: number
     unit: string
+    class?: string
+}
+
+interface InputFloatProps extends InputFloatReadonlyProps {
+    onValue: (value: number) => void
+    min: number
+    max: number
+    showMinMax?: boolean
 }
 
 export function InputFloat(props: InputFloatProps | InputFloatReadonlyProps) {
@@ -88,7 +85,7 @@ export function InputFloat(props: InputFloatProps | InputFloatReadonlyProps) {
     let floatMax = 'max' in props ? props.max / pow10 : 0;
 
     return (
-        <div class="input-group">
+        <div class={"input-group " + (props.class ? props.class : "")}>
             <input class="form-control no-spin"
                        id={id}
                        type="number"

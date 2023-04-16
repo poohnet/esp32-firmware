@@ -39,6 +39,7 @@ void EnergyManager::pre_setup()
         {"input4_state", Config::Bool(false)},
         {"relay_state", Config::Bool(false)},
         {"error_flags", Config::Uint32(0)},
+        {"config_error_flags", Config::Uint32(0)},
     });
 
     low_level_state = Config::Object({
@@ -208,7 +209,7 @@ void EnergyManager::setup()
 
     if ((config_in_use.get("phase_switching_mode")->asUint() == PHASE_SWITCHING_AUTOMATIC) && !config_in_use.get("contactor_installed")->asBool()) {
         logger.printfln("energy_manager: Invalid configuration: Automatic phase switching selected but no contactor installed.");
-        set_error(ERROR_FLAGS_BAD_CONFIG_MASK);
+        set_config_error(CONFIG_ERROR_FLAGS_PHASE_SWITCHING_MASK);
         return;
     }
 
@@ -301,25 +302,25 @@ void EnergyManager::setup()
 
     start_network_check_task();
 
-    if (max_current_unlimited_ma == 0) {
-        logger.printfln("energy_manager: No maximum current configured for chargers. Disabling energy distribution.");
-        set_error(ERROR_FLAGS_BAD_CONFIG_MASK);
-        return;
-    }
-
 #if MODULE_CHARGE_MANAGER_AVAILABLE()
     // Can't check for chargers in setup() because CM's setup() hasn't run yet to load the charger configuration.
     task_scheduler.scheduleOnce([this](){
         if (!charge_manager.have_chargers()) {
             logger.printfln("energy_manager: No chargers configured. Won't try to distribute energy.");
-            set_error(ERROR_FLAGS_BAD_CONFIG_MASK);
+            set_config_error(CONFIG_ERROR_FLAGS_NO_CHARGERS_MASK);
         }
     }, 0);
 #else
     logger.printfln("energy_manager: Module 'Charge Manager' not available. Disabling energy distribution.");
-    set_error(ERROR_FLAGS_BAD_CONFIG_MASK);
+        set_config_error(CONFIG_ERROR_FLAGS_NO_CM_MASK);
     return;
 #endif
+
+    if (max_current_unlimited_ma == 0) {
+        logger.printfln("energy_manager: No maximum current configured for chargers. Disabling energy distribution.");
+        set_config_error(CONFIG_ERROR_FLAGS_NO_MAX_CURRENT_MASK);
+        return;
+    }
 
     task_scheduler.scheduleWithFixedDelay([this](){
         this->update_energy();
@@ -529,6 +530,14 @@ void EnergyManager::set_error(uint32_t error_mask)
         update_status_led();
 }
 
+void EnergyManager::set_config_error(uint32_t config_error_mask)
+{
+    config_error_flags |= config_error_mask;
+    state.get("config_error_flags")->updateUint(config_error_flags);
+
+    set_error(ERROR_FLAGS_BAD_CONFIG_MASK);
+}
+
 void EnergyManager::check_bricklet_reachable(int rc, const char *context) {
     if (rc == TF_E_OK) {
         consecutive_bricklet_errors = 0;
@@ -702,8 +711,9 @@ void EnergyManager::update_energy()
             return;
         }
 
-        // TODO Evil: Allow runtime changes, overrides input pins!
-        target_power_from_grid_w    = config.get("target_power_from_grid")->asInt(); // watt
+#if MODULE_EM_PV_FAKER_AVAILABLE()
+        target_power_from_grid_w = em_pv_faker.state.get("fake_power")->asInt(); // watt
+#endif
 
         int32_t p_error_w, p_error_filtered_w;
         if (!excess_charging_enable) {

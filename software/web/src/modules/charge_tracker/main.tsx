@@ -122,6 +122,10 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
             </ListGroupItem>}).reverse();
     }
 
+    override async isSaveAllowed(cfg: ChargetrackerConfig) {
+        return cfg.electricity_price == 0 || cfg.electricity_price >= 100
+    }
+
     render(props: {}, state: Readonly<ChargeTrackerState> & ChargetrackerConfig) {
         if (!util.allow_render)
             return <></>
@@ -130,7 +134,8 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
             <>
                 <ConfigForm id="charge_tracker_config_form" title={__("charge_tracker.content.charge_tracker")} onSave={this.save} isModified={this.isModified()} onReset={this.reset} onDirtyChange={(d) => this.ignore_updates = d}>
                     <FormRow label={__("charge_tracker.content.price")}>
-                        <InputFloat value={state.electricity_price} onValue={this.set('electricity_price')} digits={2} unit={'ct/kWh'} max={65535} min={0}/>
+                        <InputFloat class={state.electricity_price == 0 || state.electricity_price >= 100 ? "" : "is-invalid"} value={state.electricity_price} onValue={this.set('electricity_price')} digits={2} unit={'ct/kWh'} max={65535} min={0}/>
+                        <div class="invalid-feedback">{__("charge_tracker.content.price_invalid")}</div>
                     </FormRow>
                 </ConfigForm>
 
@@ -213,7 +218,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
                                         end_timestamp_min: end.getTime() / 1000 / 60,
                                         user_filter: parseInt(state.user_filter),
                                         letterhead: state.pdf_text
-                                    }, __("charge_tracker.script.download_charge_log_failed"));
+                                    }, __("charge_tracker.script.download_charge_log_failed"), undefined, 2 * 60 * 1000);
                                     util.downloadToFile(pdf, "charge-log", "pdf", "application/pdf");
                                 } finally {
                                     this.setState({show_spinner: false});
