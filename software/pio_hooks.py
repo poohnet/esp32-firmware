@@ -253,6 +253,34 @@ def repair_rtc_dir():
     except:
         pass
 
+def find_branding_module(frontend_modules):
+    branding_module = None
+
+    for frontend_module in frontend_modules:
+        mod_path = os.path.join('web', 'src', 'modules', frontend_module.under)
+
+        potential_branding_path = os.path.join(mod_path, 'branding.ts')
+
+        if os.path.exists(potential_branding_path):
+            if branding_module != None:
+                print('Error: Branding module collision ' + mod_path + ' vs ' + branding_module)
+                sys.exit(1)
+
+            branding_module = mod_path
+
+    if branding_module is None:
+        print('Error: No branding module selected')
+        sys.exit(1)
+
+    req_for_branding = ['branding.ts', 'logo.png', 'favicon.png']
+
+    for f in req_for_branding:
+        if not os.path.exists(os.path.join(branding_module, f)):
+            print('Error: Branding module does not contain {}'.format(f))
+            sys.exit(1)
+
+    return branding_module
+
 def main():
     if env.IsCleanTarget():
         return
@@ -402,6 +430,9 @@ def main():
     with open(os.path.join(env.subst('$BUILD_DIR'), 'firmware_basename'), 'w', encoding='utf-8') as f:
         f.write(firmware_basename)
 
+    frontend_modules = [FlavoredName(x).get() for x in env.GetProjectOption("custom_frontend_modules").splitlines()]
+    branding_module = find_branding_module(frontend_modules)
+
     # Handle backend modules
     excluded_backend_modules = list(os.listdir('src/modules'))
     backend_modules = [FlavoredName(x).get() for x in env.GetProjectOption("custom_backend_modules").splitlines()]
@@ -420,8 +451,9 @@ def main():
             environ['PLATFORMIO_PROJECT_DIR'] = env.subst('$PROJECT_DIR')
             environ['PLATFORMIO_BUILD_DIR'] = env.subst('$BUILD_DIR')
 
+            abs_branding_module = os.path.abspath(branding_module)
             with ChangedDirectory(mod_path):
-                subprocess.check_call([env.subst('$PYTHONEXE'), "-u", "prepare.py"], env=environ)
+                subprocess.check_call([env.subst('$PYTHONEXE'), "-u", "prepare.py", abs_branding_module], env=environ)
 
     if build_src_filter != None:
         for excluded_backend_module in excluded_backend_modules:
@@ -432,11 +464,7 @@ def main():
     specialize_template("main.cpp.template", os.path.join("src", "main.cpp"), {
         '{{{module_includes}}}': '\n'.join(['#include "modules/{0}/{0}.h"'.format(x.under) for x in backend_modules]),
         '{{{module_decls}}}': '\n'.join(['{} {};'.format(x.camel, x.under) for x in backend_modules]),
-        '{{{module_pre_setup}}}': '\n    '.join(['{}.pre_setup();'.format(x.under) for x in backend_modules]),
-        '{{{module_setup}}}': '\n    '.join(['{}.setup();'.format(x.under) for x in backend_modules]),
-        '{{{module_register_urls}}}': '\n    '.join(['{}.register_urls();'.format(x.under) for x in backend_modules]),
-        '{{{module_register_events}}}': '\n    '.join(['{}.register_events();'.format(x.under) for x in backend_modules]),
-        '{{{module_loop}}}': '\n    '.join(['{}.loop();'.format(x.under) for x in backend_modules]),
+        '{{{imodule_vector}}}': '\n    '.join(['imodules.push_back(&{});'.format(x.under) for x in backend_modules]),
         '{{{display_name}}}': display_name,
         '{{{display_name_upper}}}': display_name.upper(),
         '{{{module_init_config}}}': ',\n        '.join('{{"{0}", Config::Bool({0}.initialized)}}'.format(x.under) for x in backend_modules if not x.under.startswith("hidden_")),
@@ -466,7 +494,6 @@ def main():
     main_ts_entries = []
     pre_scss_paths = []
     post_scss_paths = []
-    frontend_modules = [FlavoredName(x).get() for x in env.GetProjectOption("custom_frontend_modules").splitlines()]
     translation = collect_translation('web')
 
     # API
@@ -478,43 +505,8 @@ def main():
     exported_type_pattern = re.compile("export type ([A-Za-z0-9$_]+)")
     api_path_pattern = re.compile("//APIPath:([^\n]*)\n")
 
-    favicon_path = None
-    logo_path = None
-    branding_path = None
-
     for frontend_module in frontend_modules:
         mod_path = os.path.join('web', 'src', 'modules', frontend_module.under)
-
-        if not os.path.exists(mod_path) or not os.path.isdir(mod_path):
-            print("Error: Frontend module {} not found.".format(frontend_module.space, mod_path))
-            sys.exit(1)
-
-        potential_favicon_path = os.path.join(mod_path, 'favicon.png')
-
-        if os.path.exists(potential_favicon_path):
-            if favicon_path != None:
-                print('Error: Favicon path collision ' + potential_favicon_path + ' vs ' + favicon_path)
-                sys.exit(1)
-
-            favicon_path = potential_favicon_path
-
-        potential_logo_path = os.path.join(mod_path, 'logo.png')
-
-        if os.path.exists(potential_logo_path):
-            if logo_path != None:
-                print('Error: Logo path collision ' + potential_logo_path + ' vs ' + logo_path)
-                sys.exit(1)
-
-            logo_path = potential_logo_path
-
-        potential_branding_path = os.path.join(mod_path, 'branding.ts')
-
-        if os.path.exists(potential_branding_path):
-            if branding_path != None:
-                print('Error: Branding path collision ' + potential_branding_path + ' vs ' + branding_path)
-                sys.exit(1)
-
-            branding_path = potential_branding_path
 
         if os.path.exists(os.path.join(mod_path, 'navbar.html')):
             with open(os.path.join(mod_path, 'navbar.html'), 'r', encoding='utf-8') as f:
@@ -588,25 +580,13 @@ def main():
 
         f.write(data)
 
-    if favicon_path == None:
-        print('Error: Favicon missing')
-        sys.exit(1)
-
-    with open(favicon_path, 'rb') as f:
+    with open(os.path.join(branding_module, 'favicon.png'), 'rb') as f:
         favicon = b64encode(f.read()).decode('ascii')
 
-    if logo_path == None:
-        print('Error: Logo missing')
-        sys.exit(1)
-
-    if branding_path == None:
-        print('Error: Branding missing')
-        sys.exit(1)
-
-    with open(logo_path, 'rb') as f:
+    with open(os.path.join(branding_module, 'logo.png'), 'rb') as f:
         logo_base64 = b64encode(f.read()).decode('ascii')
 
-    with open(branding_path, 'r', encoding='utf-8') as f:
+    with open(os.path.join(branding_module, 'branding.ts'), 'r', encoding='utf-8') as f:
         branding = f.read()
 
     specialize_template(os.path.join("web", "index.html.template"), os.path.join("web", "src", "index.html"), {
