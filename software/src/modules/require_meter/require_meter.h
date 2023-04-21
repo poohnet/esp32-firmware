@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2022 Erik Fleckstein <erik@tinkerforge.com>
+ * Copyright (C) 2023 Frederic Henrichs <frederic@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,19 +19,36 @@
 
 #pragma once
 
+#include "module.h"
 #include "config.h"
 
-#include "module.h"
+#define METER_TIMEOUT_US 24ll * 60 * 60 * 1000 * 1000
+//#define METER_TIMEOUT_US  10 * 1000 * 1000
 
-class Ping final : public IModule
-{
+#define METER_BOOTUP_ENERGY_TIMEOUT_US 90ll * 1000 * 1000
+
+#define WARP_SMART 0
+#define WARP_PRO_DISABLED 1
+#define WARP_PRO_ENABLED 2
+
+
+class RequireMeter final : public IModule {
+private:
+    ConfigRoot config;
+
 public:
-    Ping(){}
     void pre_setup();
     void setup();
     void register_urls();
-    void loop();
 
-private:
-    ConfigRoot config;
+    void start_task();
+    void meter_found();
+    void set_require_meter_enabled(bool enabled);
+    void set_require_meter_blocking(bool block);
+
+    bool get_require_meter_enabled();
+    bool get_require_meter_blocking();
+    bool allow_charging(float meter_value);
+
+    bool initialized = false;
 };

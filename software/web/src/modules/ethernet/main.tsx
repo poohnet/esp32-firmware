@@ -22,13 +22,14 @@ import $ from "../../ts/jq";
 import * as API from "../../ts/api";
 import * as util from "../../ts/util";
 
-import { h, render, Fragment } from "preact";
+import { h, render, Fragment, Component } from "preact";
 import { __ } from "../../ts/translation";
 import { Switch } from "../../ts/components/switch";
 import { ConfigComponent } from "src/ts/components/config_component";
 import { ConfigForm } from "src/ts/components/config_form";
 import { FormRow } from "src/ts/components/form_row";
 import { IPConfiguration } from "src/ts/components/ip_configuration";
+import { IndicatorGroup } from "src/ts/components/indicator_group";
 
 type EthernetConfig = API.getType['ethernet/config'];
 
@@ -50,7 +51,7 @@ export class Ethernet extends ConfigComponent<'ethernet/config'> {
     }
 
     render(props: {}, state: Readonly<EthernetConfig>) {
-        if (!util.allow_render)
+        if (!util.render_allowed())
             return <></>
 
         return (
@@ -83,24 +84,37 @@ export class Ethernet extends ConfigComponent<'ethernet/config'> {
 
 render(<Ethernet/>, $('#ethernet')[0])
 
-function update_ethernet_state() {
-    let state = API.default_updater('ethernet/state', ['ip', 'full_duplex', 'link_speed', 'connection_start', 'connection_end'], false);
+export class EthernetStatus extends Component<{}, {}>
+{
+    render(props: {}, s: {})
+    {
+        if (!util.render_allowed() || !API.get('ethernet/config').enable_ethernet)
+            return <></>;
 
-    if (state.ip != "0.0.0.0") {
-        $('#ethernet_state_ip').html(state.ip);
-    } else {
-        $('#ethernet_state_ip').html("");
+        let state = API.get('ethernet/state');
+
+        return <>
+                <FormRow label={__("ethernet.status.ethernet_connection")} label_muted={state.ip != "0.0.0.0" ? state.ip : ""} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
+                    <IndicatorGroup
+                        style="width: 100%"
+                        class="flex-wrap"
+                        value={state.connection_state}
+                        items={[
+                            ["primary", __("ethernet.status.not_configured")],
+                            ["danger", __("ethernet.status.not_connected")],
+                            ["warning", __("ethernet.status.connecting")],
+                            ["success", __("ethernet.status.connected")],
+                        ]}/>
+                </FormRow>
+            </>;
     }
 }
 
-export function add_event_listeners(source: API.APIEventTarget) {
-    source.addEventListener('ethernet/state', update_ethernet_state);
-    source.addEventListener('ethernet/config', () => $('#status-ethernet').prop("hidden", !API.get("ethernet/config").enable_ethernet));
-}
+render(<EthernetStatus/>, $('#status-ethernet')[0]);
 
-export function init() {
+export function add_event_listeners(source: API.APIEventTarget) {}
 
-}
+export function init() {}
 
 export function update_sidebar_state(module_init: any) {
     $('#sidebar-ethernet').prop('hidden', !module_init.ethernet);

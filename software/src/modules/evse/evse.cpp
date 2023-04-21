@@ -208,6 +208,12 @@ void EVSE::pre_setup()
         {"enabled", Config::Bool(false)}
     });
     evse_boost_mode_update = evse_boost_mode;
+
+    evse_require_meter_enabled = Config::Object({
+        {"enabled", Config::Bool(false)}
+    });
+
+    evse_require_meter_enabled_update = evse_require_meter_enabled;
 }
 
 bool EVSE::apply_slot_default(uint8_t slot, uint16_t current, bool enabled, bool clear)
@@ -525,6 +531,29 @@ uint16_t EVSE::get_ocpp_current()
     return evse_slots.get(CHARGING_SLOT_OCPP)->get("max_current")->asUint();
 }
 
+void EVSE::set_require_meter_blocking(bool blocking) {
+    is_in_bootloader(tf_evse_set_charging_slot_max_current(&device, CHARGING_SLOT_REQUIRE_METER, blocking ? 0 : 32000));
+}
+
+void EVSE::set_require_meter_enabled(bool enabled) {
+    apply_slot_default(CHARGING_SLOT_REQUIRE_METER, 0, enabled, false);
+    is_in_bootloader(tf_evse_set_charging_slot_active(&device, CHARGING_SLOT_REQUIRE_METER, enabled));
+}
+
+bool EVSE::get_require_meter_blocking() {
+    uint16_t current = 0;
+    bool enabled = get_require_meter_enabled();
+    if (!enabled)
+        return false;
+
+    is_in_bootloader(tf_evse_get_charging_slot(&device, CHARGING_SLOT_REQUIRE_METER, &current, &enabled, nullptr));
+    return enabled && current == 0;
+}
+
+bool EVSE::get_require_meter_enabled() {
+    return evse_require_meter_enabled.get("enabled")->asBool();
+}
+
 void EVSE::check_debug()
 {
     task_scheduler.scheduleOnce([this](){
@@ -817,7 +846,6 @@ void EVSE::register_urls()
             ));
     }, true);
 
-
     this->DeviceModule::register_urls();
 }
 
@@ -1063,6 +1091,8 @@ void EVSE::update_all_data()
 
     evse_external_defaults.get("current")->updateUint(external_default_current);
     evse_external_defaults.get("clear_on_disconnect")->updateBool(external_default_clear_on_disconnect);
+
+    evse_require_meter_enabled.get("enabled")->updateBool(SLOT_ACTIVE(active_and_clear_on_disconnect[CHARGING_SLOT_REQUIRE_METER]));
 
     // get_user_calibration
     evse_user_calibration.get("user_calibration_active")->updateBool(user_calibration_active);

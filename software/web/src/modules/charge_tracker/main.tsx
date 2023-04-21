@@ -22,8 +22,6 @@ import $ from "../../ts/jq";
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
 
-import feather from "../../ts/feather";
-
 import { h, render, Fragment, Component } from "preact";
 import { __ } from "../../ts/translation";
 
@@ -38,6 +36,7 @@ import { getAllUsernames } from "../users/main";
 import { ConfigComponent } from "src/ts/components/config_component";
 import { ConfigForm } from "src/ts/components/config_form";
 import { InputFloat } from "src/ts/components/input_float";
+import { useMemo } from "preact/hooks";
 
 type Charge = API.getType['charge_tracker/last_charges'][0];
 type ChargetrackerConfig = API.getType['charge_tracker/config'];
@@ -55,6 +54,43 @@ interface S {
 }
 
 type ChargeTrackerState = S & API.getType['charge_tracker/state'];
+
+let wallet_icon = <svg class="feather feather-wallet mr-1" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>
+
+function TrackedCharge(props: {charge: Charge, users: API.getType['users/config']['users'], electricity_price: number}) {
+    const display_name = useMemo(
+        () => {
+            let result = __("charge_tracker.script.unknown_user");
+
+            let filtered = props.users.filter(x => x.id == props.charge.user_id);
+
+            if (props.charge.user_id != 0 || filtered[0].display_name != "Anonymous") {
+                result = __("charge_tracker.script.deleted_user")
+                if (filtered.length == 1)
+                    result = filtered[0].display_name
+            }
+            return result;
+        },
+        [props.users, props.charge.user_id]
+    );
+
+    let have_charge_cost = props.electricity_price > 0 && props.charge.energy_charged != null;
+    let price_div = have_charge_cost ? <div>{wallet_icon}<span style="vertical-align: middle;">{util.toLocaleFixed(props.electricity_price / 100 * props.charge.energy_charged / 100, 2)} €</span></div> : <></>
+
+    return <ListGroupItem>
+        <div class="row">
+            <div class="col">
+                <div class="mb-2"><User/><span class="ml-1" style="vertical-align: middle;">{display_name}</span></div>
+                <div><Calendar/><span class="ml-1" style="vertical-align: middle;">{util.timestamp_min_to_date(props.charge.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
+            </div>
+            <div class="col-auto">
+                <div class="mb-2"><BatteryCharging/><span class="ml-1" style="vertical-align: middle;">{props.charge.energy_charged === null ? "N/A" : util.toLocaleFixed(props.charge.energy_charged, 3)} kWh</span></div>
+                <div class={have_charge_cost ? "mb-2" : ""}><Clock/><span class="ml-1" style="vertical-align: middle;">{util.format_timespan(props.charge.charge_duration)}</span></div>
+                {price_div}
+            </div>
+        </div>
+    </ListGroupItem>
+}
 
 export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, ChargeTrackerState & ChargetrackerConfig> {
     constructor() {
@@ -89,37 +125,152 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
         } as any
     }
 
-    get_last_charges(charges: typeof this.state.last_charges) {
+    get_last_charges(charges: Readonly<Charge[]>) {
         let users_config = API.get('users/config');
 
-        return charges.map(c => {
-            let display_name = __("charge_tracker.script.unknown_user")
+        return charges.map(c => <TrackedCharge charge={c} users={users_config.users} electricity_price={c.electricity_price}/>)
+                      .reverse();
+    }
 
-            let filtered = users_config.users.filter(x => x.id == c.user_id);
+    to_csv_line(vals: string[], flavor: 'excel' | 'rfc4180') {
+        let line = vals.map(entry => '"' + entry.replace(/\"/, '""') + '"');
 
-            if (c.user_id != 0 || filtered[0].display_name != "Anonymous") {
-                display_name = __("charge_tracker.script.deleted_user")
-                if (filtered.length == 1)
-                    display_name = filtered[0].display_name
-            }
+        if (flavor == 'excel')
+            return line.join(";") + "\r\n";
 
-            let icon = <svg class="feather feather-wallet mr-1" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>
-            let price_div = <div>{icon}<span style="vertical-align: middle;">{util.toLocaleFixed(c.electricity_price / 100 * c.energy_charged / 100, 2)} €</span></div>
+        return line.join(",") + "\n";
+    }
 
-            return <ListGroupItem>
-                <div class="row">
-                    <div class="col">
-                        <div class="mb-2"><User/><span class="ml-1" style="vertical-align: middle;">{display_name}</span></div>
-                        <div class="mb-2"><Calendar/><span class="ml-1" style="vertical-align: middle;">{util.timestamp_min_to_date(c.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
-                        <div class="mb-2"><Clock/><span class="ml-1" style="vertical-align: middle;">{util.format_timespan(c.charge_duration)}</span></div>
-                    </div>
-                    <div class="col-auto">
-                        <div class="mb-2"><BatteryCharging/><span class="ml-1" style="vertical-align: middle;">{c.energy_charged === null ? "N/A" : util.toLocaleFixed(c.energy_charged, 3)} kWh</span></div>
-                        <div class="mb-2"><DollarSign/><span class="ml-1" style="vertical-align: middle;">{c.electricity_price === null ? "N/A" : util.toLocaleFixed(c.electricity_price / 100, 2)} ct/kWh</span></div>
-                        {c.electricity_price > 0 && c.energy_charged != null ? price_div : <></>}
-                    </div>
-                </div>
-            </ListGroupItem>}).reverse();
+    async downloadChargeLog(flavor: 'excel' | 'rfc4180', user_filter: number, start_date: Date, end_date: Date) {
+        const [usernames, display_names] = await getAllUsernames()
+            .catch(err => {
+                util.add_alert("download-usernames", "danger", __("charge_tracker.script.download_usernames_failed"), err);
+                return [null, null];
+            });
+
+        if (usernames == null || display_names == null)
+            return;
+
+        await util.download('/charge_tracker/charge_log')
+            .then(blob => blob.arrayBuffer())
+            .then(buffer => {
+                let line = [
+                    __("charge_tracker.script.csv_header_start"),
+                    __("charge_tracker.script.csv_header_display_name"),
+                    __("charge_tracker.script.csv_header_energy"),
+                    __("charge_tracker.script.csv_header_duration"),
+                    "",
+                    __("charge_tracker.script.csv_header_meter_start"),
+                    __("charge_tracker.script.csv_header_meter_end"),
+                    __("charge_tracker.script.csv_header_username"),
+                    //typeof price == 'number' && price > 0 ? __("charge_tracker.script.csv_header_price") + util.toLocaleFixed(price / 100, 2) + "ct/kWh" : "",
+                ];
+
+                let result = "";
+                if (flavor == 'excel')
+                    result += "sep=;\r\n";
+
+                let header = this.to_csv_line(line, flavor);
+                result += header;
+                let users_config = API.get('users/config');
+
+                let start = start_date.getTime() / 1000 / 60;
+
+                end_date.setHours(23, 59, 59, 999);
+                let end = end_date.getTime() / 1000 / 60;
+
+                let known_users = API.get('users/config').users.filter(u => u.id != 0).map(u => u.id);
+
+                let user_filtered = (x: number) => {
+                    switch(user_filter) {
+                        case -2:
+                            return false;
+                        case -1:
+                            return known_users.indexOf(x) < 0;
+                        default:
+                            return x != user_filter;
+                    }
+                }
+
+                if (start <= end) {
+                    for(let i = 0; i < buffer.byteLength; i += 16) {
+                        let view = new DataView(buffer, i, 16);
+
+                        let timestamp_minutes = view.getUint32(0, true);
+                        let meter_start = view.getFloat32(4, true);
+                        let user_id = view.getUint8(8);
+                        let electricity_price = view.getUint16(9, true);
+                        let charge_duration = view.getUint32(16, true);
+                        let meter_end = view.getFloat32(20, true);
+
+                        if (timestamp_minutes != 0 && timestamp_minutes < start) {
+                            // We know when this charge started and it was before the requested start date.
+                            // This means that all charges before and including this one can't be relevant.
+                            result = header;
+                            continue;
+                        }
+
+                        if (timestamp_minutes != 0 && timestamp_minutes > end)
+                            // This charge started after the requested end date. We are done searching.
+                            break;
+
+                        if (user_filtered(user_id))
+                            continue;
+
+                        let filtered = users_config.users.filter(x => x.id == user_id);
+
+                        let display_name = "";
+                        let username = ""
+                        if (user_id == 0) {
+                            if (filtered[0].display_name == "Anonymous")
+                                display_name = __("charge_tracker.script.unknown_user");
+                            else
+                                display_name = filtered[0].display_name;
+                            username = __("charge_tracker.script.unknown_user");
+                        }
+                        else if (filtered.length == 1) {
+                            display_name = filtered[0].display_name
+                            username = filtered[0].username
+                        }
+                        else {
+                            display_name = display_names[user_id];
+                            username = usernames[user_id];
+                        }
+
+                        let charged = (Number.isNaN(meter_start) || Number.isNaN(meter_end) || meter_end < meter_start) ? NaN : (meter_end - meter_start);
+                        let charged_string;
+                        let charged_price = charged / 100 * electricity_price / 100;
+                        let charged_price_string;
+                        if (Number.isNaN(charged) || charged < 0) {
+                            charged_string = 'N/A';
+                            charged_price_string = 'N/A';
+                        } else {
+                            charged_string = util.toLocaleFixed(charged, 3);
+                            charged_price_string = util.toLocaleFixed(charged_price, 2);
+                        }
+
+                        let line = [
+                            util.timestamp_min_to_date(timestamp_minutes, __("charge_tracker.script.unknown_charge_start")),
+                            display_name,
+                            charged_string,
+                            charge_duration.toString(),
+                            "",
+                            Number.isNaN(meter_start) ? 'N/A' : util.toLocaleFixed(meter_start, 3),
+                            Number.isNaN(meter_end) ? 'N/A' : util.toLocaleFixed(meter_end, 3),
+                            username,
+                            charged_price_string
+                        ];
+
+                        result += this.to_csv_line(line, flavor);
+                    }
+                }
+
+                if (flavor == 'excel')
+                    util.downloadToFile(util.win1252Encode(result), "charge-log", "csv", "text/csv; charset=windows-1252; header=present");
+                else
+                util.downloadToFile(result, "charge-log", "csv", "text/csv; charset=utf-8; header=present");
+            })
+            .catch(err => util.add_alert("download-charge-log", "alert-danger", __("charge_tracker.script.download_charge_log_failed"), err));
     }
 
     override async isSaveAllowed(cfg: ChargetrackerConfig) {
@@ -127,7 +278,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
     }
 
     render(props: {}, state: Readonly<ChargeTrackerState> & ChargetrackerConfig) {
-        if (!util.allow_render)
+        if (!util.render_allowed())
             return <></>
 
         return (
@@ -259,7 +410,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
                                     end = new Date(Date.now());
 
                                 try {
-                                    await downloadChargeLog(state.csv_flavor, parseInt(state.user_filter), start, end);
+                                    await this.downloadChargeLog(state.csv_flavor, parseInt(state.user_filter), start, end);
                                 } finally {
                                     this.setState({show_spinner: false});
                                 }
@@ -317,264 +468,101 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
 
 render(<ChargeTracker/>, $('#charge_tracker')[0]);
 
-let x = <svg class="feather feather-credit-card" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>
+interface ChargeTrackerStatusState {
+    last_charges: Readonly<API.getType['charge_tracker/last_charges']>;
+    cc: API.getType['charge_tracker/current_charge'];
+    evse_uptime: API.getType['evse/low_level_state']['uptime'];
+    energy_abs: API.getType['meter/values']['energy_abs'];
+    users: API.getType['users/config']['users'];
+    electricity_price: API.getType['charge_tracker/config']['electricity_price'];
+}
 
-function show_charge_cost(charged: number, price: number)
-{
-    if (price > 0 && charged != null)
+export class ChargeTrackerStatus extends Component<{}, ChargeTrackerStatusState> {
+    constructor()
     {
-        let icon = '<svg class="feather feather-wallet mr-1" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>'
+        super();
 
-        return `<div>${icon}<span style="vertical-align: middle;">${util.toLocaleFixed(price / 100 * charged / 100, 2)} €</span></div>`;
-    }
-    return "";
-
-
-}
-
-function update_last_charges() {
-    let charges = API.get('charge_tracker/last_charges');
-    let users_config = API.get('users/config')
-
-    let last_charges_html = charges.slice(-3).map((user) => {
-        let display_name = __("charge_tracker.script.unknown_user")
-
-        let filtered = users_config.users.filter(x => x.id == user.user_id);
-
-        if (user.user_id != 0 || filtered[0].display_name != "Anonymous") {
-            display_name = __("charge_tracker.script.deleted_user")
-            if (filtered.length == 1)
-                display_name = filtered[0].display_name
-        }
-
-        return `<div class="list-group-item">
-        <div class="row">
-            <div class="col">
-                <div class="mb-2"><span class="mr-1" data-feather="user"></span><span style="vertical-align: middle;">${display_name}</span></div>
-                <div class="mb-2"><span class="mr-1" data-feather="calendar"></span><span style="vertical-align: middle;">${util.timestamp_min_to_date(user.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
-                <div class="mb-2"><span class="mr-1" data-feather="clock"></span><span style="vertical-align: middle;">${util.format_timespan(user.charge_duration)}</span></div>
-            </div>
-            <div class="col-auto">
-                <div class="mb-2"><span class="mr-1" data-feather="battery-charging"></span><span style="vertical-align: middle;">${user.energy_charged === null ? "N/A" : util.toLocaleFixed(user.energy_charged, 3)} kWh</span></div>
-                <div class="mb-2"><span class="mr-1" data-feather="dollar-sign"></span><span style="vertical-align: middle;">${user.electricity_price === null ? "N/A" : util.toLocaleFixed(user.electricity_price / 100, 2)} ct/kWh</span></div>
-                ${show_charge_cost(user.energy_charged, user.electricity_price)}
-            </div>
-        </div>
-        </div>`
-    }).reverse();
-
-    $('#status-charge_tracker-last-charges').prop("hidden", charges.length == 0);
-    $('#charge_tracker_status_last_charges').html(last_charges_html.join(""));
-    feather.replace();
-}
-
-function to_csv_line(vals: string[], flavor: 'excel' | 'rfc4180') {
-    let line = vals.map(entry => '"' + entry.replace(/\"/, '""') + '"');
-
-    if (flavor == 'excel')
-        return line.join(";") + "\r\n";
-
-    return line.join(",") + "\n";
-}
-
-async function downloadChargeLog(flavor: 'excel' | 'rfc4180', user_filter: number, start_date: Date, end_date: Date, price?: number) {
-    const [usernames, display_names] = await getAllUsernames()
-        .catch(err => {
-            util.add_alert("download-usernames", "danger", __("charge_tracker.script.download_usernames_failed"), err);
-            return [null, null];
+        util.addApiEventListener('charge_tracker/last_charges', () => {
+            this.setState({last_charges: API.get('charge_tracker/last_charges')})
         });
 
-    if (usernames == null || display_names == null)
-        return;
+        util.addApiEventListener('charge_tracker/current_charge', () => {
+            this.setState({cc: API.get('charge_tracker/current_charge')})
+        });
 
-    await util.download('/charge_tracker/charge_log')
-        .then(blob => blob.arrayBuffer())
-        .then(buffer => {
-            let line = [
-                __("charge_tracker.script.csv_header_start"),
-                __("charge_tracker.script.csv_header_display_name"),
-                __("charge_tracker.script.csv_header_energy"),
-                __("charge_tracker.script.csv_header_duration"),
-                "",
-                __("charge_tracker.script.csv_header_meter_start"),
-                __("charge_tracker.script.csv_header_meter_end"),
-                __("charge_tracker.script.csv_header_username"),
-                typeof price == 'number' && price > 0 ? __("charge_tracker.script.csv_header_price") + util.toLocaleFixed(price / 100, 2) + "ct/kWh" : "",
-            ];
+        util.addApiEventListener('evse/low_level_state', () => {
+            this.setState({evse_uptime: API.get('evse/low_level_state').uptime})
+        });
 
-            let result = "";
-            if (flavor == 'excel')
-                result += "sep=;\r\n";
+        util.addApiEventListener('meter/values', () => {
+            this.setState({energy_abs: API.get('meter/values').energy_abs})
+        });
 
-            let header = to_csv_line(line, flavor);
-            result += header;
-            let users_config = API.get('users/config');
+        util.addApiEventListener('users/config', () => {
+            this.setState({users: API.get('users/config').users})
+        });
 
-            let start = start_date.getTime() / 1000 / 60;
-
-            end_date.setHours(23, 59, 59, 999);
-            let end = end_date.getTime() / 1000 / 60;
-
-            let known_users = API.get('users/config').users.filter(u => u.id != 0).map(u => u.id);
-
-            let user_filtered = (x: number) => {
-                switch(user_filter) {
-                    case -2:
-                        return false;
-                    case -1:
-                        return known_users.indexOf(x) < 0;
-                    default:
-                        return x != user_filter;
-                }
-            }
-
-            if (start <= end) {
-                for(let i = 0; i < buffer.byteLength; i += 16) {
-                    let view = new DataView(buffer, i, 16);
-
-                    let timestamp_minutes = view.getUint32(0, true);
-                    let meter_start = view.getFloat32(4, true);
-                    let user_id = view.getUint8(8);
-                    let charge_duration = view.getUint32(9, true) & 0x00FFFFFF;
-                    let meter_end = view.getFloat32(12, true);
-
-                    if (timestamp_minutes != 0 && timestamp_minutes < start) {
-                        // We know when this charge started and it was before the requested start date.
-                        // This means that all charges before and including this one can't be relevant.
-                        result = header;
-                        continue;
-                    }
-
-                    if (timestamp_minutes != 0 && timestamp_minutes > end)
-                        // This charge started after the requested end date. We are done searching.
-                        break;
-
-                    if (user_filtered(user_id))
-                        continue;
-
-                    let filtered = users_config.users.filter(x => x.id == user_id);
-
-                    let display_name = "";
-                    let username = ""
-                    if (user_id == 0) {
-                        if (filtered[0].display_name == "Anonymous")
-                            display_name = __("charge_tracker.script.unknown_user");
-                        else
-                            display_name = filtered[0].display_name;
-                        username = __("charge_tracker.script.unknown_user");
-                    }
-                    else if (filtered.length == 1) {
-                        display_name = filtered[0].display_name
-                        username = filtered[0].username
-                    }
-                    else {
-                        display_name = display_names[user_id];
-                        username = usernames[user_id];
-                    }
-
-                    let charged = (Number.isNaN(meter_start) || Number.isNaN(meter_end) || meter_end < meter_start) ? NaN : (meter_end - meter_start);
-                    let charged_string;
-                    let charged_price = typeof price == 'number' ? charged / 100 * price / 100 : 0;
-                    let charged_price_string;
-                    if (Number.isNaN(charged) || charged < 0) {
-                        charged_string = 'N/A';
-                        charged_price_string = 'N/A';
-                    } else {
-                        charged_string = util.toLocaleFixed(charged, 3);
-                        charged_price_string = util.toLocaleFixed(charged_price, 2);
-                    }
-
-                    let line = [
-                        util.timestamp_min_to_date(timestamp_minutes, __("charge_tracker.script.unknown_charge_start")),
-                        display_name,
-                        charged_string,
-                        charge_duration.toString(),
-                        "",
-                        Number.isNaN(meter_start) ? 'N/A' : util.toLocaleFixed(meter_start, 3),
-                        Number.isNaN(meter_end) ? 'N/A' : util.toLocaleFixed(meter_end, 3),
-                        username,
-                        price > 0 ? charged_price_string : ""
-                    ];
-
-                    result += to_csv_line(line, flavor);
-                }
-            }
-
-            if (flavor == 'excel')
-                util.downloadToFile(util.win1252Encode(result), "charge-log", "csv", "text/csv; charset=windows-1252; header=present");
-            else
-            util.downloadToFile(result, "charge-log", "csv", "text/csv; charset=utf-8; header=present");
-        })
-        .catch(err => util.add_alert("download-charge-log", "alert-danger", __("charge_tracker.script.download_charge_log_failed"), err));
-}
-
-function update_current_charge() {
-    let cc = API.get('charge_tracker/current_charge');
-    let evse_ll = API.get('evse/low_level_state');
-    let mv = API.get('meter/values');
-    let uc = API.get('users/config');
-
-    $('#charge_tracker_current_charge').prop("hidden", cc.user_id == -1);
-
-    if (cc.user_id == -1) {
-        return;
+        util.addApiEventListener('charge_tracker/config', () => {
+            this.setState({electricity_price: API.get('charge_tracker/config').electricity_price})
+        });
     }
 
-    let filtered = uc.users.filter((x) => x.id == cc.user_id);
-    let user_display_name = __("charge_tracker.script.unknown_user");
-    if (filtered.length > 0 && (cc.user_id != 0 || filtered[0].display_name != "Anonymous"))
-        user_display_name = filtered[0].display_name;
-
-    let energy_charged = mv.energy_abs - cc.meter_start;
-    let time_charging = evse_ll.uptime - cc.evse_uptime_start
-    if (evse_ll.uptime < cc.evse_uptime_start)
-        time_charging += 0xFFFFFFFF;
-
-    time_charging = Math.floor(time_charging / 1000);
-
-    let price = cc.electricity_price;
-
-    if (filtered.length == 0)
-        $('#users_status_charging_user').html(__("charge_tracker.script.deleted_user"));
-    else if (filtered[0].display_name == "Anonymous" && cc.user_id == 0)
-        $('#users_status_charging_user').html(__("charge_tracker.script.unknown_user"));
-    else
-        $('#users_status_charging_user').html(user_display_name);
-    $('#users_status_charging_time').html(util.format_timespan(time_charging));
-    $('#users_status_electricity_price').html(cc.electricity_price == null ? "N/A ct/kWh" : util.toLocaleFixed(cc.electricity_price / 100, 2) + " ct/kWh");
-    $('#users_status_charged_energy').html(cc.meter_start == null ? "N/A kWh" : util.toLocaleFixed(energy_charged, 3) + " kWh");
-    $('#users_status_charging_start').html(util.timestamp_min_to_date(cc.timestamp_minutes, __("charge_tracker.script.unknown_charge_start")));
-    if (price > 0 && cc.meter_start != null)
+    render(props: {}, state: ChargeTrackerStatusState)
     {
-        $('#current_charge_price').text(util.toLocaleFixed(price / 100 * energy_charged / 100, 2) + " €");
-        $('#current_charge_price_div').prop('hidden', false);
+        if (!util.render_allowed())
+            return <></>;
+
+        let current_charge = <></>;
+
+        if (state.cc.user_id != -1) {
+            let charge_duration = state.evse_uptime - state.cc.evse_uptime_start
+            if (state.evse_uptime < state.cc.evse_uptime_start)
+                charge_duration += 0xFFFFFFFF;
+
+            charge_duration = Math.floor(charge_duration / 1000);
+
+            let charge: Charge = {
+                charge_duration: charge_duration,
+                energy_charged: state.energy_abs - state.cc.meter_start,
+                timestamp_minutes: state.cc.timestamp_minutes,
+                user_id: state.cc.user_id,
+                electricity_price: state.cc.electricity_price
+            };
+
+            current_charge = <FormRow label={__("charge_tracker.status.current_charge")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
+                <ListGroup>
+                    <TrackedCharge charge={charge}
+                                   users={state.users}
+                                   electricity_price={state.electricity_price}
+                                   />
+                </ListGroup>
+            </FormRow>;
+        }
+
+        let last_charges = state.last_charges.length == 0 ? <></>
+            : <FormRow label={__("charge_tracker.status.last_charges")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
+                <ListGroup>
+                    {state.last_charges.slice(-3).map(c =>
+                        <TrackedCharge charge={c}
+                                       users={state.users}
+                                       electricity_price={state.electricity_price}
+                                       />
+                    ).reverse()}
+                </ListGroup>
+            </FormRow>;
+
+        return <>
+                    {current_charge}
+                    {last_charges}
+            </>;
     }
-    else
-        $('#current_charge_price_div').prop('hidden', true);
 }
 
-function update_config() {
-    let config = API.get('charge_tracker/config');
+render(<ChargeTrackerStatus/>, $('#status-charge_tracker')[0]);
 
-    if (!config.electricity_price) {
-        return;
-    }
+export function init() {}
 
-    $('#status_current_price').val(util.toLocaleFixed(config.electricity_price / 100, 2) + " ct/kWh");
-}
-
-export function init() {
-
-}
-
-export function add_event_listeners(source: API.APIEventTarget) {
-    source.addEventListener('charge_tracker/last_charges', update_last_charges);
-    source.addEventListener('charge_tracker/current_charge', update_current_charge);
-    source.addEventListener('charge_tracker/config', update_config);
-    source.addEventListener('evse/low_level_state', update_current_charge);
-    source.addEventListener('meter/values', update_current_charge);
-    source.addEventListener('users/config', update_current_charge);
-}
+export function add_event_listeners(source: API.APIEventTarget) {}
 
 export function update_sidebar_state(module_init: any) {
     $('#sidebar-charge_tracker').prop('hidden', !module_init.charge_tracker);

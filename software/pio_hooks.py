@@ -541,7 +541,6 @@ def main():
                 api_imports.append("import * as {} from '../modules/{}/api';".format(api_module, frontend_module.under))
 
                 api_config_map_entries += ["'{}{}': {}.{},".format(api_path, x, api_module, x) for x in api_exports]
-                api_config_map_entries += ["'{}{}_modified': ConfigModified,".format(api_path, x, api_module, x) for x in api_exports]
                 api_cache_entries += ["'{}{}': null as any,".format(api_path, x) for x in api_exports]
                 api_cache_entries += ["'{}{}_modified': null as any,".format(api_path, x) for x in api_exports]
 
@@ -589,12 +588,16 @@ def main():
     with open(os.path.join(branding_module, 'branding.ts'), 'r', encoding='utf-8') as f:
         branding = f.read()
 
+    with open(os.path.join(branding_module, 'pre.scss'), 'r', encoding='utf-8') as f:
+        color = f.read().split('\n')[1].split(' ')[1].removesuffix(';')
+
     specialize_template(os.path.join("web", "index.html.template"), os.path.join("web", "src", "index.html"), {
         '{{{favicon}}}': favicon,
         '{{{logo_base64}}}': logo_base64,
         '{{{navbar}}}': '\n                        '.join(navbar_entries),
         '{{{content}}}': '\n                    '.join(content_entries),
-        '{{{status}}}': '\n                            '.join(status_entries)
+        '{{{status}}}': '\n                            '.join(status_entries),
+        '{{{theme_color}}}': color
     })
 
     specialize_template(os.path.join("web", "main.ts.template"), os.path.join("web", "src", "main.ts"), {

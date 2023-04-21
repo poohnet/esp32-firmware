@@ -25,6 +25,7 @@
 #include "task_scheduler.h"
 #include "modules.h"
 
+
 void Meter::pre_setup()
 {
     state = Config::Object({
@@ -84,10 +85,26 @@ void Meter::updateMeterValues(float power, float energy_rel, float energy_abs)
 {
     if (!meter_setup_done)
         return;
+    bool changed = false;
+    float old_value;
 
-    values.get("power")->updateFloat(power);
-    values.get("energy_rel")->updateFloat(energy_rel);
-    values.get("energy_abs")->updateFloat(energy_abs);
+    if (!isnan(power)) {
+        old_value = values.get("power")->asFloat();
+        changed |= values.get("power")->updateFloat(power) && !isnan(old_value);
+    }
+
+    if (!isnan(energy_rel)) {
+        old_value = values.get("energy_rel")->asFloat();
+        changed |= values.get("energy_rel")->updateFloat(energy_rel) && !isnan(old_value);
+    }
+
+    if (!isnan(energy_abs)) {
+        old_value = values.get("energy_abs")->asFloat();
+        changed |= values.get("energy_abs")->updateFloat(energy_abs) && !isnan(old_value);
+    }
+
+    if (changed)
+        last_value_change = esp_timer_get_time();
 
     power_hist.add_sample(power);
 }
@@ -117,9 +134,18 @@ void Meter::updateMeterAllValues(float values[METER_ALL_VALUES_COUNT])
     if (!meter_setup_done)
         return;
 
+    bool changed = false;
+
     for (int i = 0; i < METER_ALL_VALUES_COUNT; ++i)
-        if (!isnan(values[i]))
-            all_values.get(i)->updateFloat(values[i]);
+        if (!isnan(values[i])) {
+            auto wrap = all_values.get(i);
+            auto old_value = wrap->asFloat();
+            changed |= wrap->updateFloat(values[i]) && !isnan(old_value);
+        }
+
+    if (changed) {
+        last_value_change = esp_timer_get_time();
+    }
 }
 
 void Meter::registerResetCallback(std::function<void(void)> cb)
@@ -149,6 +175,10 @@ void Meter::setupMeter(uint8_t meter_type)
     }
 
     meter_setup_done = true;
+
+#if MODULE_REQUIRE_METER_AVAILABLE()
+    require_meter.meter_found();
+#endif
 }
 
 void Meter::setup()

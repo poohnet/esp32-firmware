@@ -96,7 +96,12 @@ String ChargeTracker::chargeRecordFilename(uint32_t i)
     return String(CHARGE_RECORD_FOLDER) + "/charge-record-" + i + ".bin";
 }
 
-void ChargeTracker::startCharge(uint32_t timestamp_minutes, float meter_start, uint8_t user_id, uint32_t evse_uptime, uint8_t auth_type, Config::ConfVariant auth_info) {
+bool ChargeTracker::startCharge(uint32_t timestamp_minutes, float meter_start, uint8_t user_id, uint32_t evse_uptime, uint8_t auth_type, Config::ConfVariant auth_info) {
+#if MODULE_REQUIRE_METER_AVAILABLE()
+    if (!require_meter.allow_charging(meter_start))
+        return false;
+#endif
+
     std::lock_guard<std::mutex> lock{records_mutex};
     ChargeStart cs;
     File file = LittleFS.open(chargeRecordFilename(this->last_charge_record), "a", true);
@@ -116,7 +121,7 @@ void ChargeTracker::startCharge(uint32_t timestamp_minutes, float meter_start, u
     if ((file.size() % CHARGE_RECORD_SIZE) != 0) {
         logger.printfln("Can't track start of charge: Last charge end was not tracked or file is damaged! Offset is %u bytes. Expected 0", file.size() % CHARGE_RECORD_SIZE);
         // TODO: for robustness we would have to write the last end here? Yes, but only if % == 9. Also write duration 0, so we know this is a "faked" end. Still write the correct meter state.
-        return;
+        return false;
     }
 
     uint16_t electricity_price = config.get("electricity_price")->asUint();
@@ -140,6 +145,7 @@ void ChargeTracker::startCharge(uint32_t timestamp_minutes, float meter_start, u
     current_charge.get("authorization_type")->updateUint(auth_type);
     current_charge.get("authorization_info")->value = auth_info;
     current_charge.get("authorization_info")->value.updated = 0xFF;
+    return true;
 }
 
 void ChargeTracker::endCharge(uint32_t charge_duration_seconds, float meter_end)

@@ -154,6 +154,8 @@ public:
 
     void setupMeter(uint8_t meter_type);
 
+    bool all_values_changed();
+
     bool meter_setup_done = false;
 
     ConfigRoot state;
@@ -163,6 +165,8 @@ public:
     ConfigRoot last_reset;
 
     ValueHistory power_hist;
+
+    int64_t last_value_change = 0;
 
     std::vector<std::function<void(void)>> reset_callbacks;
 };

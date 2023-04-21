@@ -59,7 +59,7 @@ void CMNetworking::register_urls()
 
 // If we don't have the evse or evse_v2 module, but have cm_networking, this is probably an energy manager.
 // We only want to announce manageable chargers, not managers.
-#if MODULE_EVSE_AVAILABLE() || MODULE_EVSE_V2_AVAILABLE()
+#if MODULE_NETWORK_AVAILABLE() && (MODULE_EVSE_AVAILABLE() || MODULE_EVSE_V2_AVAILABLE())
     if (!network.config.get("enable_mdns")->asBool())
         return;
 
@@ -166,6 +166,13 @@ bool CMNetworking::is_resolved(uint8_t charger_idx) {
     return resolve_state[charger_idx] == RESOLVE_STATE_RESOLVED;
 }
 
+void CMNetworking::clear_cached_hostname(uint8_t charger_idx) {
+    const char *hostname = hostnames[charger_idx].c_str();
+    auto err = dns_removehost(hostname, nullptr);
+    if (err != ESP_OK)
+        logger.printfln("cm_networking: Couldn't remove hostname from cache: error %i", err);
+}
+
 static const uint8_t cm_command_packet_length_versions[] = {
     sizeof(struct cm_packet_header),
     sizeof(struct cm_packet_header) + sizeof(struct cm_command_v1),
@@ -253,61 +260,68 @@ void CMNetworking::register_manager(std::vector<String> &&hosts,
         struct sockaddr_in source_addr;
         socklen_t socklen = sizeof(source_addr);
 
-        int len = recvfrom(manager_sock, &state_pkt, sizeof(state_pkt), 0, (sockaddr *)&source_addr, &socklen);
+        // Try to receive up to four packets in one go to catch up on any backlog.
+        // Retrieving one packet every 100+ms is not enough with 10 chargers configured.
+        // Also, chargers might sync up and send their status packets bunched up.
+        // Retrieve them quickly to free up the RX buffer.
+        // Don't process more than four packets in one go, to avoid stalling other tasks for too long.
+        for (int poll_ctr = 0; poll_ctr < 4; ++poll_ctr) {
+            int len = recvfrom(manager_sock, &state_pkt, sizeof(state_pkt), 0, (sockaddr *)&source_addr, &socklen);
 
-        if (len < 0) {
-            if (errno != EAGAIN && errno != EWOULDBLOCK)
-                logger.printfln("recvfrom failed: errno %d", errno);
-            return;
-        }
-
-        int charger_idx = -1;
-        for(int i = 0; i < names.size(); ++i)
-            if (source_addr.sin_family == dest_addrs[i].sin_family &&
-                source_addr.sin_port == dest_addrs[i].sin_port &&
-                source_addr.sin_addr.s_addr == dest_addrs[i].sin_addr.s_addr) {
-                charger_idx = i;
-                break;
+            if (len < 0) {
+                if (errno != EAGAIN && errno != EWOULDBLOCK)
+                    logger.printfln("recvfrom failed: errno %d", errno);
+                return;
             }
 
-        // Don't log in the first 20 seconds after startup: We are probably still resolving hostnames.
-        if (charger_idx == -1) {
-            if (deadline_elapsed(20000))
-                logger.printfln("Received packet from unknown %s. Is the config complete?", inet_ntoa(source_addr.sin_addr));
-            return;
+            int charger_idx = -1;
+            for(int idx = 0; idx < names.size(); ++idx)
+                if (source_addr.sin_family == dest_addrs[idx].sin_family &&
+                    source_addr.sin_port == dest_addrs[idx].sin_port &&
+                    source_addr.sin_addr.s_addr == dest_addrs[idx].sin_addr.s_addr) {
+                        charger_idx = idx;
+                        break;
+                }
+
+            // Don't log in the first 20 seconds after startup: We are probably still resolving hostnames.
+            if (charger_idx == -1) {
+                if (deadline_elapsed(20000))
+                    logger.printfln("Received packet from unknown %s. Is the config complete?", inet_ntoa(source_addr.sin_addr));
+                return;
+            }
+
+            String validation_error = validate_state_packet_header(&state_pkt, len);
+            if (validation_error != "") {
+                logger.printfln("Received state packet from %s (%s) (%i bytes) failed validation: %s",
+                                names[charger_idx].c_str(),
+                                inet_ntoa(source_addr.sin_addr),
+                                len,
+                                validation_error.c_str());
+                manager_error_callback(charger_idx, CM_NETWORKING_ERROR_INVALID_HEADER);
+                return;
+            }
+
+            if (seq_num_invalid(state_pkt.header.seq_num, last_seen_seq_num[charger_idx])) {
+                logger.printfln("Received stale (out of order?) state packet from %s (%s). Last seen seq_num is %u, Received seq_num is %u",
+                                names[charger_idx].c_str(),
+                                inet_ntoa(source_addr.sin_addr),
+                                last_seen_seq_num[charger_idx],
+                                state_pkt.header.seq_num);
+                return;
+            }
+
+            last_seen_seq_num[charger_idx] = state_pkt.header.seq_num;
+
+            if (!CM_STATE_FLAGS_MANAGED_IS_SET(state_pkt.v1.state_flags)) {
+                manager_error_callback(charger_idx, CM_NETWORKING_ERROR_NOT_MANAGED);
+                logger.printfln("%s (%s) reports managed is not activated!",
+                    names[charger_idx].c_str(),
+                    inet_ntoa(source_addr.sin_addr));
+                return;
+            }
+
+            manager_callback(charger_idx, &state_pkt.v1);
         }
-
-        String validation_error = validate_state_packet_header(&state_pkt, len);
-        if (validation_error != "") {
-            logger.printfln("Received state packet from %s (%s) (%i bytes) failed validation: %s",
-                names[charger_idx].c_str(),
-                inet_ntoa(source_addr.sin_addr),
-                len,
-                validation_error.c_str());
-            manager_error_callback(charger_idx, CM_NETWORKING_ERROR_INVALID_HEADER);
-            return;
-        }
-
-        if (seq_num_invalid(state_pkt.header.seq_num, last_seen_seq_num[charger_idx])) {
-            logger.printfln("Received stale (out of order?) state packet from %s (%s). Last seen seq_num is %u, Received seq_num is %u",
-                names[charger_idx].c_str(),
-                inet_ntoa(source_addr.sin_addr),
-                last_seen_seq_num[charger_idx],
-                state_pkt.header.seq_num);
-            return;
-        }
-
-        last_seen_seq_num[charger_idx] = state_pkt.header.seq_num;
-
-        if (!CM_STATE_FLAGS_MANAGED_IS_SET(state_pkt.v1.state_flags)) {
-            manager_error_callback(charger_idx, CM_NETWORKING_ERROR_NOT_MANAGED);
-            logger.printfln("%s (%s) reports managed is not activated!",
-                names[charger_idx].c_str(),
-                inet_ntoa(source_addr.sin_addr));
-            return;
-        }
-
-        manager_callback(charger_idx, &state_pkt.v1);
     }, 100, 100);
 }
 
@@ -583,6 +597,8 @@ bool CMNetworking::mdns_result_is_charger(mdns_result_t *entry, const char ** re
 
     int found = 0;
     for(size_t i = 0; i < entry->txt_count; ++i) {
+        // strcmp is save here: Keys are always null terminated.
+        // https://github.com/espressif/esp-idf/blob/7eba5f80027e1648775b46f889cb4d9519afc965/components/mdns/mdns.c#L3000-L3011
         if (strcmp(entry->txt[i].key, "enabled") == 0 && entry->txt_value_len[i] > 0) {
             if (ret_enabled != nullptr)
                 *ret_enabled = entry->txt[i].value;
@@ -637,6 +653,8 @@ void CMNetworking::add_scan_result_entry(mdns_result_t *entry, TFJsonSerializer 
 
     uint8_t error = SCAN_RESULT_ERROR_OK;
 
+    // strcmp is save here: txt values such as enabled are null terminated:
+    // https://github.com/espressif/esp-idf/blob/7eba5f80027e1648775b46f889cb4d9519afc965/components/mdns/mdns.c#L3017-L3023
     if (strcmp(enabled, "true") != 0) {
         error = SCAN_RESULT_ERROR_MANAGEMENT_DISABLED;
     } else {

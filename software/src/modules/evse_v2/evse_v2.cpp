@@ -250,6 +250,12 @@ void EVSEV2::pre_setup()
     });
 
     evse_control_pilot_disconnect_update = evse_control_pilot_disconnect;
+
+    evse_require_meter_enabled = Config::Object({
+        {"enabled", Config::Bool(false)}
+    });
+
+    evse_require_meter_enabled_update = evse_require_meter_enabled;
 }
 
 bool EVSEV2::apply_slot_default(uint8_t slot, uint16_t current, bool enabled, bool clear)
@@ -378,6 +384,29 @@ void EVSEV2::get_data_storage(uint8_t page, uint8_t *data)
 void EVSEV2::set_indicator_led(int16_t indication, uint16_t duration, uint8_t *ret_status)
 {
     tf_evse_v2_set_indicator_led(&device, indication, duration, ret_status);
+}
+
+void EVSEV2::set_require_meter_blocking(bool blocking) {
+    is_in_bootloader(tf_evse_v2_set_charging_slot_max_current(&device, CHARGING_SLOT_REQUIRE_METER, blocking ? 0 : 32000));
+}
+
+void EVSEV2::set_require_meter_enabled(bool enabled) {
+    apply_slot_default(CHARGING_SLOT_REQUIRE_METER, 0, enabled, false);
+    is_in_bootloader(tf_evse_v2_set_charging_slot_active(&device, CHARGING_SLOT_REQUIRE_METER, enabled));
+}
+
+bool EVSEV2::get_require_meter_blocking() {
+    uint16_t current = 0;
+    bool enabled = get_require_meter_enabled();
+    if (!enabled)
+        return false;
+
+    is_in_bootloader(tf_evse_v2_get_charging_slot(&device, CHARGING_SLOT_REQUIRE_METER, &current, &enabled, nullptr));
+    return enabled && current == 0;
+}
+
+bool EVSEV2::get_require_meter_enabled() {
+    return evse_require_meter_enabled.get("enabled")->asBool();
 }
 
 void EVSEV2::setup()
@@ -1304,6 +1333,8 @@ void EVSEV2::update_all_data()
 
     evse_external_defaults.get("current")->updateUint(external_default_current);
     evse_external_defaults.get("clear_on_disconnect")->updateBool(external_default_clear_on_disconnect);
+
+    evse_require_meter_enabled.get("enabled")->updateBool(SLOT_ACTIVE(active_and_clear_on_disconnect[CHARGING_SLOT_REQUIRE_METER]));
 
 #if MODULE_WATCHDOG_AVAILABLE()
     static size_t watchdog_handle = watchdog.add("evse_v2_all_data", "EVSE not reachable");
