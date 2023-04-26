@@ -22,81 +22,67 @@ import $ from "../../ts/jq";
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
 
-import { h, render, Fragment, Component } from "preact";
-import { translate_unchecked, __ } from "../../ts/translation";
+import { h, render, Fragment } from "preact";
+import { __ } from "../../ts/translation";
 
 import { FormRow } from "../../ts/components/form_row";
-import { InputText } from "../../ts/components/input_text";
-import { Button, InputGroup } from "react-bootstrap";
 import { InputSelect } from "src/ts/components/input_select";
-import { InputFloat } from "src/ts/components/input_float";
 
+function ChargeLimitsOverride() {
+    if (!util.render_allowed() || !API.hasFeature("evse"))
+        return <></>;
 
-interface ChargeLimitsState {
-    state: API.getType["charge_limits/state"]
-    meter_abs: number
-    evse_uptime: number
-}
+    let config_in_use = API.get("charge_limits/active_limits");
+    let config = API.get("charge_limits/default_limits");
+    let state = API.get("charge_limits/state");
 
-interface ChargeLimitsOverrideState extends ChargeLimitsState
-{
-    config_in_use: API.getType['charge_limits/active_limits']
-    config: API.getType['charge_limits/default_limits']
-    electricity_price: number
-}
+    let evse_uptime = API.get("evse/low_level_state").uptime;
+    let electricity_price = API.get("charge_tracker/config").electricity_price;
 
-class ChargeLimitsOverride extends Component<{}, ChargeLimitsOverrideState>
-{
-    timeout_id: number;
-    override_duration: number
+    const get_duration_left = () => {
+        let ret = "";
+        if (config_in_use.duration == 0)
+            ret = __("charge_limits.content.unlimited")
+        else {
+            let duration: number;
+            duration = state.target_timestamp_ms;
+            if (state.start_timestamp_ms != 0)
+                duration = Math.floor((state.target_timestamp_ms - evse_uptime));
+            if (state.target_timestamp_ms - evse_uptime < 0 && state.start_timestamp_ms != 0)
+                duration = 0;
 
-    constructor()
-    {
-        super();
+            ret = util.format_timespan(Math.floor(duration / 1000));
+        }
 
-        this.timeout_id = null;
-        this.override_duration = 0;
-
-
-
-        util.addApiEventListener("charge_limits/active_limits", () => {
-            this.setState({config_in_use: API.get("charge_limits/active_limits")});
-        })
-
-        util.addApiEventListener("charge_limits/default_limits", () => {
-            this.setState({config: API.get("charge_limits/default_limits")})
-        })
-
-        util.addApiEventListener("charge_limits/state", () => {
-            this.setState({state: API.get("charge_limits/state")});
-        })
-
-        util.addApiEventListener("meter/values", () => {
-            this.setState({meter_abs: API.get("meter/values").energy_abs});
-        })
-
-        util.addApiEventListener("evse/low_level_state", () => {
-            this.setState({evse_uptime: API.get("evse/low_level_state").uptime});
-        })
-
-        util.addApiEventListener("charge_tracker/config", () => {
-            this.setState({electricity_price: API.get("charge_tracker/config").electricity_price});
-        })
+        return ret;
     }
 
-    render(props: {}, s: ChargeLimitsOverrideState)
-    {
-        let {state,
-            config_in_use,
-            config,
-            evse_uptime,
-            meter_abs,
-            electricity_price} = s;
+    let duration_items: [string, string][] = [
+        ["disabled", get_duration_left()],
+        ["0", __("charge_limits.content.unlimited")],
+        ["1", __("charge_limits.content.min15")],
+        ["2", __("charge_limits.content.min30")],
+        ["3", __("charge_limits.content.min45")],
+        ["4", __("charge_limits.content.h1")],
+        ["5", __("charge_limits.content.h2")],
+        ["6", __("charge_limits.content.h3")],
+        ["7", __("charge_limits.content.h4")],
+        ["8", __("charge_limits.content.h6")],
+        ["9", __("charge_limits.content.h8")],
+        ["10", __("charge_limits.content.h12")]
+    ];
 
-        if (!state || !config_in_use || !config)
-            return <></>;
+    if (config_in_use.duration != 0)
+        duration_items[0][1] = duration_items[config_in_use.duration + 1][1] + " | " + get_duration_left() + __("charge_limits.content.left");
 
-        const has_meter = API.hasFeature("meter");
+    duration_items[config.duration + 1][1] += " " + __("charge_limits.content.configured");
+    if (config.duration != config_in_use.duration)
+        duration_items[config_in_use.duration + 1][1] += " " + __("charge_limits.content.overridden");
+
+    let energy_row = <></>
+
+    if (API.hasFeature("meter")) {
+        let meter_abs = API.get("meter/values").energy_abs;
 
         const get_energy_left = () => {
             let ret = "";
@@ -114,42 +100,6 @@ class ChargeLimitsOverride extends Component<{}, ChargeLimitsOverrideState>
 
             return ret;
         }
-
-        const get_duration_left = () => {
-            let ret = "";
-            if (config_in_use.duration == 0)
-                ret = __("charge_limits.content.unlimited")
-            else {
-                let duration: number;
-                duration = state.target_timestamp_ms;
-                if (state.start_timestamp_ms != 0)
-                    duration = Math.floor((state.target_timestamp_ms - evse_uptime));
-                if (state.target_timestamp_ms - evse_uptime < 0 && state.start_timestamp_ms != 0)
-                    duration = 0;
-
-                ret = util.format_timespan(Math.floor(duration / 1000));
-            }
-
-            return ret;
-        }
-
-        let duration_items: [string, string][] = [
-            ["disabled", get_duration_left()],
-            ["0", __("charge_limits.content.unlimited")],
-            ["1", __("charge_limits.content.min15")],
-            ["2", __("charge_limits.content.min30")],
-            ["3", __("charge_limits.content.min45")],
-            ["4", __("charge_limits.content.h1")],
-            ["5", __("charge_limits.content.h2")],
-            ["6", __("charge_limits.content.h3")],
-            ["7", __("charge_limits.content.h4")],
-            ["8", __("charge_limits.content.h6")],
-            ["9", __("charge_limits.content.h8")],
-            ["10", __("charge_limits.content.h12")]
-        ];
-
-        if (config_in_use.duration != 0)
-            duration_items[0][1] = duration_items[config_in_use.duration + 1][1] + " | " + get_duration_left() + __("charge_limits.content.left");
 
         let energy_items: [string, string][] = [
             ["disabled", get_energy_left()],
@@ -182,10 +132,10 @@ class ChargeLimitsOverride extends Component<{}, ChargeLimitsOverrideState>
         if (conf_idx == -1)
             energy_items = [energy_items[0],
                             [config.energy_wh.toString(),
-                             util.toLocaleFixed(config.energy_wh / 1000.0, 3)
-                             + " kWh "
-                             + (electricity_price > 0 ? ` (~ ${util.toLocaleFixed(electricity_price / 10000 * config.energy_wh / 1000, 2)} €)` : "")
-                             + __("charge_limits.content.configured")],
+                                util.toLocaleFixed(config.energy_wh / 1000.0, 3)
+                                + " kWh "
+                                + (electricity_price > 0 ? ` (~ ${util.toLocaleFixed(electricity_price / 10000 * config.energy_wh / 1000, 2)} €)` : "")
+                                + __("charge_limits.content.configured")],
                             ...energy_items.slice(1)];
         else
             energy_items[conf_idx][1] += " " + __("charge_limits.content.configured");
@@ -198,32 +148,27 @@ class ChargeLimitsOverride extends Component<{}, ChargeLimitsOverrideState>
                 energy_items[conf_idx][1] += " " + __("charge_limits.content.overridden");
         }
 
-
-        duration_items[config.duration + 1][1] += " " + __("charge_limits.content.configured");
-        if (config.duration != config_in_use.duration)
-            duration_items[config_in_use.duration + 1][1] += " " + __("charge_limits.content.overridden");
-
-        return <>
-                <FormRow label={__("charge_limits.content.override_duration")} labelColClasses="col-sm-4" contentColClasses="col-lg-8 col-xl-4">
-                    <InputSelect items={duration_items}
-                        value={"disabled"}
-                        onValue={(v) => {
-                            this.setState({config_in_use: {...config_in_use, duration: Number(v)}})
-                            API.call("charge_limits/override_duration", {duration: Number(v)}, __("charge_limits.script.override_failed"));
-                    }}/>
-                </FormRow>
-                {has_meter ? <>{
-                    <FormRow label={__("charge_limits.content.override_energy")} labelColClasses="col-sm-4" contentColClasses="col-lg-8 col-xl-4">
-                        <InputSelect items={energy_items}
-                            value={"disabled"}
-                            onValue={(v) => {
-                                this.setState({config_in_use: {...config_in_use, energy_wh: Number(v)}})
-                                API.call("charge_limits/override_energy", {energy_wh: Number(v)}, __("charge_limits.script.override_failed"));
-                        }}/>
-                    </FormRow>
-                }</> : <></>}
-            </>
+        energy_row = <FormRow label={__("charge_limits.content.override_energy")} labelColClasses="col-sm-4" contentColClasses="col-lg-8 col-xl-4">
+            <InputSelect items={energy_items}
+                value={"disabled"}
+                onValue={(v) => {
+                    this.setState({config_in_use: {...config_in_use, energy_wh: Number(v)}})
+                    API.call("charge_limits/override_energy", {energy_wh: Number(v)}, __("charge_limits.script.override_failed"));
+            }}/>
+        </FormRow>
     }
+
+    return <>
+            <FormRow label={__("charge_limits.content.override_duration")} labelColClasses="col-sm-4" contentColClasses="col-lg-8 col-xl-4">
+                <InputSelect items={duration_items}
+                    value={"disabled"}
+                    onValue={(v) => {
+                        this.setState({config_in_use: {...config_in_use, duration: Number(v)}})
+                        API.call("charge_limits/override_duration", {duration: Number(v)}, __("charge_limits.script.override_failed"));
+                }}/>
+            </FormRow>
+            {energy_row}
+        </>
 }
 
 render(<ChargeLimitsOverride/>, $('#charge_limits_override')[0]);
