@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2023 Frederic Henrichs <frederic@tinkerforge.com>
+ * Copyright (C) 2023 Erik Fleckstein <erik@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,26 +19,42 @@
 
 #pragma once
 
-#include "module.h"
 #include "config.h"
 
-class RequireMeter final : public IModule {
-private:
-    ConfigRoot config;
+#include "module.h"
+#include "tools.h"
 
+class EvseLed final : public IModule
+{
 public:
+    EvseLed(){}
     void pre_setup();
     void setup();
     void register_urls();
 
-    void start_task();
-    void meter_found();
-    void set_require_meter_enabled(bool enabled);
-    void set_require_meter_blocking(bool block);
+    enum Blink {
+        None = -1,
+        Off = 0,
+        /* 1 - 254 = PWM dimmed */
+        On = 255,
+        Ack = 1001,
+        Nack = 1002,
+        Nag = 1003,
+        ErrorStart = 2001,
+        ErrorEnd = 2010,
+    };
 
-    bool get_require_meter_enabled();
-    bool get_require_meter_blocking();
-    bool allow_charging(float meter_value);
+    bool set_module(Blink state, uint16_t duration_ms);
+    bool set_api(Blink state, uint16_t duration_ms);
 
-    bool initialized = false;
+    ConfigRoot config, config_in_use;
+    ConfigRoot led;
+
+private:
+    bool accepts_new_state(Blink state);
+    bool set(Blink state, uint16_t duration_ms, bool via_api);
+
+    Blink current_state = Blink::None;
+    micros_t current_duration_end_us = 0_usec;
+    bool current_state_via_api = false;
 };
