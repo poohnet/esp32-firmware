@@ -475,6 +475,10 @@ function ChargeTrackerStatus() {
     let users = API.get('users/config').users;
     let electricity_price = API.get('charge_tracker/config').electricity_price;
 
+    let electricity_price_edit = <FormRow label={__("charge_tracker.status.current_price")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
+        <InputText value={util.toLocaleFixed(electricity_price / 100, 2) + " ct/kWh"}/>
+    </FormRow>
+
     let current_charge = <></>;
 
     if (cc.user_id != -1) {
@@ -513,6 +517,7 @@ function ChargeTrackerStatus() {
         </FormRow>;
 
     return <>
+                {electricity_price_edit}
                 {current_charge}
                 {last_charges_list}
         </>;
