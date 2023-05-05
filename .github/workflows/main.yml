@@ -26,3 +26,9 @@ jobs:
       - name: Build PlatformIO Project
         working-directory: ./software
         run: pio run -e warp2_poohnet
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./software/build/
+          name: warp*.*
