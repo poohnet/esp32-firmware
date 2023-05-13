@@ -29,6 +29,8 @@
 #define MAX_DATA_AGE 30000 // milliseconds
 #define DATA_INTERVAL_5MIN 5 // minutes
 
+//#define EM_DP_LOG_DETAILS
+
 void EnergyManager::register_events()
 {
     event.addStateUpdate("meter/state", {"state"}, [this](Config *config){
@@ -36,25 +38,44 @@ void EnergyManager::register_events()
     });
 
     event.addStateUpdate("meter/values", {"power"}, [this](Config *config){
-        update_history_meter_power_average(config->asFloat()); // FIXME: could this be NaN?
+        update_history_meter_power(config->asFloat());
     });
 }
 
-void EnergyManager::update_history_meter_power_average(float power)
+void EnergyManager::update_history_meter_power(float power /* W */)
 {
     uint32_t now = millis();
 
     if (!isnan(history_meter_power_value)) {
-        uint32_t duration;
+        uint32_t duration_ms;
 
         if (now >= history_meter_power_timestamp) {
-            duration = now - history_meter_power_timestamp;
+            duration_ms = now - history_meter_power_timestamp;
         } else {
-            duration = UINT32_MAX - history_meter_power_timestamp + now;
+            duration_ms = UINT32_MAX - history_meter_power_timestamp + now;
         }
 
-        history_meter_power_sum += (double)history_meter_power_value * duration;
-        history_meter_power_sum_duration += duration;
+        double duration_s = (double)duration_ms / 1000.0;
+        double energy_ws = (double)history_meter_power_value * duration_s;
+
+        history_meter_power_sum += energy_ws;
+        history_meter_power_duration += duration_s;
+
+        if (!persistent_data_loaded) {
+            persistent_data_loaded = load_persistent_data();
+        }
+
+        if (persistent_data_loaded && energy_ws != 0) {
+            double energy_dwh = energy_ws / 36000.0;
+
+            if (energy_dwh >= 0) {
+                history_meter_energy_import += energy_dwh;
+            } else {
+                history_meter_energy_export += -energy_dwh;
+            }
+
+            save_persistent_data();
+        }
     }
 
     history_meter_power_value = power;
@@ -67,16 +88,25 @@ void EnergyManager::collect_data_points()
     struct timeval tv;
     struct tm utc;
     struct tm local;
+    bool persistent_data_changed = false;
 
     if (!clock_synced(&tv)) {
         return;
+    }
+
+    if (!persistent_data_loaded) {
+        persistent_data_loaded = load_persistent_data();
+
+        if (!persistent_data_loaded) {
+            return;
+        }
     }
 
     gmtime_r(&tv.tv_sec, &utc);
     localtime_r(&tv.tv_sec, &local);
 
     // 5min data
-    int current_5min_slot = utc.tm_min / 5;
+    uint32_t current_5min_slot = ((utc.tm_year * 366 + utc.tm_yday) * 24 + utc.tm_hour) * 12 + utc.tm_min / 5;
 
     if (current_5min_slot != last_history_5min_slot) {
         for (auto &charger : charge_manager.charge_manager_state.get("chargers")) {
@@ -118,15 +148,15 @@ void EnergyManager::collect_data_points()
 
             // FIXME: how to tell if meter data is stale?
             if (history_meter_available) {
-                update_history_meter_power_average(history_meter_power_value);
+                update_history_meter_power(history_meter_power_value);
 
-                if (history_meter_power_sum_duration > 0) {
+                if (history_meter_power_duration > 0) {
                     history_power_grid = clamp<int64_t>(INT32_MIN,
-                                                        roundf(history_meter_power_sum / history_meter_power_sum_duration),
+                                                        roundf(history_meter_power_sum / history_meter_power_duration),
                                                         INT32_MAX - 1); // W
 
                     history_meter_power_sum = 0;
-                    history_meter_power_sum_duration = 0;
+                    history_meter_power_duration = 0;
                 }
             }
 
@@ -136,10 +166,11 @@ void EnergyManager::collect_data_points()
         }
 
         last_history_5min_slot = current_5min_slot;
+        persistent_data_changed = true;
     }
 
     // daily data
-    int current_daily_slot = local.tm_year * 366 + local.tm_yday;
+    uint32_t current_daily_slot = local.tm_year * 366 + local.tm_yday;
 
     if (current_daily_slot != last_history_daily_slot && local.tm_hour == 23 && local.tm_min >= 55) {
         for (const auto &charger : charge_manager.charge_manager_state.get("chargers")) {
@@ -172,14 +203,21 @@ void EnergyManager::collect_data_points()
             uint32_t energy_general_out[6] = {UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX}; // dWh
 
             // FIXME: how to tell if meter data is stale?
-            if (meter.state.get("state")->asUint() == 2 && api.hasFeature("meter_all_values")) {
+            if (meter.state.get("state")->asUint() == 2) {
                 have_data = true;
-                energy_grid_in = clamp<uint64_t>(0,
-                                                 roundf(meter.all_values.get(METER_ALL_VALUES_TOTAL_IMPORT_KWH)->asFloat() * 100.0),
-                                                 UINT32_MAX - 1); // kWh -> dWh
-                energy_grid_out = clamp<uint64_t>(0,
-                                                  roundf(meter.all_values.get(METER_ALL_VALUES_TOTAL_EXPORT_KWH)->asFloat() * 100.0),
-                                                  UINT32_MAX - 1); // kWh -> dWh
+
+                if (api.hasFeature("meter_all_values")) {
+                    energy_grid_in = clamp<uint64_t>(0,
+                                                     roundf(meter.all_values.get(METER_ALL_VALUES_TOTAL_IMPORT_KWH)->asFloat() * 100.0), // kWh -> dWh
+                                                     UINT32_MAX - 1);
+                    energy_grid_out = clamp<uint64_t>(0,
+                                                      roundf(meter.all_values.get(METER_ALL_VALUES_TOTAL_EXPORT_KWH)->asFloat() * 100.0), // kWh -> dWh
+                                                      UINT32_MAX - 1);
+                }
+                else {
+                    energy_grid_in = clamp<uint64_t>(0, roundf(history_meter_energy_import), UINT32_MAX - 1);
+                    energy_grid_out = clamp<uint64_t>(0, roundf(history_meter_energy_export), UINT32_MAX - 1);
+                }
             }
 
             // FIXME: fill energy_general_in and energy_general_out
@@ -190,7 +228,84 @@ void EnergyManager::collect_data_points()
         }
 
         last_history_daily_slot = current_daily_slot;
+        persistent_data_changed = true;
     }
+
+    if (persistent_data_changed) {
+        save_persistent_data();
+    }
+}
+
+struct PersistentData {
+    uint8_t version;
+    uint8_t padding0[3];
+    uint32_t last_history_5min_slot;
+    uint32_t last_history_daily_slot;
+    double history_meter_energy_import;
+    double history_meter_energy_export;
+    uint16_t padding1;
+    uint16_t checksum;
+};
+
+bool EnergyManager::load_persistent_data()
+{
+    uint8_t buf[63] = {0};
+    if (tf_warp_energy_manager_get_data_storage(&device, 0, buf) != TF_E_OK) {
+        return false;
+    }
+
+    if (internet_checksum(buf, sizeof(PersistentData)) != 0) {
+        logger.printfln("Checksum mismatch while reading persistent energy manager data. Assuming first start.");
+        return true;
+    }
+
+    PersistentData data;
+    memcpy(&data, buf, sizeof(data));
+
+    if (data.version != 1) {
+        logger.printfln("Unexpected version %u while reading persistent energy manager data.", data.version);
+        return true;
+    }
+
+    last_history_5min_slot = data.last_history_5min_slot;
+    last_history_daily_slot = data.last_history_daily_slot;
+    history_meter_energy_import = data.history_meter_energy_import;
+    history_meter_energy_export = data.history_meter_energy_export;
+
+#ifdef EM_DP_LOG_DETAILS
+    logger.printfln("load_persistent_data: slots %u %u, energy %f %f",
+                    last_history_5min_slot,
+                    last_history_daily_slot,
+                    history_meter_energy_import,
+                    history_meter_energy_export);
+#endif
+
+    return true;
+}
+
+void EnergyManager::save_persistent_data()
+{
+    PersistentData data;
+    memset(&data, 0, sizeof(data));
+
+#ifdef EM_DP_LOG_DETAILS
+    logger.printfln("save_persistent_data: slots %u %u, energy %f %f",
+                    last_history_5min_slot,
+                    last_history_daily_slot,
+                    history_meter_energy_import,
+                    history_meter_energy_export);
+#endif
+
+    data.version = 1;
+    data.last_history_5min_slot = last_history_5min_slot;
+    data.last_history_daily_slot = last_history_daily_slot;
+    data.history_meter_energy_import = history_meter_energy_import;
+    data.history_meter_energy_export = history_meter_energy_export;
+    data.checksum = internet_checksum((uint8_t *)&data, sizeof(data));
+
+    uint8_t buf[63] = {0};
+    memcpy(buf, &data, sizeof(data));
+    tf_warp_energy_manager_set_data_storage(&device, 0, buf);
 }
 
 void EnergyManager::set_wallbox_5min_data_point(struct tm *utc, struct tm *local, uint32_t uid, uint8_t flags, uint16_t power /* W */)
@@ -214,8 +329,10 @@ void EnergyManager::set_wallbox_5min_data_point(struct tm *utc, struct tm *local
 
     check_bricklet_reachable(rc, "set_wallbox_5min_data_point");
 
-    //logger.printfln("set_wallbox_5min_data_point: u%u %d-%02d-%02d %02d:%02d f%u p%u",
-    //                uid, 2000 + utc_year, utc_month, utc_day, utc_hour, utc_minute, flags, power);
+#ifdef EM_DP_LOG_DETAILS
+    logger.printfln("set_wallbox_5min_data_point: u%u %d-%02d-%02d %02d:%02d f%u p%u",
+                    uid, 2000 + utc_year, utc_month, utc_day, utc_hour, utc_minute, flags, power);
+#endif
 
     if (rc != TF_E_OK) {
         logger.printfln("energy_manager: Failed to set wallbox 5min data point: error %d", rc);
@@ -272,8 +389,10 @@ void EnergyManager::set_wallbox_daily_data_point(struct tm *local, uint32_t uid,
 
     check_bricklet_reachable(rc, "set_wallbox_daily_data_point");
 
-    //logger.printfln("set_wallbox_daily_data_point: u%u %d-%02d-%02d e%u",
-    //                uid, 2000 + year, month, day, energy);
+#ifdef EM_DP_LOG_DETAILS
+    logger.printfln("set_wallbox_daily_data_point: u%u %d-%02d-%02d e%u",
+                    uid, 2000 + year, month, day, energy);
+#endif
 
     if (rc != TF_E_OK) {
         logger.printfln("energy_manager: Failed to set wallbox daily data point: error %d", rc);
@@ -334,8 +453,10 @@ void EnergyManager::set_energy_manager_5min_data_point(struct tm *utc,
 
     check_bricklet_reachable(rc, "set_energy_manager_5min_data_point");
 
-    //logger.printfln("set_energy_manager_5min_data_point: %d-%02d-%02d %02d:%02d f%u gr%d ge%d,%d,%d,%d,%d,%d",
-    //                2000 + utc_year, utc_month, utc_day, utc_hour, utc_minute, flags, power_grid, power_general[0], power_general[1], power_general[2], power_general[3], power_general[4], power_general[5]);
+#ifdef EM_DP_LOG_DETAILS
+    logger.printfln("set_energy_manager_5min_data_point: %d-%02d-%02d %02d:%02d f%u gr%d ge%d,%d,%d,%d,%d,%d",
+                    2000 + utc_year, utc_month, utc_day, utc_hour, utc_minute, flags, power_grid, power_general[0], power_general[1], power_general[2], power_general[3], power_general[4], power_general[5]);
+#endif
 
     if (rc != TF_E_OK) {
         logger.printfln("energy_manager: Failed to set energy manager 5min data point: error %d", rc);
@@ -416,11 +537,13 @@ void EnergyManager::set_energy_manager_daily_data_point(struct tm *local,
 
     check_bricklet_reachable(rc, "set_energy_manager_daily_data_point");
 
-    //logger.printfln("set_energy_manager_daily_data_point: %d-%02d-%02d gri%u gro%u gei%u,%u,%u,%u,%u,%u geo%u,%u,%u,%u,%u,%u",
-    //                2000 + year, month, day,
-    //                energy_grid_in, energy_grid_out,
-    //                energy_general_in[0], energy_general_in[1], energy_general_in[2], energy_general_in[3], energy_general_in[4], energy_general_in[5],
-    //                energy_general_out[0], energy_general_out[1], energy_general_out[2], energy_general_out[3], energy_general_out[4], energy_general_out[5]);
+#ifdef EM_DP_LOG_DETAILS
+    logger.printfln("set_energy_manager_daily_data_point: %d-%02d-%02d gri%u gro%u gei%u,%u,%u,%u,%u,%u geo%u,%u,%u,%u,%u,%u",
+                    2000 + year, month, day,
+                    energy_grid_in, energy_grid_out,
+                    energy_general_in[0], energy_general_in[1], energy_general_in[2], energy_general_in[3], energy_general_in[4], energy_general_in[5],
+                    energy_general_out[0], energy_general_out[1], energy_general_out[2], energy_general_out[3], energy_general_out[4], energy_general_out[5]);
+#endif
 
     if (rc != TF_E_OK) {
         logger.printfln("energy_manager: Failed to set energy manager daily data point: error %i", rc);
