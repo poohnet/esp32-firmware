@@ -175,10 +175,15 @@ void NFC::handle_event(tag_info_t *tag, bool found, bool injected)
 #if MODULE_EVSE_LED_AVAILABLE()
             evse_led.set_module(EvseLed::Blink::Ack, 2000);
 #endif
+#if MODULE_PIEZO_SPEAKER_AVAILABLE()
+            piezo_speaker.beep();
+#endif
+#if MODULE_USERS_AVAILABLE()
             users.trigger_charge_action(user_id, injected ? CHARGE_TRACKER_AUTH_TYPE_NFC_INJECTION : CHARGE_TRACKER_AUTH_TYPE_NFC, Config::Object({
                     {"tag_type", Config::Uint8(tag->tag_type)},
                     {"tag_id", Config::Str(tag->tag_id)}}).value,
                     injected ? tag_injection_action : TRIGGER_CHARGE_ANY);
+#endif
 #if MODULE_OCPP_AVAILABLE()
             ocpp.on_tag_seen(tag->tag_id);
 #endif
@@ -338,6 +343,8 @@ void NFC::register_urls()
 {
     api.addState("nfc/seen_tags", &seen_tags, {}, 1000);
     api.addPersistentConfig("nfc/config", &config, {}, 1000);
+
+#if MODULE_USERS_AVAILABLE()
     api.addCommand("nfc/inject_tag", &inject_tag, {}, [this](){
         last_tag_injection = millis();
         tag_injection_action = TRIGGER_CHARGE_ANY;
@@ -364,6 +371,7 @@ void NFC::register_urls()
         if (last_tag_injection == 0)
             last_tag_injection -= 1;
     }, true);
+#endif
 
     this->DeviceModule::register_urls();
 }
