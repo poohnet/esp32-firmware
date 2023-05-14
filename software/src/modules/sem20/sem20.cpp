@@ -187,7 +187,3 @@ void SEM20::register_urls()
 
   power_hist.register_urls("sem20/");
 }
-
-void SEM20::loop()
-{
-}

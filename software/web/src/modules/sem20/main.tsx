@@ -197,7 +197,7 @@ export class SEM20 extends Component<{}, SEM20State> {
     }
 
     render(props: {}, state: Readonly<SEM20State>) {
-        if (!util.allow_render) {
+        if (!util.render_allowed()) {
             return (<></>);
         }
 

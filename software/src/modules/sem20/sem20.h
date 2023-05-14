@@ -20,9 +20,11 @@
 #pragma once
 
 #include "config.h"
+
+#include "module.h"
 #include "value_history.h"
 
-class SEM20 {
+class SEM20 final : public IModule {
   public:
     SEM20();
     ~SEM20();
@@ -30,9 +32,6 @@ class SEM20 {
     void pre_setup();
     void setup();
     void register_urls();
-    void loop();
-
-    bool initialized = false;
 
   private:
     ConfigRoot values;
