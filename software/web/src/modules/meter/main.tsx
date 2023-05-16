@@ -158,7 +158,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
 
             return {
                 width: div.clientWidth,
-                height: Math.floor(div.clientWidth / aspect_ratio),
+                height: Math.floor((div.clientWidth + (window.innerWidth - document.documentElement.clientWidth)) / aspect_ratio),
             }
         }
 
@@ -184,6 +184,9 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                     stroke: "rgb(0, 123, 255)",
                     fill: "rgb(0, 123, 255, 0.1)",
                     width: 2,
+                    points: {
+                        show: false,
+                    },
                 },
             ],
             axes: [

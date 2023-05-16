@@ -27,8 +27,15 @@ import { __ } from "../../ts/translation";
 import { PageHeader } from "../../ts/components/page_header";
 import { InputDate } from "../../ts/components/input_date";
 import { InputMonth } from "../../ts/components/input_month";
+import { InputSelect } from "../../ts/components/input_select";
 import { FormRow } from "../../ts/components/form_row";
+import { OutputFloat } from "src/ts/components/output_float";
 import uPlot from 'uplot';
+
+function hasValue(a: any): boolean
+{
+    return a !== null && a !== undefined;
+}
 
 interface CachedData {
     update_timestamp: number;
@@ -40,6 +47,7 @@ interface UplotData extends CachedData {
     names: string[];
     values: number[][];
     stacked: boolean[];
+    bars: boolean[];
 }
 
 interface Wallbox5minData extends CachedData {
@@ -77,10 +85,17 @@ interface UplotWrapperProps {
     id: string;
     class: string;
     sidebar_id: string;
+    show: boolean;
     marker_width_reduction: number;
+    legend_time_label: string;
+    legend_time_with_minutes: boolean;
+    legend_value_prefix: string;
+    x_format: Intl.DateTimeFormatOptions;
     y_min?: number;
     y_max?: number;
     y_step?: number;
+    y_unit: string;
+    y_digits: number;
     default_fill?: boolean;
 }
 
@@ -111,6 +126,23 @@ const fills = [
     'rgb(188, 189,  34, 0.1)',
     'rgb( 23, 190, 207, 0.1)',
 ];
+
+let color_cache: {[id: string]: {stroke: string, fill: string}} = {};
+let color_cache_next: number = 0;
+
+function get_color(key: string)
+{
+    if (!color_cache[key]) {
+        color_cache[key] = {
+            stroke: strokes[color_cache_next % strokes.length],
+            fill: fills[color_cache_next % fills.length],
+        }
+
+        color_cache_next++;
+    }
+
+    return color_cache[key];
+}
 
 class UplotWrapper extends Component<UplotWrapperProps, {}> {
     uplot: uPlot;
@@ -157,7 +189,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
 
             return {
                 width: div.clientWidth,
-                height: Math.floor(div.clientWidth / aspect_ratio),
+                height: Math.floor((div.clientWidth + (window.innerWidth - document.documentElement.clientWidth)) / aspect_ratio),
             }
         }
 
@@ -171,8 +203,19 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             },
             series: [
                 {
-                    label: __("em_energy_analysis.script.time"),
-                    value: (self: uPlot, rawValue: number) => rawValue !== null ? util.timestamp_min_to_date((rawValue / 60), '???') : null,
+                    label: this.props.legend_time_label,
+                    value: (self: uPlot, rawValue: number) => {
+                        if (rawValue !== null) {
+                            if (this.props.legend_time_with_minutes) {
+                                return util.timestamp_min_to_date((rawValue / 60), '???');
+                            }
+                            else {
+                                return new Date(rawValue * 1000).toLocaleDateString([], {year: 'numeric', month: '2-digit', day: '2-digit'});
+                            }
+                        }
+
+                        return null;
+                    },
                 },
             ],
             axes: [
@@ -188,12 +231,13 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                         3600 * 8,
                         3600 * 12,
                         3600 * 24,
+                        3600 * 48,
                     ],
                     values: (self: uPlot, splits: number[]) => {
                         let values: string[] = new Array(splits.length);
 
                         for (let i = 0; i < splits.length; ++i) {
-                            values[i] = (new Date(splits[i] * 1000)).toLocaleString([], {hour: '2-digit', minute: '2-digit'});
+                            values[i] = (new Date(splits[i] * 1000)).toLocaleString([], this.props.x_format);
                         }
 
                         return values;
@@ -205,7 +249,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                         let values: string[] = new Array(splits.length);
 
                         for (let i = 0; i < splits.length; ++i) {
-                            values[i] = util.toLocaleFixed(splits[i]); // FIXME: assuming that no fractional part is necessary
+                            values[i] = util.toLocaleFixed(splits[i], this.props.y_digits);
                         }
 
                         return values;
@@ -272,15 +316,15 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
 
     render(props?: UplotWrapperProps, state?: Readonly<{}>, context?: any): ComponentChild {
         return (
-            <div>
-                <div ref={this.no_data_ref} style={`position: absolute; width: calc(100% - ${props.marker_width_reduction}px); height: 100%; visibility: hidden; display: flex;`}>
+            <>
+                <div ref={this.no_data_ref} style={`position: absolute; width: calc(100% - ${props.marker_width_reduction}px); height: 100%; visibility: hidden; display: ${props.show ? 'flex' : 'none'};`}>
                     <span class="h3" style="margin: auto;">{__("em_energy_analysis.content.no_data")}</span>
                 </div>
-                <div ref={this.loading_ref} style={`position: absolute; width: calc(100% - ${props.marker_width_reduction}px); height: 100%; display: flex;`}>
+                <div ref={this.loading_ref} style={`position: absolute; width: calc(100% - ${props.marker_width_reduction}px); height: 100%; visibility: ${props.show ? 'visible' : 'hidden'}; display: ${props.show ? 'flex' : 'none'};`}>
                     <span class="h3" style="margin: auto;">{__("em_energy_analysis.content.loading")}</span>
                 </div>
-                <div ref={this.div_ref} id={props.id} class={props.class} style="visibility: hidden;" />
-            </div>
+                <div ref={this.div_ref} class={props.class} style={`display: ${props.show ? 'block' : 'none'}; visibility: hidden;`} />
+            </>
         );
     }
 
@@ -290,18 +334,35 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
         this.loading_ref.current.style.visibility = 'visible';
     }
 
+    set_show(show: boolean) {
+        this.div_ref.current.style.display = show ? 'block' : 'none';
+        this.no_data_ref.current.style.display = show ? 'flex' : 'none';
+        this.loading_ref.current.style.display = show ? 'flex' : 'none';
+    }
+
     get_series_opts(i: number): uPlot.Series {
         let name = this.data.names[i];
+        let color = get_color(name);
 
         return {
             show: this.series_visibility[this.data.keys[i]],
             pxAlign: 0,
             spanGaps: false,
-            label: __("em_energy_analysis.script.power") + (name ? ' ' + name: ''),
-            value: (self: uPlot, rawValue: number, seriesIdx: number, idx: number | null) => rawValue !== null ? util.toLocaleFixed(this.data.values[seriesIdx][idx]) + " W" : null, // FIXME: assuming that no fractional part is necessary
-            stroke: strokes[(i - 1) % strokes.length],
-            fill: this.data.stacked[i] || this.props.default_fill ? fills[(i - 1) % fills.length] : undefined,
+            label: this.props.legend_value_prefix + (name ? ' ' + name: ''),
+            value: (self: uPlot, rawValue: number, seriesIdx: number, idx: number | null) => {
+                if (rawValue !== null) {
+                    return util.toLocaleFixed(this.data.values[seriesIdx][idx], this.props.y_digits) + " " + this.props.y_unit;
+                }
+
+                return null;
+            },
+            stroke: color.stroke,
+            fill: this.data.stacked[i] || this.props.default_fill ? color.fill : undefined,
             width: 2,
+            paths: this.data.bars[i] ? uPlot.paths.bars({size: [0.6, 100]}) : undefined,
+            points: {
+                show: false,
+            },
         };
     }
 
@@ -414,7 +475,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                 } else {
                     this.uplot.addBand({
                         series: [i, last_stacked_index],
-                        fill: fills[(i - 1) % fills.length],
+                        fill: get_color(this.data.names[i]).fill,
                     });
                 }
 
@@ -473,6 +534,11 @@ export class EMEnergyAnalysisStatusChart extends Component<{}, {force_render: nu
         } as any;
 
         util.eventTarget.addEventListener('info/modules', () => {
+            if (!API.hasFeature('energy_manager')) {
+                console.log("Energy Analysis: energy_manager feature not available");
+                return;
+            }
+
             this.setState({force_render: Date.now()});
         });
     }
@@ -483,16 +549,23 @@ export class EMEnergyAnalysisStatusChart extends Component<{}, {force_render: nu
         }
 
         return (
-            <>
+            <div>
                 <UplotWrapper ref={this.uplot_wrapper_ref}
                               id="em_energy_analysis_status_chart"
                               class="em-energy-analysis-status-chart"
                               sidebar_id="status"
+                              show={true}
                               marker_width_reduction={8}
+                              legend_time_label={__("em_energy_analysis.script.time_5min")}
+                              legend_time_with_minutes={true}
+                              legend_value_prefix={__("em_energy_analysis.script.power")}
+                              x_format={{hour: '2-digit', minute: '2-digit'}}
                               y_min={0}
                               y_max={1500}
+                              y_unit={"W"}
+                              y_digits={0}
                               default_fill={true} />
-            </>
+            </div>
         )
     }
 }
@@ -506,6 +579,10 @@ interface EMEnergyAnalysisState {
     data_type: '5min'|'daily';
     current_5min_date: Date;
     current_daily_date: Date;
+    wallbox_5min_cache_energy_total: {[id: number]: {[id: string]: number[]}};
+    wallbox_daily_cache_energy_total: {[id: number]: {[id: string]: number}};
+    energy_manager_5min_cache_energy_total: {[id: string]: {grid_in: number[], grid_out: number[]}};
+    energy_manager_daily_cache_energy_total: {[id: string]: {grid_in: number, grid_out: number}};
 }
 
 interface Charger {
@@ -514,7 +591,8 @@ interface Charger {
 }
 
 export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyAnalysisState> {
-    uplot_wrapper_ref = createRef();
+    uplot_wrapper_5min_ref = createRef();
+    uplot_wrapper_daily_ref = createRef();
     status_ref: RefObject<EMEnergyAnalysisStatusChart> = null;
     uplot_update_timeout: number = null;
     uplot_5min_cache: {[id: string]: UplotData} = {};
@@ -552,6 +630,10 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             data_type: '5min',
             current_5min_date: current_5min_date,
             current_daily_date: current_daily_date,
+            wallbox_5min_cache_energy_total: {},
+            wallbox_daily_cache_energy_total: {},
+            energy_manager_5min_cache_energy_total: {},
+            energy_manager_daily_cache_energy_total: {}
         } as any;
 
         util.eventTarget.addEventListener('info/modules', () => {
@@ -560,12 +642,8 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                 return;
             }
 
-            if (this.state.data_type == '5min') {
-                this.update_current_5min_cache();
-            }
-            else {
-                this.update_current_daily_cache();
-            }
+            this.update_current_5min_cache();
+            this.update_current_daily_cache();
 
             this.setState({force_render: Date.now()});
         });
@@ -617,7 +695,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                 else {
                     let slot = Math.floor((changed.hour * 60 + changed.minute) / 5);
 
-                    if (slot > 0 && (data.flags[slot - 1] & 0x80 /* no data */) != 0) {
+                    if (slot > 0 && data.flags[slot - 1] === null) {
                         // previous slot has no data. was a previous update event missed?
                         delete subcache[key];
                         reload_subcache = true;
@@ -656,7 +734,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             } else {
                 let slot = Math.floor((changed.hour * 60 + changed.minute) / 5);
 
-                if (slot > 0 && (data.flags[slot - 1] & 0x80 /* no data */) != 0) {
+                if (slot > 0 && data.flags[slot - 1] === null) {
                     // previous slot has no data. was a previous update event missed?
                     delete this.energy_manager_5min_cache[key];
                     reload_cache = true;
@@ -840,7 +918,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return;
         }
 
-        uplot_data = {update_timestamp: now, use_timestamp: now, keys: [null], names: [null], values: [null], stacked: [false]};
+        uplot_data = {update_timestamp: now, use_timestamp: now, keys: [null], names: [null], values: [null], stacked: [false], bars: [false]};
 
         let slot_count: number = 0;
         let energy_manager_data = this.energy_manager_5min_cache[key];
@@ -848,10 +926,11 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
         if (energy_manager_data && !energy_manager_data.empty) {
             slot_count = Math.max(slot_count, energy_manager_data.power_grid.length);
 
-            uplot_data.keys.push('em');
+            uplot_data.keys.push('em_flags');
             uplot_data.names.push(__("em_energy_analysis.script.grid_connection"));
             uplot_data.values.push(energy_manager_data.power_grid);
             uplot_data.stacked.push(false);
+            uplot_data.bars.push(false);
         }
 
         for (let charger of this.chargers) {
@@ -865,6 +944,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                     uplot_data.names.push(charger.name);
                     uplot_data.values.push(wallbox_data.power);
                     uplot_data.stacked.push(true);
+                    uplot_data.bars.push(false);
                 }
             }
         }
@@ -905,7 +985,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return;
         }
 
-        uplot_data = {update_timestamp: now, use_timestamp: now, keys: [null], names: [null], values: [null], stacked: [false]};
+        uplot_data = {update_timestamp: now, use_timestamp: now, keys: [null], names: [null], values: [null], stacked: [false], bars: [false]};
 
         let slot_count: number = 0;
         let energy_manager_data = this.energy_manager_5min_cache[key];
@@ -913,10 +993,11 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
         if (energy_manager_data && !energy_manager_data.power_grid_empty) {
             slot_count = Math.max(slot_count, energy_manager_data.power_grid.length)
 
-            uplot_data.keys.push('em');
+            uplot_data.keys.push('em_power');
             uplot_data.names.push(null);
             uplot_data.values.push(energy_manager_data.power_grid);
             uplot_data.stacked.push(false);
+            uplot_data.bars.push(false);
         }
 
         let timestamps: number[] = new Array(slot_count);
@@ -934,6 +1015,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
 
     update_uplot_daily_cache(date: Date) {
         let key = this.date_to_daily_key(date);
+        let previous_key = this.date_to_daily_key(new Date(date.getFullYear(), date.getMonth() - 1));
         let uplot_data = this.uplot_daily_cache[key];
         let needs_update = false;
         let now = Date.now();
@@ -949,13 +1031,28 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             }
 
             if (!needs_update) {
-                for (let charger of this.chargers) {
-                    if (this.wallbox_daily_cache[charger.uid]) {
-                        let wallbox_data = this.wallbox_daily_cache[charger.uid][key];
+                let energy_manager_previous_data = this.energy_manager_daily_cache[previous_key];
 
-                        if (wallbox_data && uplot_data.update_timestamp < wallbox_data.update_timestamp) {
-                            needs_update = true;
-                            break;
+                if (energy_manager_previous_data && uplot_data.update_timestamp < energy_manager_previous_data.update_timestamp) {
+                    needs_update = true;
+                }
+
+                if (!needs_update) {
+                    for (let charger of this.chargers) {
+                        if (this.wallbox_daily_cache[charger.uid]) {
+                            let wallbox_data = this.wallbox_daily_cache[charger.uid][key];
+
+                            if (wallbox_data && uplot_data.update_timestamp < wallbox_data.update_timestamp) {
+                                needs_update = true;
+                                break;
+                            }
+
+                            let wallbox_previous_data = this.wallbox_daily_cache[charger.uid][previous_key];
+
+                            if (wallbox_previous_data && uplot_data.update_timestamp < wallbox_previous_data.update_timestamp) {
+                                needs_update = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -968,37 +1065,145 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return;
         }
 
-        uplot_data = {update_timestamp: now, use_timestamp: now, keys: [null], names: [null], values: [null], stacked: [false]};
+        uplot_data = {update_timestamp: now, use_timestamp: now, keys: [null], names: [null], values: [null], stacked: [false], bars: [false]};
 
         let slot_count: number = 0;
         let energy_manager_data = this.energy_manager_daily_cache[key];
+        let energy_manager_previous_data = this.energy_manager_daily_cache[previous_key];
 
         if (energy_manager_data && !energy_manager_data.empty) {
             // energy_grid_in and energy_grid_out have the same length
             slot_count = Math.max(slot_count, energy_manager_data.energy_grid_in.length);
 
-            uplot_data.keys.push('em_grid_in');
-            uplot_data.names.push(__("em_energy_analysis.script.grid_in"));
-            uplot_data.values.push(energy_manager_data.energy_grid_in);
-            uplot_data.stacked.push(false);
+            let energy_grid_in = new Array(energy_manager_data.energy_grid_in.length);
+            let last_energy_grid_in = null;
+            let energy_grid_in_5min_total = new Array(energy_manager_data.energy_grid_in.length);
+            let energy_grid_in_daily_total: number = 0;
 
-            uplot_data.keys.push('em_grid_out');
-            uplot_data.names.push(__("em_energy_analysis.script.grid_out"));
-            uplot_data.values.push(energy_manager_data.energy_grid_out);
+            if (energy_manager_previous_data) {
+                last_energy_grid_in = energy_manager_previous_data.energy_grid_in[energy_manager_previous_data.energy_grid_in.length - 1];
+            }
+
+            for (let i = 0; i < energy_manager_data.energy_grid_in.length; ++i) {
+                if (energy_manager_data.energy_grid_in[i] !== null && last_energy_grid_in !== null) {
+                    energy_grid_in[i] = energy_manager_data.energy_grid_in[i] - last_energy_grid_in;
+                    energy_grid_in_daily_total += energy_grid_in[i];
+                }
+                else {
+                    energy_grid_in[i] = null;
+                }
+
+                energy_grid_in_5min_total[i] = energy_grid_in[i];
+                last_energy_grid_in = energy_manager_data.energy_grid_in[i];
+            }
+
+            uplot_data.keys.push('em_energy_in');
+            uplot_data.names.push(__("em_energy_analysis.script.grid_in"));
+            uplot_data.values.push(energy_grid_in);
             uplot_data.stacked.push(false);
+            uplot_data.bars.push(true);
+
+            let energy_grid_out = new Array(energy_manager_data.energy_grid_out.length);
+            let last_energy_grid_out = null;
+            let energy_grid_out_5min_total = new Array(energy_manager_data.energy_grid_out.length);
+            let energy_grid_out_daily_total: number = 0;
+
+            if (energy_manager_previous_data) {
+                last_energy_grid_out = energy_manager_previous_data.energy_grid_out[energy_manager_previous_data.energy_grid_out.length - 1];
+            }
+
+            for (let i = 0; i < energy_manager_data.energy_grid_out.length; ++i) {
+                if (energy_manager_data.energy_grid_out[i] !== null && last_energy_grid_out !== null) {
+                    energy_grid_out[i] = energy_manager_data.energy_grid_out[i] - last_energy_grid_out;
+
+                    if (energy_grid_out[i] > 0) {
+                        energy_grid_out[i] = -energy_grid_out[i];
+                    }
+
+                    energy_grid_out_daily_total += energy_grid_out[i];
+                }
+                else {
+                    energy_grid_out[i] = null;
+                }
+
+                energy_grid_out_5min_total[i] = energy_grid_out[i];
+                last_energy_grid_out = energy_manager_data.energy_grid_out[i];
+            }
+
+            uplot_data.keys.push('em_energy_out');
+            uplot_data.names.push(__("em_energy_analysis.script.grid_out"));
+            uplot_data.values.push(energy_grid_out);
+            uplot_data.stacked.push(false);
+            uplot_data.bars.push(true);
+
+            this.setState((prevState) => ({
+                energy_manager_5min_cache_energy_total: {
+                    ...prevState.energy_manager_5min_cache_energy_total,
+                    [key]: {
+                        grid_in: energy_grid_in_5min_total,
+                        grid_out: energy_grid_out_5min_total
+                    }
+                },
+                energy_manager_daily_cache_energy_total: {
+                    ...prevState.energy_manager_daily_cache_energy_total,
+                    [key]: {
+                        grid_in: energy_grid_in_daily_total,
+                        grid_out: energy_grid_out_daily_total
+                    }
+                }
+            }));
         }
 
         for (let charger of this.chargers) {
             if (this.wallbox_daily_cache[charger.uid]) {
                 let wallbox_data = this.wallbox_daily_cache[charger.uid][key];
+                let wallbox_previous_data = this.wallbox_daily_cache[charger.uid][previous_key];
 
                 if (wallbox_data && !wallbox_data.empty) {
                     slot_count = Math.max(slot_count, wallbox_data.energy.length);
 
-                    uplot_data.keys.push('wb' + charger.uid);
+                    let energy = new Array(wallbox_data.energy.length);
+                    let last_energy = null;
+                    let energy_5min_total = new Array(wallbox_data.energy.length);
+                    let energy_daily_total: number = 0;
+
+                    if (wallbox_previous_data) {
+                        last_energy = wallbox_previous_data.energy[wallbox_previous_data.energy.length - 1];
+                    }
+
+                    for (let i = 0; i < wallbox_data.energy.length; ++i) {
+                        if (wallbox_data.energy[i] !== null && last_energy !== null) {
+                            energy[i] = wallbox_data.energy[i] - last_energy;
+                            energy_daily_total += energy[i];
+                        }
+                        else {
+                            energy[i] = null;
+                        }
+
+                        energy_5min_total[i] = energy[i];
+                        last_energy = wallbox_data.energy[i];
+                    }
+
+                    uplot_data.keys.push('wb_energy_' + charger.uid);
                     uplot_data.names.push(charger.name);
-                    uplot_data.values.push(wallbox_data.energy);
+                    uplot_data.values.push(energy);
                     uplot_data.stacked.push(true);
+                    uplot_data.bars.push(true);
+
+                    this.setState((prevState) => ({
+                        wallbox_5min_cache_energy_total: {
+                            ...prevState.wallbox_5min_cache_energy_total,
+                            [charger.uid]: {
+                                ...(prevState.wallbox_5min_cache_energy_total[charger.uid] || {}), [key]: energy_5min_total
+                            }
+                        },
+                        wallbox_daily_cache_energy_total: {
+                            ...prevState.wallbox_daily_cache_energy_total,
+                            [charger.uid]: {
+                                ...(prevState.wallbox_daily_cache_energy_total[charger.uid] || {}), [key]: energy_daily_total
+                            }
+                        }
+                    }));
                 }
             }
         }
@@ -1056,8 +1261,8 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return true;
         }
 
-        if (this.uplot_wrapper_ref.current) {
-            this.uplot_wrapper_ref.current.set_loading();
+        if (this.uplot_wrapper_5min_ref.current) {
+            this.uplot_wrapper_5min_ref.current.set_loading();
         }
 
         let year: number = date.getFullYear();
@@ -1092,7 +1297,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             data.flags[slot] = payload[slot * 2];
             data.power[slot] = payload[slot * 2 + 1];
 
-            if ((data.flags[slot] & 0x80 /* no data */) == 0) {
+            if (data.flags[slot] !== null) {
                 data.empty = false;
             }
         }
@@ -1124,8 +1329,8 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return true;
         }
 
-        if (this.uplot_wrapper_ref.current) {
-            this.uplot_wrapper_ref.current.set_loading();
+        if (this.uplot_wrapper_5min_ref.current) {
+            this.uplot_wrapper_5min_ref.current.set_loading();
         }
 
         let year: number = date.getFullYear();
@@ -1170,7 +1375,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                 payload[slot * 8 + 7],
             ];
 
-            if ((data.flags[slot] & 0x80 /* no data */) == 0) {
+            if (data.flags[slot] !== null) {
                 data.empty = false;
             }
 
@@ -1207,7 +1412,13 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
         return Math.floor(timestamp / (24 * 60 * 60 * 1000));
     }
 
-    async update_wallbox_daily_cache(uid: number, date: Date) {
+    async update_wallbox_daily_cache(uid: number, date: Date, update_previous?: boolean) {
+        if (update_previous !== false) {
+            let previous_date = new Date(date.getFullYear(), date.getMonth() - 1, date.getDate());
+
+            await this.update_wallbox_daily_cache(uid, previous_date, false);
+        }
+
         let now = Date.now();
 
         if (date.getTime() > now) {
@@ -1225,8 +1436,8 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return true;
         }
 
-        if (this.uplot_wrapper_ref.current) {
-            this.uplot_wrapper_ref.current.set_loading();
+        if (this.uplot_wrapper_daily_ref.current) {
+            this.uplot_wrapper_daily_ref.current.set_loading();
         }
 
         let year: number = date.getFullYear();
@@ -1273,7 +1484,13 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
         return true;
     }
 
-    async update_energy_manager_daily_cache(date: Date) {
+    async update_energy_manager_daily_cache(date: Date, update_previous?: boolean) {
+        if (update_previous !== false) {
+            let previous_date = new Date(date.getFullYear(), date.getMonth() - 1, date.getDate());
+
+            await this.update_energy_manager_daily_cache(previous_date, false);
+        }
+
         let now = Date.now();
 
         if (date.getTime() > now) {
@@ -1290,8 +1507,8 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return true;
         }
 
-        if (this.uplot_wrapper_ref.current) {
-            this.uplot_wrapper_ref.current.set_loading();
+        if (this.uplot_wrapper_daily_ref.current) {
+            this.uplot_wrapper_daily_ref.current.set_loading();
         }
 
         let year: number = date.getFullYear();
@@ -1398,6 +1615,14 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
     }
 
     update_current_5min_cache() {
+        let current_daily_date: Date = new Date(this.state.current_5min_date);
+
+        current_daily_date.setDate(1);
+        current_daily_date.setHours(0);
+        current_daily_date.setMinutes(0);
+        current_daily_date.setSeconds(0);
+        current_daily_date.setMilliseconds(0);
+
         this.update_energy_manager_5min_cache(this.state.current_5min_date)
             .then((success: boolean) => {
                 if (!success) {
@@ -1405,6 +1630,20 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                 }
 
                 return this.update_wallbox_5min_cache_all(this.state.current_5min_date);
+            })
+            .then((success: boolean) => {
+                if (!success) {
+                    return Promise.resolve(false);
+                }
+
+                return this.update_energy_manager_daily_cache(current_daily_date);
+            })
+            .then((success: boolean) => {
+                if (!success) {
+                    return Promise.resolve(false);
+                }
+
+                return this.update_wallbox_daily_cache_all(current_daily_date);
             })
             .then((success: boolean) => {
                 if (!success) {
@@ -1420,10 +1659,6 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
     }
 
     update_current_daily_cache() {
-        if (this.uplot_wrapper_ref.current) {
-            this.uplot_wrapper_ref.current.set_loading();
-        }
-
         this.update_energy_manager_daily_cache(this.state.current_daily_date)
             .then((success: boolean) => {
                 if (!success) {
@@ -1457,22 +1692,34 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
     }
 
     update_uplot() {
-        if (this.uplot_wrapper_ref.current) {
-            if (this.state.data_type == '5min') {
+        if (this.state.data_type == '5min') {
+            if (this.uplot_wrapper_5min_ref.current) {
                 this.update_uplot_5min_cache(this.state.current_5min_date);
+
+                let current_daily_date: Date = new Date(this.state.current_5min_date);
+
+                current_daily_date.setDate(1);
+                current_daily_date.setHours(0);
+                current_daily_date.setMinutes(0);
+                current_daily_date.setSeconds(0);
+                current_daily_date.setMilliseconds(0);
+
+                this.update_uplot_daily_cache(current_daily_date);
 
                 let key = this.date_to_5min_key(this.state.current_5min_date);
                 let data = this.uplot_5min_cache[key];
 
-                this.uplot_wrapper_ref.current.set_data(data);
+                this.uplot_wrapper_5min_ref.current.set_data(data);
             }
-            else {
+        }
+        else {
+            if (this.uplot_wrapper_daily_ref.current) {
                 this.update_uplot_daily_cache(this.state.current_daily_date);
 
                 let key = this.date_to_daily_key(this.state.current_daily_date);
                 let data = this.uplot_daily_cache[key];
 
-                this.uplot_wrapper_ref.current.set_data(data);
+                this.uplot_wrapper_daily_ref.current.set_data(data);
             }
         }
 
@@ -1498,26 +1745,180 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return (<></>);
         }
 
+        let total_5min = () => {
+            let key = this.date_to_daily_key(state.current_5min_date);
+            let energy_total = state.energy_manager_5min_cache_energy_total[key];
+            let slot = state.current_5min_date.getDate() - 1;
+            let rows = [];
+            let has_grid_in = hasValue(energy_total) && hasValue(energy_total.grid_in) && hasValue(energy_total.grid_in[slot]);
+            let has_grid_out = hasValue(energy_total) && hasValue(energy_total.grid_out) && hasValue(energy_total.grid_out[slot]);
+
+            if (has_grid_in || has_grid_out) {
+                rows.push(
+                    <FormRow label={__("em_energy_analysis.script.grid_in") + ' / ' + __("em_energy_analysis.script.grid_out")} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                        <div class="row">
+                            <div class="col-md-6">
+                                {has_grid_in ?
+                                    <OutputFloat value={energy_total.grid_in[slot]} digits={2} scale={0} unit="kWh"/>
+                                    : undefined
+                                }
+                            </div>
+                            <div class="col-md-6">
+                                {has_grid_out ?
+                                    <OutputFloat value={energy_total.grid_out[slot]} digits={2} scale={0} unit="kWh"/>
+                                    : undefined
+                                }
+                            </div>
+                        </div>
+                    </FormRow>
+                );
+            }
+
+            for (let charger of this.chargers) {
+                let energy_total = ((state.wallbox_5min_cache_energy_total[charger.uid] || {})[key] || [])[state.current_5min_date.getDate() - 1];
+
+                if (hasValue(energy_total)) {
+                    rows.push(
+                        <FormRow label={charger.name} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <OutputFloat value={energy_total} digits={2} scale={0} unit="kWh"/>
+                                </div>
+                                <div class="col-md-6">
+                                </div>
+                            </div>
+                        </FormRow>
+                    );
+                }
+            }
+
+            return rows;
+        };
+
+        let total_daily = () => {
+            let key = this.date_to_daily_key(state.current_daily_date);
+            let energy_total = state.energy_manager_daily_cache_energy_total[key];
+            let rows = [];
+
+            if (hasValue(energy_total)) {
+                rows.push(
+                    <FormRow label={__("em_energy_analysis.script.grid_in") + ' / ' + __("em_energy_analysis.script.grid_out")} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <OutputFloat value={energy_total.grid_in} digits={2} scale={0} unit="kWh"/>
+                            </div>
+                            <div class="col-md-6">
+                                <OutputFloat value={energy_total.grid_out} digits={2} scale={0} unit="kWh"/>
+                            </div>
+                        </div>
+                    </FormRow>
+                );
+            }
+
+            for (let charger of this.chargers) {
+                let energy_total = (state.wallbox_daily_cache_energy_total[charger.uid] || {})[key];
+
+                if (hasValue(energy_total)) {
+                    rows.push(
+                        <FormRow label={charger.name} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <OutputFloat value={energy_total} digits={2} scale={0} unit="kWh"/>
+                                </div>
+                                <div class="col-md-6">
+                                </div>
+                            </div>
+                        </FormRow>
+                    );
+                }
+            }
+
+            return rows;
+        };
+
         return (
             <>
                 <PageHeader title={__("em_energy_analysis.content.em_energy_analysis")} colClasses="col-xl-10"/>
                 <div class="row">
                     <div class="col-xl-10 mb-3">
-                        <UplotWrapper ref={this.uplot_wrapper_ref}
-                                      id="em_energy_analysis_chart"
-                                      class="em-energy-analysis-chart"
-                                      sidebar_id="em-energy-analysis"
-                                      marker_width_reduction={30}
-                                      y_min={0}
-                                      y_max={100}
-                                      y_step={10} />
+                        <div>
+                            <UplotWrapper ref={this.uplot_wrapper_5min_ref}
+                                          id="em_energy_analysis_5min_chart"
+                                          class="em-energy-analysis-chart"
+                                          sidebar_id="em-energy-analysis"
+                                          show={true}
+                                          marker_width_reduction={30}
+                                          legend_time_label={__("em_energy_analysis.script.time_5min")}
+                                          legend_time_with_minutes={true}
+                                          legend_value_prefix=""
+                                          x_format={{hour: '2-digit', minute: '2-digit'}}
+                                          y_min={0}
+                                          y_max={100}
+                                          y_step={10}
+                                          y_unit={"W"}
+                                          y_digits={0} />
+                            <UplotWrapper ref={this.uplot_wrapper_daily_ref}
+                                          id="em_energy_analysis_daily_chart"
+                                          class="em-energy-analysis-chart"
+                                          sidebar_id="em-energy-analysis"
+                                          show={false}
+                                          marker_width_reduction={30}
+                                          legend_time_label={__("em_energy_analysis.script.time_daily")}
+                                          legend_time_with_minutes={false}
+                                          legend_value_prefix=""
+                                          x_format={{month: '2-digit', day: '2-digit'}}
+                                          y_min={0}
+                                          y_max={100}
+                                          y_step={10}
+                                          y_unit={"kWh"}
+                                          y_digits={2}
+                                          default_fill={true} />
+                        </div>
                     </div>
                 </div>
-                <FormRow label={__("em_energy_analysis.content.date")} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
-                    {state.data_type == '5min'
-                     ? <InputDate date={state.current_5min_date} onDate={this.set_current_5min_date.bind(this)} buttons="day"/>
-                     : <InputMonth date={state.current_daily_date} onDate={this.set_current_daily_date.bind(this)} buttons="month"/>}
+                <FormRow label={__("em_energy_analysis.content.data_type")} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <InputSelect value={state.data_type} onValue={(v) => {
+                                    let data_type: '5min'|'daily' = v as any;
+
+                                    this.setState({data_type: data_type}, () => {
+                                        if (data_type == '5min') {
+                                            this.uplot_wrapper_5min_ref.current.set_show(true);
+                                            this.uplot_wrapper_daily_ref.current.set_show(false);
+                                        }
+                                        else {
+                                            this.uplot_wrapper_daily_ref.current.set_show(true);
+                                            this.uplot_wrapper_5min_ref.current.set_show(false);
+                                        }
+
+                                        this.update_uplot();
+                                    });
+                                }}
+                                items={[
+                                    ["5min", __("em_energy_analysis.content.data_type_5min")],
+                                    ["daily", __("em_energy_analysis.content.data_type_daily")],
+                                ]}/>
+                        </div>
+                        <div class="col-md-6">
+                            {state.data_type == '5min'
+                            ? <InputDate date={state.current_5min_date} onDate={this.set_current_5min_date.bind(this)} buttons="day"/>
+                            : <InputMonth date={state.current_daily_date} onDate={this.set_current_daily_date.bind(this)} buttons="month"/>}
+                        </div>
+                    </div>
                 </FormRow>
+                {state.data_type == '5min' ?
+                    <>
+                        {
+                            total_5min()
+                        }
+                    </> :
+                    <>
+                        {
+                            total_daily()
+                        }
+                    </>
+                }
             </>
         )
     }
@@ -1536,7 +1937,7 @@ function update_meter_values() {
     if (values.power == null)
         return;
 
-    $('#status_em_energy_analysis_status_grid_connection_power').val(util.toLocaleFixed(values.power, 0) + " W");
+    $('#status_em_energy_analysis_status_grid_connection_power').val(util.toLocaleFixed(values.power) + " W");
 }
 
 export function init() {
