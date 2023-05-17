@@ -88,22 +88,31 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
     }
 
     addScanResults(result: ScanCharger[]) {
-        let copy = [...this.state.scanResult];
-        outer_loop:
-        for (let newC of result) {
-            for (let oldIdx in copy) {
-                let oldC = copy[oldIdx];
-                if (newC.hostname != oldC.hostname)
-                    continue;
+        // Copy to remove signals.
+        let newResult: ScanCharger[] = result.filter(c => c).map(c => ({
+            display_name: c.display_name,
+            error: c.error,
+            hostname: c.hostname,
+            ip: c.ip,
+        }));
 
-                if (oldC.ip == "[no_address]")
-                    copy[oldIdx].ip = newC.ip;
-
-                continue outer_loop;
-            }
-            copy.push(newC);
+        for (let oldC of this.state.scanResult) {
+            let i = newResult.findIndex(c => c.hostname == oldC.hostname);
+            if (i == -1)
+                newResult.push(oldC);
+            else if (newResult[i].ip == "[no_address]")
+                newResult[i].ip = oldC.ip;
         }
-        this.setState({scanResult: copy});
+
+        newResult.sort((a, b) => {
+            if (a.error == 0 && b.error != 0)
+                return -1;
+            if (a.error != 0 && b.error == 0)
+                return 1;
+            return a.display_name.localeCompare(b.display_name);
+        });
+
+        this.setState({scanResult: newResult});
     }
 
     setCharger (i: number, val: Partial<ChargerConfig>){
@@ -173,8 +182,6 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
         this.setState({chargers: c})
     }
 
-
-    scan_timeout: number = null;
     async scan_services()
     {
         try {
@@ -182,21 +189,6 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
         } catch {
             return;
         }
-
-        if (this.scan_timeout != null)
-            window.clearTimeout(this.scan_timeout);
-
-        this.scan_timeout = window.setTimeout(async function () {
-            this.scan_timeout = null;
-
-            let result = "";
-            try {
-                result = await util.download("/charge_manager/scan_result").then(blob => blob.text());
-                let parsed = JSON.parse(result);
-                this.addScanResults(parsed);
-            } catch {
-            }
-        }, 3000);
     }
 
     intToIP(int: number) {
@@ -337,10 +329,13 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
             <Collapse in={state.minimum_current_auto}>
                 <div>
                     <FormRow label={__("charge_manager.content.minimum_current_vehicle_type")}>
-                        <Switch desc={__("charge_manager.content.minimum_current_vehicle_type_desc")}
-                            checked={state.minimum_current_vehicle_type != 0}
-                            onClick={() => this.setState({minimum_current_vehicle_type: state.minimum_current_vehicle_type ? 0 : 1})}
-                        />
+                        <InputSelect items={[
+                                ["0", __("charge_manager.content.minimum_current_vehicle_type_other")],
+                                ["1", __("charge_manager.content.minimum_current_vehicle_type_zoe")],
+                            ]}
+                            value={state.minimum_current_vehicle_type}
+                            onValue={(v) => this.setState({minimum_current_vehicle_type: parseInt(v)})}
+                            />
                     </FormRow>
                 </div>
             </Collapse>
@@ -473,7 +468,8 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
                                 {
                                     state.scanResult.filter(c => !state.chargers.some(c1 => c1.host == c.hostname + ".local"))
                                         .map(c => (
-                                            <ListGroup.Item action type="button"
+                                            <ListGroup.Item key={c.hostname}
+                                                        action type="button"
                                                         onClick={c.error != 0 ? () => {} : () => {
                                                             this.setState({newCharger: {host: c.hostname + ".local", name: c.display_name}})
                                                         }}
