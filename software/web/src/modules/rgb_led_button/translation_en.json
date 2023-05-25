@@ -1,0 +1,20 @@
+{
+    "rgb_led_button": {
+        "status": {
+        },
+        "navbar": {
+            "rgb_led_button": "RGB LED Button"
+        },
+        "content": {
+            "rgb_led_button": "RGB LED Button",
+            "color": "Color",
+            "button": "Button",
+            "button_unknown": "Unknown"
+        },
+        "script": {
+            "save_config_failed": "Could not save color",
+            "button_pressed": "Pressed",
+            "button_released": "Released"
+        }
+    }
+}

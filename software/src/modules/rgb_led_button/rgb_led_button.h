@@ -41,6 +41,18 @@ public:
     void register_urls();
     void loop();
 
+    void set_bricklet_color(String color);
+    void poll_bricklet_color();
+
+    // ConfigRoot object to represent the color to be send to the frontend module
+    ConfigRoot config;
+
+    // Extra ConfigRoot object to represent color updates received from the frontend module
+    ConfigRoot config_update;
+
+    // ConfigRoot object to represent the button state to be send to the frontend module
+    ConfigRoot state;
+
 private:
     void setup_RGBLEDButton();
 };
