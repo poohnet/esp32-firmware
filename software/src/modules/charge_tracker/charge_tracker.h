@@ -30,6 +30,8 @@
 #define CHARGE_TRACKER_AUTH_TYPE_NFC 2
 #define CHARGE_TRACKER_AUTH_TYPE_NFC_INJECTION 3
 
+#define CHARGE_TRACKER_MAX_REPAIR 200
+
 class ChargeTracker final : public IModule
 {
 public:
@@ -63,4 +65,7 @@ public:
 
     std::mutex records_mutex;
     std::mutex pdf_mutex;
+private:
+    bool repair_last(float);
+    void repair_charges();
 };

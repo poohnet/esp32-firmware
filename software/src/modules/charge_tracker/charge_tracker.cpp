@@ -43,6 +43,13 @@ struct ChargeEnd {
     uint8_t __dummy[8] = {0};
 } __attribute__((packed));
 
+struct Charge {
+    ChargeStart cs;
+    ChargeEnd ce;
+} __attribute__((packed));
+
+static bool repair_logic(Charge *);
+
 static_assert(sizeof(ChargeEnd) == 16, "Unexpected size of ChargeEnd");
 
 #define CHARGE_RECORD_SIZE (sizeof(ChargeStart) + sizeof(ChargeEnd))
@@ -96,6 +103,44 @@ String ChargeTracker::chargeRecordFilename(uint32_t i)
     return String(CHARGE_RECORD_FOLDER) + "/charge-record-" + i + ".bin";
 }
 
+bool ChargeTracker::repair_last(float meter_start) {
+    Charge charges[3];
+    charges[0].ce.meter_end = NAN;
+    charges[2].cs.meter_start = meter_start;
+
+    if (!LittleFS.exists(chargeRecordFilename(last_charge_record)))
+        return true;
+
+    File r_file = LittleFS.open(chargeRecordFilename(last_charge_record), "r+");
+    if (r_file.size() % CHARGE_RECORD_SIZE != 0) {
+        logger.printfln("Can't track start of charge: Last charge end was not tracked or file is damaged! Offset is %u bytes. Expected 0", r_file.size() % CHARGE_RECORD_SIZE);
+        // TODO: for robustness we would have to write the last end here? Yes, but only if % == 9. Also write duration 0, so we know this is a "faked" end. Still write the correct meter state.
+        return false;
+    }
+
+    if (r_file.size() > sizeof(Charge)) {
+        r_file.seek(r_file.size() - sizeof(Charge) * 2);
+        r_file.read(reinterpret_cast<uint8_t *>(&charges), sizeof(Charge) * 2);
+    }
+    else if (r_file.size() == sizeof(Charge)) {
+        if (last_charge_record > 1) {
+            File tmp = LittleFS.open(chargeRecordFilename(last_charge_record - 1));
+            tmp.seek(tmp.size() - sizeof(Charge) * 2);
+            tmp.read(reinterpret_cast<uint8_t *>(&charges), sizeof(Charge));
+        }
+        r_file.seek(r_file.size() - sizeof(Charge));
+        r_file.read(reinterpret_cast<uint8_t *>(&charges[1]), sizeof(Charge));
+    }
+
+    if (repair_logic(&charges[1])) {
+        r_file.seek(r_file.size() - sizeof(Charge));
+        r_file.write(reinterpret_cast<uint8_t *>(&charges[1]), sizeof(Charge));
+        logger.printfln("Repaired previous broken charge.");
+        last_charges.get(last_charges.count() - 1)->get("energy_charged")->updateFloat(charges[1].ce.meter_end - charges[1].cs.meter_start);
+    }
+    return true;
+}
+
 bool ChargeTracker::startCharge(uint32_t timestamp_minutes, float meter_start, uint8_t user_id, uint32_t evse_uptime, uint8_t auth_type, Config::ConfVariant auth_info) {
 #if MODULE_REQUIRE_METER_AVAILABLE()
     if (!require_meter.allow_charging(meter_start))
@@ -103,6 +148,11 @@ bool ChargeTracker::startCharge(uint32_t timestamp_minutes, float meter_start, u
 #endif
 
     std::lock_guard<std::mutex> lock{records_mutex};
+
+    if (!repair_last(meter_start)) {
+        return false;
+    }
+
     ChargeStart cs;
     File file = LittleFS.open(chargeRecordFilename(this->last_charge_record), "a", true);
 
@@ -116,12 +166,6 @@ bool ChargeTracker::startCharge(uint32_t timestamp_minutes, float meter_start, u
         updateState();
 
         file = LittleFS.open(new_file_name, "w", true);
-    }
-
-    if ((file.size() % CHARGE_RECORD_SIZE) != 0) {
-        logger.printfln("Can't track start of charge: Last charge end was not tracked or file is damaged! Offset is %u bytes. Expected 0", file.size() % CHARGE_RECORD_SIZE);
-        // TODO: for robustness we would have to write the last end here? Yes, but only if % == 9. Also write duration 0, so we know this is a "faked" end. Still write the correct meter state.
-        return false;
     }
 
     uint16_t electricity_price = config.get("electricity_price")->asUint();
@@ -164,7 +208,7 @@ void ChargeTracker::endCharge(uint32_t charge_duration_seconds, float meter_end)
         }
 
         ce.charge_duration = charge_duration_seconds;
-        ce.meter_end = meter_end == 0 ? NAN : meter_end;
+        ce.meter_end = meter_end;
 
         uint8_t buf[sizeof(ChargeEnd)] = {0};
         memcpy(buf, &ce, sizeof(ce));
@@ -407,6 +451,8 @@ void ChargeTracker::setup()
         return;
     }
 
+    repair_charges();
+
     api.restorePersistentConfig("charge_tracker/config", &config);
 
     // Fill charge_tracker/last_charges
@@ -544,6 +590,102 @@ static char *tracked_charge_to_string(char *buf, ChargeStart cs, ChargeEnd ce, b
     }
 
     return buf;
+}
+
+static bool repair_logic(Charge *buf) {
+    bool repaired = false;
+    uint8_t state = 0;
+
+    // There are only known issues with broken charges with a meter end of 0.
+    // We can add the same logic for the start too if needed.
+    state |= !isnan(buf[-1].ce.meter_end) << 3;
+    state |= (!isnan(buf[0].cs.meter_start)) << 2;
+    state |= (!isnan(buf[0].ce.meter_end) && buf[0].ce.meter_end != 0) << 1;
+    state |= !isnan(buf[1].cs.meter_start);
+
+    // We have five cases that can be repaired/ have to be repaired. state is a bitmap.
+    switch (state)
+    {
+    // The end of a charge is missing but we got the beginning and the beginning of the next charge.
+    case 10:
+    case 11:
+        if (buf[-1].ce.meter_end <= buf[0].ce.meter_end
+                && buf[0].ce.meter_end - buf[-1].ce.meter_end < CHARGE_TRACKER_MAX_REPAIR) {
+            buf[0].cs.meter_start = buf[-1].ce.meter_end;
+            repaired = true;
+        }
+        break;
+
+    // The start of a charge is missing but we got the end of it and the end of the previous charge.
+    case 5:
+    case 13:
+        if (buf[0].cs.meter_start <= buf[1].cs.meter_start
+                && buf[1].cs.meter_start - buf[0].cs.meter_start < CHARGE_TRACKER_MAX_REPAIR) {
+            // If the Meter is new and somehow meter start and meter end is 0 this is not a broken charge.
+            if (buf[0].ce.meter_end == 0 && buf[0].cs.meter_start == 0)
+                break;
+
+            buf[0].ce.meter_end = buf[1].cs.meter_start;
+            repaired = true;
+        }
+        break;
+
+    // We got no meter values of the charge but we got the end of the previous and the start of the next.
+    case 9:
+        if (buf[-1].ce.meter_end <= buf[1].cs.meter_start
+                && buf[1].cs.meter_start - buf[-1].ce.meter_end < CHARGE_TRACKER_MAX_REPAIR) {
+            buf[0].cs.meter_start = buf[-1].ce.meter_end;
+            buf[0].ce.meter_end = buf[1].cs.meter_start;
+            repaired = true;
+        }
+        break;
+
+    default:
+        break;
+    }
+    return repaired;
+}
+
+void ChargeTracker::repair_charges() {
+    auto buf = heap_alloc_array<Charge>(258);
+    uint32_t num_repaired = 0;
+    Charge transfer;
+    transfer.ce.meter_end = NAN;
+
+    for (int i = this->first_charge_record; i <= this->last_charge_record; ++i) {
+        bool file_needs_repair = false;
+        memset(reinterpret_cast<uint8_t *>(&buf[1]), 0, sizeof(Charge) * 257);
+
+        File f = LittleFS.open(chargeRecordFilename(i));
+        if (i < this->last_charge_record) {
+            File next_f = LittleFS.open(chargeRecordFilename(i + 1));
+            int read = next_f.read(reinterpret_cast<uint8_t *>(&buf[257]), sizeof(Charge));
+            if (read != sizeof(Charge))
+                buf[257].cs.meter_start = NAN;
+        }
+        else
+            buf[257].cs.meter_start = NAN;
+
+        int read = f.read(reinterpret_cast<uint8_t *>(&buf[1]), sizeof(Charge) * 257);
+        if (read == -1 || read == 0) {
+            break;
+        }
+
+        for (int a = 1; a < read / sizeof(Charge); a++) {
+            if (repair_logic(&buf[a])) {
+                file_needs_repair = true;
+                num_repaired++;
+            }
+        }
+        if (file_needs_repair) {
+            File write_f = LittleFS.open(chargeRecordFilename(i), "w");
+            write_f.write(reinterpret_cast<uint8_t *>(&buf[1]), read);
+        }
+        buf[0] = buf[256];
+    }
+    if (num_repaired != 0) {
+        logger.printfln("Repaired %u charge-entries.", num_repaired);
+    }
 }
 
 void ChargeTracker::register_urls()
