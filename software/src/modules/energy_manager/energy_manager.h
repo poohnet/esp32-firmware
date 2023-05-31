@@ -50,7 +50,8 @@
 #define PHASE_SWITCHING_ALWAYS_1PHASE       1
 #define PHASE_SWITCHING_ALWAYS_3PHASE       2
 #define PHASE_SWITCHING_EXTERNAL_CONTROL    3
-#define PHASE_SWITCHING_MAX                 3
+#define PHASE_SWITCHING_PV1P_FAST3P         4
+#define PHASE_SWITCHING_MAX                 4
 
 #define RELAY_CONFIG_MANUAL                 0
 #define RELAY_CONFIG_RULE_BASED             1
@@ -187,8 +188,6 @@ public:
 
     void apply_defaults();
 
-    float calculate_cloud_filter_coefficient(uint32_t mode);
-
     bool get_sdcard_info(struct sdcard_info *data);
     bool format_sdcard();
     uint16_t get_energy_meter_detailed_values(float *ret_values);
@@ -268,11 +267,17 @@ private:
     bool     just_switched_mode                  = false;
     uint32_t phase_state_change_blocked_until    = 0;
     uint32_t on_state_change_blocked_until       = 0;
+    uint32_t charge_manager_available_current_ma = 0;
     uint32_t charge_manager_allocated_current_ma = 0;
     uint32_t max_current_limited_ma              = 0;
+
     int32_t  power_available_w                   = 0;
     int32_t  power_available_filtered_w          = 0;
-    float    power_at_meter_filtered_w           = NAN;
+    int32_t  power_at_meter_filtered_w           = INT32_MAX;
+    int32_t *power_at_meter_mavg_values_w        = nullptr;
+    int32_t  power_at_meter_mavg_total           = 0;
+    int32_t  power_at_meter_mavg_values_count    = 0;
+    int32_t  power_at_meter_mavg_position        = 0;
 
     // Config cache
     uint32_t default_mode             = 0;
@@ -293,9 +298,6 @@ private:
     int32_t  overall_min_power_w = 0;
     int32_t  threshold_3to1_w    = 0;
     int32_t  threshold_1to3_w    = 0;
-
-    // Pre-calculated data
-    float    cloud_filter_coefficient = 0;
 
     void update_history_meter_power(float power);
     void collect_data_points();

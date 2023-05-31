@@ -272,6 +272,7 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                                 ["0", __("energy_manager.content.automatic")],
                                 ["1", __("energy_manager.content.always_single_phase")],
                                 ["2", __("energy_manager.content.always_three_phases")],
+                                ["4", __("energy_manager.content.pv1p_fast3p")],
                                 ["3", __("energy_manager.content.external_control")],
                             ] : [
                                 ["1", __("energy_manager.content.fixed_single_phase")],
@@ -389,7 +390,7 @@ export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, 
                                 <InputSelect
                                     items={[
                                         ["0", __("energy_manager.content.cloud_filter_off")],
-                                        ["1", __("energy_manager.content.cloud_filter_light")],
+                                        ["1", __("energy_manager.content.cloud_filter_weak")],
                                         ["2", __("energy_manager.content.cloud_filter_medium")],
                                         ["3", __("energy_manager.content.cloud_filter_strong")],
                                     ]}

@@ -45,6 +45,7 @@
             "automatic": "Automatisch",
             "always_single_phase": "Immer einphasig",
             "always_three_phases": "Immer dreiphasig",
+            "pv1p_fast3p": "Einphasiger PV-Modus, dreiphasiger Schnell-Modus",
             "external_control": "Externe Steuerung (EVCC)",
             "external_control_notification": "Externe Steuerung für die Phasenumschaltung ist aktiv. Dadurch werden alle Einstellungen im Zusammenhang mit PV-Überschussladen deaktiviert.",
 
@@ -76,7 +77,7 @@
             "cloud_filter": "Wolkenfilter",
             "cloud_filter_muted": "reduziert den Einfluss von wechselnd bewölktem Wetter",
             "cloud_filter_off": "Ohne",
-            "cloud_filter_light": "Schwach",
+            "cloud_filter_weak": "Schwach",
             "cloud_filter_medium": "Mittel",
             "cloud_filter_strong": "Stark",
 

@@ -38,12 +38,9 @@ public:
     bool onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain);
 
     ConfigRoot state;
+
+private:
     ConfigRoot config;
     ConfigRoot runtime_config;
     ConfigRoot runtime_config_update;
-
-private:
-    float filter_coefficient = 0;
-    float fake_power_from_mqtt_w = NAN;
-    float fake_power_filtered_w = NAN;
 };
