@@ -33,6 +33,7 @@
 #include "warp_energy_manager_bricklet_firmware_bin.embedded.h"
 
 #define EM_TASK_DELAY_MS                    250
+#define CURRENT_POWER_SMOOTHING_SAMPLES     4
 
 #define MODE_FAST                           0
 #define MODE_OFF                            1
@@ -86,7 +87,7 @@
 #define HYSTERESIS_MIN_TIME_MINUTES         5
 
 #define ERROR_FLAGS_BAD_CONFIG_BIT_POS      31
-#define ERROR_FLAGS_BAD_CONFIG_MASK         (1 << ERROR_FLAGS_BAD_CONFIG_BIT_POS)
+#define ERROR_FLAGS_BAD_CONFIG_MASK         (1u<< ERROR_FLAGS_BAD_CONFIG_BIT_POS)
 #define ERROR_FLAGS_SDCARD_BIT_POS          25
 #define ERROR_FLAGS_SDCARD_MASK             (1 << ERROR_FLAGS_SDCARD_BIT_POS)
 #define ERROR_FLAGS_BRICKLET_BIT_POS        24
@@ -170,11 +171,11 @@ class EnergyManager : public DeviceModule<TF_WARPEnergyManager,
 {
 public:
     EnergyManager() : DeviceModule("energy_manager", "WARP Energy Manager", "Energy Manager", std::bind(&EnergyManager::setup_energy_manager, this)){}
-    void pre_setup();
-    void setup();
-    void register_urls();
-    void register_events();
-    void loop();
+    void pre_setup() override;
+    void setup() override;
+    void register_urls() override;
+    void register_events() override;
+    void loop() override;
 
     // Called in energy_manager_meter setup
     void update_all_data();
@@ -223,7 +224,7 @@ public:
     bool     contactor_check_tripped = false;
     bool     is_3phase               = false;
     bool     wants_on_last           = false;
-    float    power_at_meter_w        = NAN;
+    float    power_at_meter_raw_w    = NAN;
 
 private:
     void update_status_led();
@@ -259,7 +260,7 @@ private:
     SwitchingState switching_state               = SwitchingState::Monitoring;
     uint32_t switching_start                     = 0;
     uint32_t mode                                = 0;
-    uint8_t  have_phases                         = 0;
+    uint32_t  have_phases                        = 0;
     bool     wants_3phase                        = false;
     bool     wants_3phase_last                   = false;
     bool     is_on_last                          = false;
@@ -273,6 +274,12 @@ private:
 
     int32_t  power_available_w                   = 0;
     int32_t  power_available_filtered_w          = 0;
+
+    int32_t  power_at_meter_smooth_w             = INT32_MAX;
+    int32_t  power_at_meter_smooth_values_w[CURRENT_POWER_SMOOTHING_SAMPLES];
+    int32_t  power_at_meter_smooth_total         = 0;
+    int32_t  power_at_meter_smooth_position      = 0;
+
     int32_t  power_at_meter_filtered_w           = INT32_MAX;
     int32_t *power_at_meter_mavg_values_w        = nullptr;
     int32_t  power_at_meter_mavg_total           = 0;
@@ -287,7 +294,7 @@ private:
     int32_t  target_power_from_grid_w = 0;
     uint32_t guaranteed_power_w       = 0;
     bool     contactor_installed      = false;
-    uint8_t  phase_switching_mode     = 0;
+    uint32_t phase_switching_mode     = 0;
     uint32_t switching_hysteresis_ms  = 0;
     bool     hysteresis_wear_ok       = false;
     uint32_t max_current_unlimited_ma = 0;
