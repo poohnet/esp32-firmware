@@ -49,7 +49,6 @@ extern char passphrase[20];
 extern int8_t blue_led_pin;
 extern int8_t green_led_pin;
 extern int8_t button_pin;
-extern bool factory_reset_requested;
 
 #if TF_LOCAL_ENABLE != 0
 
@@ -63,7 +62,7 @@ static TF_Local local;
 #define RESET_WAIT_SECS 8
 #endif
 
-__attribute((unused))
+#if defined(BUILD_NAME_ENERGY_MANAGER)
 static void check_for_factory_reset() {
     // A factory reset will leave the green LED on, even across a restart. Switch it off here.
     digitalWrite(green_led_pin, false);
@@ -109,8 +108,9 @@ static void check_for_factory_reset() {
             }
             // If the button is still pressed, perform factory reset.
             if (button_pressed) {
-                // Perform factory reset, blue LED stays on to show success.
-                factory_reset_requested = true;
+                // Perform factory reset, switch on blue LED to show success.
+                digitalWrite(blue_led_pin, false);
+                factory_reset();
             } else {
                 // Factory reset aborted, switch off blue LED.
                 blue_led_off = true;
@@ -119,6 +119,7 @@ static void check_for_factory_reset() {
     }
     digitalWrite(blue_led_pin, blue_led_off);
 }
+#endif
 
 void ESP32EthernetBrick::setup()
 {

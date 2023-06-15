@@ -342,7 +342,8 @@ export class ChargeManager extends ConfigComponent<'charge_manager/config', {}, 
 
             <Collapse in={!state.minimum_current_auto}>
                 <div>
-                    <FormRow label={__("charge_manager.content.minimum_current")} label_muted={__("charge_manager.content.minimum_current_muted")}>
+                    <FormRow label={      energyManagerMode ? __("charge_manager.content.minimum_current_3p")       : __("charge_manager.content.minimum_current")}
+                             label_muted={energyManagerMode ? __("charge_manager.content.minimum_current_3p_muted") : __("charge_manager.content.minimum_current_muted")}>
                         <InputFloat
                             unit="A"
                             value={state.minimum_current}
@@ -607,7 +608,8 @@ export class ChargeManagerStatus extends Component<{}, ChargeManagerStatusState>
             }
 
             let charger_config = state.config.chargers[i];
-            const name_link = API.is_dirty("charge_manager/config") || !charger_config || charger_config.host == "127.0.0.1" ? c.name : <a target="_blank" rel="noopener noreferrer" href={"http://" + charger_config.host}>{c.name}</a>
+            const name_link = (API.is_dirty("charge_manager/config") || !charger_config) ? c.name :
+                                <a target="_blank" rel="noopener noreferrer" href={(charger_config.host == '127.0.0.1' || charger_config.host == 'localhost') ? '/' : "http://" + charger_config.host}>{c.name}</a>
 
             return  <div class="card">
                         <h5 class="card-header">

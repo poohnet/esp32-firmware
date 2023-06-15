@@ -29,8 +29,7 @@
 
 #define AUTHORIZED_TAG_LIST_LENGTH 16
 
-#define TOKEN_LIFETIME_MS 30000
-#define DETECTION_THRESHOLD_MS 1000
+#define DETECTION_THRESHOLD_MS 2000
 
 void NFC::pre_setup()
 {
@@ -142,9 +141,6 @@ void NFC::check_nfc_state()
 
 uint8_t NFC::get_user_id(tag_info_t *tag, uint8_t *tag_idx)
 {
-    if (tag->last_seen >= TOKEN_LIFETIME_MS)
-        return false;
-
     Config *auth_tags = (Config *)config_in_use.get("authorized_tags");
 
     for (uint8_t auth_tag_idx = 0; auth_tag_idx < auth_tags->count(); ++auth_tag_idx) {
@@ -158,36 +154,29 @@ uint8_t NFC::get_user_id(tag_info_t *tag, uint8_t *tag_idx)
     return 0;
 }
 
-void NFC::handle_event(tag_info_t *tag, bool found, bool injected)
+void NFC::tag_seen(tag_info_t *tag, bool injected)
 {
     uint8_t idx = 0;
     uint8_t user_id = get_user_id(tag, &idx);
 
     if (user_id != 0) {
-        if (found) {
-            // Found a new authorized tag. Create/overwrite auth token. Overwrite blink state even if we previously saw a not authorized tag.
-            auth_token = idx;
-            auth_token_seen = millis();
+        // Found a new authorized tag.
 #if MODULE_EVSE_LED_AVAILABLE()
-            evse_led.set_module(EvseLed::Blink::Ack, 2000);
+        evse_led.set_module(EvseLed::Blink::Ack, 2000);
 #endif
 #if MODULE_PIEZO_SPEAKER_AVAILABLE()
-            piezo_speaker.beep();
+        piezo_speaker.beep();
 #endif
 #if MODULE_USERS_AVAILABLE()
-            users.trigger_charge_action(user_id, injected ? CHARGE_TRACKER_AUTH_TYPE_NFC_INJECTION : CHARGE_TRACKER_AUTH_TYPE_NFC, Config::Object({
-                    {"tag_type", Config::Uint8(tag->tag_type)},
-                    {"tag_id", Config::Str(tag->tag_id, 0, 30)}}).value,
-                    injected ? tag_injection_action : TRIGGER_CHARGE_ANY);
+        users.trigger_charge_action(user_id, injected ? CHARGE_TRACKER_AUTH_TYPE_NFC_INJECTION : CHARGE_TRACKER_AUTH_TYPE_NFC, Config::Object({
+                {"tag_type", Config::Uint8(tag->tag_type)},
+                {"tag_id", Config::Str(tag->tag_id, 0, 30)}}).value,
+                injected ? tag_injection_action : TRIGGER_CHARGE_ANY);
 #endif
 #if MODULE_OCPP_AVAILABLE()
-            ocpp.on_tag_seen(tag->tag_id);
+        ocpp.on_tag_seen(tag->tag_id);
 #endif
-        } else if (auth_token == idx) {
-            // Lost an authorized tag. If we still have it's auth token, extend the token's validity.
-            //auth_token_seen = millis();
-        }
-    } else if (found) {
+    } else {
 #if MODULE_OCPP_AVAILABLE()
         ocpp.on_tag_seen(tag->tag_id);
 #endif
@@ -251,13 +240,11 @@ void NFC::update_seen_tags()
     seen_tags.get(TAG_LIST_LENGTH - 1)->get("tag_id")->updateString(new_tags[TAG_LIST_LENGTH - 1].tag_id);
 
     // compare new list with old
-    // tags that are not seen anymore are lost
-    // tags that are seen again or are not in the old list are found
     for (int new_idx = 0; new_idx < TAG_LIST_LENGTH; ++new_idx) {
         if (new_tags[new_idx].last_seen == 0)
             continue;
 
-        bool found = false;
+        bool new_found_in_old = false;
         int old_idx;
         for (old_idx = 0; old_idx < TAG_LIST_LENGTH; ++old_idx) {
             if (old_tags[old_idx].last_seen == 0)
@@ -268,40 +255,34 @@ void NFC::update_seen_tags()
                        NFC_TAG_ID_STRING_LENGTH) != 0)
                 continue;
 
-            found = true;
+            new_found_in_old = true;
             break;
         }
 
-        bool new_seen = new_tags[new_idx].last_seen < DETECTION_THRESHOLD_MS;
-
-        if (!found && new_seen) {
-            // found new tag
-            handle_event(&new_tags[new_idx], true, new_idx == TAG_LIST_LENGTH - 1);
+        if (!new_found_in_old) {
+            // This tag is in the new list but not in the old.
+            // We don't care about the detection threshold here,
+            // because this will probably only happen if this
+            // task slowed down because something else blocked
+            // for more than one second.
+            logger.printfln("Seen %s", new_tags[new_idx].tag_id);
+            tag_seen(&new_tags[new_idx], new_idx == TAG_LIST_LENGTH - 1);
             continue;
         }
 
         bool old_seen = old_tags[old_idx].last_seen < DETECTION_THRESHOLD_MS;
-        old_tags[old_idx].last_seen = 0;
+        bool new_seen = new_tags[new_idx].last_seen < DETECTION_THRESHOLD_MS;
 
-        if (old_seen && !new_seen) {
-            // lost old tag
-            handle_event(&old_tags[old_idx], false, old_idx == TAG_LIST_LENGTH - 1);
-            continue;
-        }
         if (!old_seen && new_seen) {
-            // found new tag
-            handle_event(&new_tags[new_idx], true, new_idx == TAG_LIST_LENGTH - 1);
+            // This tag was in the old list as well,
+            // but with a last_seen value over the detection threshold.
+            // -> The tag was seen, then removed and then seen again.
+            // If old_seen was also true, this would be a tag that
+            // is detected continously, which only counts as one detection.
+            logger.printfln("Seen %s", new_tags[new_idx].tag_id);
+            tag_seen(&new_tags[new_idx], new_idx == TAG_LIST_LENGTH - 1);
             continue;
         }
-    }
-
-    // tags that are also in the new list are marked with last_seen = 0
-    // all other tags are displaced i.e. gone
-    for (int old_idx = 0; old_idx < TAG_LIST_LENGTH; ++old_idx) {
-        if (old_tags[old_idx].last_seen == 0)
-            continue;
-
-        handle_event(&old_tags[old_idx], false, old_idx == TAG_LIST_LENGTH - 1);
     }
 
     tag_info_t *tmp = old_tags;

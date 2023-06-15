@@ -150,6 +150,7 @@ function get_color(group: string, name: string)
 interface UplotLoaderProps {
     show: boolean;
     marker_width_reduction: number;
+    marker_class: 'h3'|'h4';
     children: VNode | VNode[];
 };
 
@@ -182,10 +183,10 @@ class UplotLoader extends Component<UplotLoaderProps, {}> {
         return (
             <>
                 <div ref={this.no_data_ref} style={`position: absolute; width: calc(100% - ${props.marker_width_reduction}px); height: 100%; visibility: hidden; display: ${props.show ? 'flex' : 'none'};`}>
-                    <span class="h3" style="margin: auto;">{__("em_energy_analysis.content.no_data")}</span>
+                    <span class={props.marker_class} style="margin: auto;">{__("em_energy_analysis.content.no_data")}</span>
                 </div>
                 <div ref={this.loading_ref} style={`position: absolute; width: calc(100% - ${props.marker_width_reduction}px); height: 100%; visibility: ${props.show ? 'visible' : 'hidden'}; display: ${props.show ? 'flex' : 'none'};`}>
-                    <span class="h3" style="margin: auto;">{__("em_energy_analysis.content.loading")}</span>
+                    <span class={props.marker_class} style="margin: auto;">{__("em_energy_analysis.content.loading")}</span>
                 </div>
                 {props.children}
             </>
@@ -233,6 +234,10 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
         let get_size = () => {
             let div = this.div_ref.current;
             let aspect_ratio = parseFloat(getComputedStyle(div).aspectRatio);
+
+            if (isNaN(aspect_ratio)) {
+                aspect_ratio = 2;
+            }
 
             return {
                 width: div.clientWidth,
@@ -628,26 +633,29 @@ export class EMEnergyAnalysisStatus extends Component<{}, {force_render: number}
             <>
                 <FormRow label={__("em_energy_analysis_status.status.history")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4" hidden={!show}>
                     <div class="card pl-1 pb-1">
-                        <UplotLoader ref={this.uplot_loader_ref}
-                                    show={true}
-                                    marker_width_reduction={8} >
-                            <UplotWrapper ref={this.uplot_wrapper_ref}
-                                        id="em_energy_analysis_status_chart"
-                                        class="em-energy-analysis-status-chart"
-                                        sidebar_id="status"
-                                        color_cache_group="status"
-                                        show={true}
-                                        legend_time_label={__("em_energy_analysis.script.time_5min")}
-                                        legend_time_with_minutes={true}
-                                        legend_value_prefix={__("em_energy_analysis.script.power")}
-                                        x_format={{hour: '2-digit', minute: '2-digit'}}
-                                        x_padding_factor={0}
-                                        y_min={0}
-                                        y_max={1500}
-                                        y_unit={"W"}
-                                        y_digits={0}
-                                        default_fill={true} />
-                        </UplotLoader>
+                        <div>
+                            <UplotLoader ref={this.uplot_loader_ref}
+                                         show={true}
+                                         marker_width_reduction={8}
+                                         marker_class={'h4'} >
+                                <UplotWrapper ref={this.uplot_wrapper_ref}
+                                              id="em_energy_analysis_status_chart"
+                                              class="em-energy-analysis-status-chart"
+                                              sidebar_id="status"
+                                              color_cache_group="status"
+                                              show={true}
+                                              legend_time_label={__("em_energy_analysis.script.time_5min")}
+                                              legend_time_with_minutes={true}
+                                              legend_value_prefix={__("em_energy_analysis.script.power")}
+                                              x_format={{hour: '2-digit', minute: '2-digit'}}
+                                              x_padding_factor={0}
+                                              y_min={0}
+                                              y_max={1500}
+                                              y_unit={"W"}
+                                              y_digits={0}
+                                              default_fill={true} />
+                            </UplotLoader>
+                        </div>
                     </div>
                 </FormRow>
                 <FormRow label={__("em_energy_analysis_status.status.grid_connection_power")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4" hidden={!show}>
@@ -1972,11 +1980,12 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                         <div>
                             <UplotLoader ref={this.uplot_loader_5min_ref}
                                          show={true}
-                                         marker_width_reduction={30} >
+                                         marker_width_reduction={30}
+                                         marker_class={'h3'} >
                                 <UplotWrapper ref={this.uplot_wrapper_5min_ref}
                                               id="em_energy_analysis_5min_chart"
                                               class="em-energy-analysis-chart"
-                                              sidebar_id="em-energy-analysis"
+                                              sidebar_id="em_energy_analysis"
                                               color_cache_group="analsyis"
                                               show={true}
                                               legend_time_label={__("em_energy_analysis.script.time_5min")}
@@ -1992,11 +2001,12 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                             </UplotLoader>
                             <UplotLoader ref={this.uplot_loader_daily_ref}
                                          show={false}
-                                         marker_width_reduction={30} >
+                                         marker_width_reduction={30}
+                                         marker_class={'h3'} >
                                 <UplotWrapper ref={this.uplot_wrapper_daily_ref}
                                               id="em_energy_analysis_daily_chart"
                                               class="em-energy-analysis-chart"
-                                              sidebar_id="em-energy-analysis"
+                                              sidebar_id="em_energy_analysis"
                                               color_cache_group="analsyis"
                                               show={false}
                                               legend_time_label={__("em_energy_analysis.script.time_daily")}
@@ -2070,7 +2080,7 @@ let status_ref = createRef();
 
 render(<EMEnergyAnalysisStatus ref={status_ref} />, $('#status-em_energy_analysis_status')[0]);
 
-render(<EMEnergyAnalysis status_ref={status_ref} />, $('#em-energy-analysis')[0]);
+render(<EMEnergyAnalysis status_ref={status_ref} />, $('#em_energy_analysis')[0]);
 
 export function init() {
 
@@ -2081,5 +2091,5 @@ export function add_event_listeners(source: API.APIEventTarget) {
 }
 
 export function update_sidebar_state(module_init: any) {
-    $('#sidebar-em-energy-analysis').prop('hidden', !module_init.energy_manager);
+    $('#sidebar-em_energy_analysis').prop('hidden', !module_init.energy_manager);
 }
