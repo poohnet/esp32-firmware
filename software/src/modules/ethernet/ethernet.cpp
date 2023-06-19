@@ -119,7 +119,7 @@ void Ethernet::setup()
 #if MODULE_NETWORK_AVAILABLE()
             ETH.setHostname(network.config.get("hostname")->asEphemeralCStr());
 #else
-            ETH.setHostname((String(BUILD_HOST_PREFIX) + String("-") + String(local_uid_str)).c_str());
+            ETH.setHostname((String(BUILD_HOST_PREFIX) + "-" + local_uid_str).c_str());
 #endif
             ethernet_state.get("connection_state")->updateUint((uint)EthernetState::NOT_CONNECTED);
         },
@@ -157,7 +157,6 @@ void Ethernet::setup()
             ethernet_state.get("connection_state")->updateUint((uint)EthernetState::CONNECTED);
             ethernet_state.get("ip")->updateString(ip);
 
-            api.wifiAvailable();
             was_connected = true;
             last_connected = millis();
             ethernet_state.get("connection_start")->updateUint(last_connected);

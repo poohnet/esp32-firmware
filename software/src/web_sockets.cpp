@@ -164,11 +164,15 @@ static esp_err_t ws_handler(httpd_req_t *req)
 
             int sock = httpd_req_to_sockfd(req);
 
-            ws->keepAliveAdd(sock);
-
             if (ws->on_client_connect_fn) {
+                // call the client connect callback before adding the client to
+                // the keep alive list to ensure that the full state is send by the
+                // callback before any other message with a partial state might
+                // be send to all clients known by the keep alive list
                 ws->on_client_connect_fn(WebSocketsClient{sock, ws});
             }
+
+            ws->keepAliveAdd(sock);
         }
         return ESP_OK;
     }
@@ -354,6 +358,11 @@ void WebSocketsClient::send(const char *payload, size_t payload_len)
     ws->sendToClient(payload, payload_len, fd);
 }
 
+void WebSocketsClient::sendOwned(char *payload, size_t payload_len)
+{
+    ws->sendToClientOwned(payload, payload_len, fd);
+}
+
 void WebSockets::sendToClient(const char *payload, size_t payload_len, int fd)
 {
     if (httpd_ws_get_fd_info(server.httpd, fd) != HTTPD_WS_CLIENT_WEBSOCKET)
@@ -373,6 +382,22 @@ void WebSockets::sendToClient(const char *payload, size_t payload_len, int fd)
     }
 
     work_queue.push_back({server.httpd, {fd, -1, -1, -1, -1}, payload_copy, payload_len});
+}
+
+void WebSockets::sendToClientOwned(char *payload, size_t payload_len, int fd)
+{
+    if (httpd_ws_get_fd_info(server.httpd, fd) != HTTPD_WS_CLIENT_WEBSOCKET) {
+        free(payload);
+        return;
+    }
+
+    std::lock_guard<std::recursive_mutex> lock{work_queue_mutex};
+    if (queueFull()) {
+        free(payload);
+        return;
+    }
+
+    work_queue.push_back({server.httpd, {fd, -1, -1, -1, -1}, payload, payload_len});
 }
 
 bool WebSockets::haveActiveClient()

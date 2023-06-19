@@ -141,7 +141,7 @@ def get_tf_coredump_data(coredump_path: str):
 
         # search xtensa extra info behind out core dump data
         extra_info_idx = b.find(EXTRA_INFO_HEADER, end)
-        if extra_info_idx < 0 or (len(b) - extra_info_idx < (len(EXTRA_INFO_HEADER) + 2 + 164)):
+        if extra_info_idx < 0 or (len(b) - extra_info_idx < (len(EXTRA_INFO_HEADER) + 2 + 108)):
             return (tf_core_dump_data, None)
 
         extra_data = {}
@@ -151,7 +151,7 @@ def get_tf_coredump_data(coredump_path: str):
         # skip two bytes (probably part of the ELF section header)
         extra_info_idx += 2
 
-        extra_info = b[extra_info_idx:extra_info_idx+164]
+        extra_info = b[extra_info_idx:extra_info_idx+108]
         extra_data['crashed_task_handle'] = int.from_bytes(extra_info[:4], byteorder='little')
 
         for i in range(4, len(extra_info), 8):
@@ -231,7 +231,8 @@ if __name__ == '__main__':
             sys.exit (-1)
 
         tf_coredump_data = json.loads(tf_coredump_json)
-        extra_data = format_extra_data(extra_data).replace('\n', '\\n')
+        if extra_data is not None:
+            extra_data = format_extra_data(extra_data).replace('\n', '\\n')
 
         elf_name = tf_coredump_data['firmware_file_name'] + ".elf"
         script_path = os.path.dirname(os.path.realpath(__file__))
@@ -250,6 +251,11 @@ if __name__ == '__main__':
                         for filename in filenames:
                             os.utime(os.sep.join([dirpath, filename]), (commit_time, commit_time))
 
+                coredump_py_gdb_cmds = ""
+                if os.path.exists("coredump_py_gdb_cmds"):
+                    with open("coredump_py_gdb_cmds") as f:
+                        coredump_py_gdb_cmds = f.read().replace("\n", " ")
+
                 os.system(f"{gdb} " +
                           ("-q --batch " if not args.interactive else "") +
                            "-iex 'set pagination off' " +
@@ -258,6 +264,7 @@ if __name__ == '__main__':
                           f"-iex 'set substitute-path /home/erik/ {os.path.expanduser('~')}' " +
                            "-iex 'set style enabled on' " +
                            "-iex 'set print frame-info source-and-location' " +
+                            coredump_py_gdb_cmds +
                           ("-ex 'shell clear' " if args.interactive else "") +
                            "-ex 'echo ================================================================================\n' " +
                            "-ex 'echo In interactive mode:\n' " +
@@ -265,7 +272,7 @@ if __name__ == '__main__':
                            "-ex 'echo     - Run \"thread apply all bt full\" to print traces of all threads.\n' " +
                            "-ex 'echo\n' " +
                           f"-ex 'echo Crashed firmware {tf_coredump_data['firmware_file_name']}\n' " +
-                          f"-ex 'echo {extra_data}\n' " +
+                          (f"-ex 'echo {extra_data}\n' " if extra_data is not None else "")+
                            "-ex 'echo ================================================================================\n' " +
                            "-ex 'echo ============================= Registers at crash ===============================\n' " +
                            "-ex 'echo ================================================================================\n' " +

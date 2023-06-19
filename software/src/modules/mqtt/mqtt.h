@@ -49,6 +49,7 @@ public:
     void pre_setup() override;
     void setup() override;
     void register_urls() override;
+    void register_events() override;
     void connect();
 
     void publish_with_prefix(const String &path, const String &payload);
@@ -63,7 +64,6 @@ public:
     void addResponse(size_t responseIdx, const ResponseRegistration &reg) override;
     bool pushStateUpdate(size_t stateIdx, const String &payload, const String &path) override;
     void pushRawStateUpdate(const String &payload, const String &path) override;
-    void wifiAvailable() override;
 
     void onMqttConnect();
     void onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain);

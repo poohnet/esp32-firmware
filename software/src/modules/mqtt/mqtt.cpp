@@ -47,8 +47,8 @@ void Mqtt::pre_setup()
         {"broker_port", Config::Uint16(1883)},
         {"broker_username", Config::Str("", 0, 64)},
         {"broker_password", Config::Str("", 0, 64)},
-        {"global_topic_prefix", Config::Str(String(BUILD_HOST_PREFIX) + String("/") + String("ABC"), 0, 64)},
-        {"client_name", Config::Str(String(BUILD_HOST_PREFIX) + String("-") + String("ABC"), 1, 64)},
+        {"global_topic_prefix", Config::Str(String(BUILD_HOST_PREFIX) + "/" + "ABC", 0, 64)},
+        {"client_name", Config::Str(String(BUILD_HOST_PREFIX) + "-" + "ABC", 1, 64)},
         {"interval", Config::Uint32(1)}
     }), [](Config &cfg) -> String {
 #if MODULE_MQTT_AUTO_DISCOVERY_AVAILABLE()
@@ -139,14 +139,6 @@ void Mqtt::pushRawStateUpdate(const String &payload, const String &path)
     this->publish_with_prefix(path, payload);
 }
 
-void Mqtt::wifiAvailable()
-{
-    static bool started = false;
-    if (!started)
-        esp_mqtt_client_start(client);
-    started = true;
-}
-
 void Mqtt::onMqttConnect()
 {
     last_connected_ms = millis();
@@ -186,8 +178,12 @@ void Mqtt::onMqttConnect()
 
 void Mqtt::onMqttDisconnect()
 {
+    if (this->mqtt_state.get("connection_state")->asEnum<MqttConnectionState>() == MqttConnectionState::NOT_CONNECTED)
+        logger.printfln("MQTT: Failed to connect to broker.");
+    else
+        logger.printfln("MQTT: Disconnected from broker.");
+
     this->mqtt_state.get("connection_state")->updateInt((int)MqttConnectionState::NOT_CONNECTED);
-    logger.printfln("MQTT: Disconnected from broker.");
     if (was_connected) {
         was_connected = false;
         uint32_t now = millis();
@@ -347,14 +343,15 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             break;
         case MQTT_EVENT_ERROR: {
                 auto eh = event->error_handle;
+                bool was_connected = mqtt->mqtt_state.get("connection_state")->asEnum<MqttConnectionState>() != MqttConnectionState::NOT_CONNECTED;
 
                 if (eh->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
-                    if (eh->esp_tls_last_esp_err != ESP_OK) {
+                    if (was_connected && eh->esp_tls_last_esp_err != ESP_OK) {
                         const char *e = esp_err_to_name_r(eh->esp_tls_last_esp_err, err_buf, sizeof(err_buf) / sizeof(err_buf[0]));
                         logger.printfln("MQTT: Transport error: %s (esp_tls_last_esp_err)", e);
                         mqtt->mqtt_state.get("last_error")->updateInt(eh->esp_tls_last_esp_err);
                     }
-                    if (eh->esp_tls_stack_err != 0) {
+                    if (was_connected && eh->esp_tls_stack_err != 0) {
                         const char *e = esp_err_to_name_r(eh->esp_tls_stack_err, err_buf, sizeof(err_buf) / sizeof(err_buf[0]));
                         logger.printfln("MQTT: Transport error: %s (esp_tls_stack_err)", e);
                         mqtt->mqtt_state.get("last_error")->updateInt(eh->esp_tls_stack_err);
@@ -426,6 +423,7 @@ void Mqtt::setup()
     mqtt_cfg.password = mqtt_config_in_use.get("broker_password")->asEphemeralCStr();
     mqtt_cfg.buffer_size = MQTT_RECV_BUFFER_SIZE;
     mqtt_cfg.network_timeout_ms = 1000;
+    mqtt_cfg.message_retransmit_timeout = 400;
 
     client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, this);
@@ -437,4 +435,21 @@ void Mqtt::register_urls()
 {
     api.addPersistentConfig("mqtt/config", &mqtt_config, {"broker_password"}, 1000);
     api.addState("mqtt/state", &mqtt_state, {}, 1000);
+}
+
+void Mqtt::register_events() {
+    // Start MQTT client here to make sure all handlers are already registered.
+
+    // Start immediately if we already have a working ethernet connection. WiFi takes a bit longer.
+    // Wait 20 secs to not spam the event log with a failed connection attempt.
+    bool start_immediately = false;
+#if MODULE_ETHERNET_AVAILABLE()
+    start_immediately = ethernet.get_connection_state() == EthernetState::CONNECTED;
+#endif
+    if (start_immediately)
+        esp_mqtt_client_start(client);
+    else
+        task_scheduler.scheduleOnce([this]() {
+            esp_mqtt_client_start(client);
+        }, 20000);
 }

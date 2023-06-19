@@ -10,6 +10,10 @@ $body-color: black;
 $gray-700: black;
 $gray-900: black;
 
+$cyan: #0dcaf0;
+// Default is 150. The changed $cyan has a y (luma) value of 149.821.
+$yiq-contrasted-threshold: 149;
+
 @import "../node_modules/bootstrap/scss/functions";
 @import "../node_modules/bootstrap/scss/variables";
 
