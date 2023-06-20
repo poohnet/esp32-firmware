@@ -143,6 +143,7 @@ resp_charger_state.addItem("2: Ready")
 resp_charger_state.addItem("3: Charging")
 resp_charger_state.addItem("4: Error")
 def lalala():
+    global time_since_state_change
     time_since_state_change = time.time()
 resp_charger_state.currentIndexChanged.connect(lalala)
 layout.addRow("Vehicle state", resp_charger_state)
@@ -172,6 +173,12 @@ resp_supported_current.setMinimum(0)
 resp_supported_current.setMaximum(32)
 resp_supported_current.setSuffix(" A")
 layout.addRow("Supported current", resp_supported_current)
+
+resp_max_line_current = QSpinBox()
+resp_max_line_current.setMinimum(0)
+resp_max_line_current.setMaximum(32)
+resp_max_line_current.setSuffix(" A")
+layout.addRow("Max line current", resp_max_line_current)
 
 resp_managed = QCheckBox("")
 resp_managed.setChecked(True)
@@ -253,19 +260,19 @@ def send():
                     resp_charger_state.currentIndex(),
                     resp_error_state.value(),
                     flags,
-                    0,  # LV0
+                    230,  # LV0
                     0,  # LV1
                     0,  # LV2
-                    0,  # LC0
+                    resp_max_line_current.value(),  # LC0
                     0,  # LC1
                     0,  # LC2
-                    0,  # LPF0
+                    1,  # LPF0
                     0,  # LPF1
                     0,  # LPF2
-                    0,  # power_total
+                    230 * resp_max_line_current.value(),  # power_total
                     0,  # energy_rel
                     0,  # energy_abs
-                    int(time.time() - time_since_state_change)
+                    int(1000 * (time.time() - time_since_state_change))
     )
     if not resp_block_seq_num.isChecked():
         next_seq_num += 1

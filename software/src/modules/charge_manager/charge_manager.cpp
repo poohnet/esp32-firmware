@@ -45,8 +45,8 @@
 #define CHARGE_MANAGER_ERROR_EVSE_NONREACTIVE 130
 #define CHARGE_MANAGER_CLIENT_ERROR_START 192
 
-// This is a hack to allow the validator of charge_manager_available_current
-// to access charge_manager_config["maximum_available_current"]
+// This is a hack to allow the validator of available_current
+// to access config["maximum_available_current"]
 // It is necessary, because configs only take a function pointer as
 // validator function, so lambda capture lists have to be empty.
 static uint32_t max_avail_current = 0;
@@ -66,7 +66,7 @@ static void apply_energy_manager_config(Config &conf)
 
 void ChargeManager::pre_setup()
 {
-    charge_manager_config = ConfigRoot{Config::Object({
+    config = ConfigRoot{Config::Object({
         {"enable_charge_manager", Config::Bool(false)},
         {"enable_watchdog", Config::Bool(false)},
         {"default_available_current", Config::Uint32(0)},
@@ -76,6 +76,17 @@ void ChargeManager::pre_setup()
         {"minimum_current_1p", Config::Uint(6000, 6000, 32000)},
         {"minimum_current_vehicle_type", Config::Uint32(0)},
         {"verbose", Config::Bool(false)},
+        // Line currents are used to calculate the "requested current"
+        // if a charger is in state C for at least
+        // "requested_current_threshold" ms.
+        // Otherwise the "requested current" is the "supported current"
+        // to allow the car to ramp up fast.
+        {"requested_current_threshold", Config::Uint16(60)},
+        // Added to requested current before distributing current.
+        // This margin has to be large enough to make sure
+        // every vehicle can always request more current.
+        // See https://github.com/Tinkerforge/warp-charger/blob/master/tools/current_ramp/allowed_vs_effective_3.gp
+        {"requested_current_margin", Config::Uint16(3000)},
         {"chargers", Config::Array({},
             new Config{Config::Object({
                 {"host", Config::Str("", 0, 64)},
@@ -125,7 +136,7 @@ void ChargeManager::pre_setup()
         return "";
     }};
 
-    charge_manager_state = Config::Object({
+    state = Config::Object({
         {"state", Config::Uint8(0)}, // 0 - not configured, 1 - active, 2 - shutdown
         {"uptime", Config::Uint32(0)},
         {"allocated_current", Config::Uint32(0)},
@@ -140,6 +151,7 @@ void ChargeManager::pre_setup()
                 {"uptime", Config::Uint32(0)},
                 {"supported_current", Config::Uint16(0)}, // maximum current supported by the charger
                 {"allowed_current", Config::Uint16(0)}, // last current limit reported by the charger
+                {"requested_current", Config::Uint16(0)}, // requested current calculated with the line currents reported by the charger
                 {"wants_to_charge", Config::Bool(false)},
                 {"wants_to_charge_low_priority", Config::Bool(false)},
                 {"is_charging", Config::Bool(false)},
@@ -164,25 +176,25 @@ void ChargeManager::pre_setup()
         )}
     });
 
-    charge_manager_available_current = ConfigRoot{Config::Object({
+    available_current = ConfigRoot{Config::Object({
         {"current", Config::Uint32(0)},
     }), [](const Config &conf) -> String {
         if (conf.get("current")->asUint() > max_avail_current)
             return "Current too large: maximum available current is configured to " + String(max_avail_current);
         return "";
     }};
-    charge_manager_available_current_update = charge_manager_available_current;
+    available_current_update = available_current;
 
-    charge_manager_available_phases = ConfigRoot{Config::Object({
+    available_phases = ConfigRoot{Config::Object({
         {"phases", Config::Uint(3, 1, 3)},
     }), [](const Config &conf) -> String {
         if (conf.get("phases")->asUint() == 2)
             return "Two phases not supported.";
         return "";
     }};
-    charge_manager_available_phases_update = charge_manager_available_phases;
+    available_phases_update = available_phases;
 
-    charge_manager_control_pilot_disconnect = ConfigRoot{Config::Object({
+    control_pilot_disconnect = ConfigRoot{Config::Object({
         {"disconnect", Config::Bool(false)},
     })};
 }
@@ -212,7 +224,7 @@ static uint8_t get_charge_state(uint8_t charger_state, uint16_t supported_curren
 
 void ChargeManager::start_manager_task()
 {
-    auto chargers = charge_manager_config_in_use.get("chargers");
+    auto chargers = config_in_use.get("chargers");
 
     std::vector<String> hosts;
     std::vector<String> names;
@@ -222,7 +234,7 @@ void ChargeManager::start_manager_task()
     }
 
     cm_networking.register_manager(std::move(hosts), names, [this, chargers](uint8_t client_id, cm_state_v1 *v1, cm_state_v2 *v2) mutable {
-            auto target = charge_manager_state.get("chargers")->get(client_id);
+            auto target = state.get("chargers")->get(client_id);
             // Don't update if the uptimes are the same.
             // This means, that the EVSE hangs or the communication
             // is not working. As last_update will now hang too,
@@ -262,6 +274,32 @@ void ChargeManager::start_manager_task()
             target->get("cp_disconnect_state")->updateBool(CM_STATE_FLAGS_CP_DISCONNECTED_IS_SET(v1->state_flags));
             target->get("last_update")->updateUint(millis());
             target->get("charger_state")->updateUint(v1->charger_state);
+
+            uint16_t requested_current = v1->supported_current;
+
+            if (v2 != nullptr && v1->charger_state == 3 && v2->time_since_state_change >= config_in_use.get("requested_current_threshold")->asUint() * 1000) {
+                int32_t max_phase_current = -1;
+
+                for (int i = 0; i < 3; i++) {
+                    if (isnan(v1->line_currents[i])) {
+                        // Don't trust the line currents if one is missing.
+                        max_phase_current = -1;
+                        break;
+                    }
+
+                    max_phase_current = max(max_phase_current, (int32_t)(v1->line_currents[i] * 1000.0f));
+                }
+
+                if (max_phase_current == -1)
+                    max_phase_current = 32000;
+
+                max_phase_current += config_in_use.get("requested_current_margin")->asUint();
+
+                max_phase_current = max(6000, min(32000, max_phase_current));
+                requested_current = min(requested_current, (uint16_t)max_phase_current);
+            }
+            target->get("requested_current")->updateUint(requested_current);
+
             target->get("meter_supported")->updateBool(CM_FEATURE_FLAGS_METER_IS_SET(v1->feature_flags));
             target->get("power_total_sum")->updateFloat(target->get("power_total_sum")->asFloat() + v1->power_total);
             target->get("power_total_count")->updateUint(target->get("power_total_count")->asUint() + 1);
@@ -282,9 +320,9 @@ void ChargeManager::start_manager_task()
                                                                   v1->supported_current,
                                                                   v1->charging_time,
                                                                   target->get("allocated_current")->asUint()));
-            charge_manager_state.get("uptime")->updateUint(millis());
+            state.get("uptime")->updateUint(millis());
     }, [this](uint8_t client_id, uint8_t error){
-        auto target = charge_manager_state.get("chargers")->get(client_id);
+        auto target = state.get("chargers")->get(client_id);
         target->get("state")->updateUint(5);
         target->get("error")->updateUint(error);
     });
@@ -297,8 +335,8 @@ void ChargeManager::start_manager_task()
         if (i >= chargers->count())
             i = 0;
 
-        auto state = charge_manager_state.get("chargers")->get(i);
-        if(cm_networking.send_manager_update(i, state->get("allocated_current")->asUint(), state->get("cp_disconnect")->asBool()))
+        auto charger = state.get("chargers")->get(i);
+        if(cm_networking.send_manager_update(i, charger->get("allocated_current")->asUint(), charger->get("cp_disconnect")->asBool()))
             ++i;
 
     }, 0, cm_send_delay);
@@ -309,45 +347,45 @@ int idx_array[MAX_CLIENTS] = {0};
 void ChargeManager::setup()
 {
     uint32_t control_cycle_time_ms;
-    if (!api.restorePersistentConfig("charge_manager/config", &charge_manager_config)) {
-        charge_manager_config.get("maximum_available_current")->updateUint(0);
+    if (!api.restorePersistentConfig("charge_manager/config", &config)) {
+        config.get("maximum_available_current")->updateUint(0);
 #if MODULE_ENERGY_MANAGER_AVAILABLE()
-        apply_energy_manager_config(charge_manager_config);
+        apply_energy_manager_config(config);
         control_cycle_time_ms = 5 * 1000;
 #else
         control_cycle_time_ms = 10 * 1000;
 #endif
     }
 
-    charge_manager_config_in_use = charge_manager_config;
+    config_in_use = config;
 
-    max_avail_current = charge_manager_config_in_use.get("maximum_available_current")->asUint();
+    max_avail_current = config_in_use.get("maximum_available_current")->asUint();
 
-    if(!charge_manager_config_in_use.get("enable_charge_manager")->asBool() || charge_manager_config_in_use.get("chargers")->count() == 0) {
+    if(!config_in_use.get("enable_charge_manager")->asBool() || config_in_use.get("chargers")->count() == 0) {
         initialized = true;
         return;
     }
-    charge_manager_state.get("state")->updateUint(1);
+    state.get("state")->updateUint(1);
 
-    charge_manager_available_current.get("current")->updateUint(charge_manager_config_in_use.get("default_available_current")->asUint());
-    for (int i = 0; i < charge_manager_config_in_use.get("chargers")->count(); ++i) {
-        charge_manager_state.get("chargers")->add();
-        charge_manager_state.get("chargers")->get(i)->get("name")->updateString(charge_manager_config_in_use.get("chargers")->get(i)->get("name")->asString());
+    available_current.get("current")->updateUint(config_in_use.get("default_available_current")->asUint());
+    for (int i = 0; i < config_in_use.get("chargers")->count(); ++i) {
+        state.get("chargers")->add();
+        state.get("chargers")->get(i)->get("name")->updateString(config_in_use.get("chargers")->get(i)->get("name")->asString());
         idx_array[i] = i;
     }
 
-    for (int i = charge_manager_config_in_use.get("chargers")->count(); i < MAX_CLIENTS; ++i)
+    for (int i = config_in_use.get("chargers")->count(); i < MAX_CLIENTS; ++i)
         idx_array[i] = -1;
 
     start_manager_task();
 
     task_scheduler.scheduleWithFixedDelay([this](){this->distribute_current();}, control_cycle_time_ms, control_cycle_time_ms);
 
-    if (charge_manager_config_in_use.get("enable_watchdog")->asBool()) {
+    if (config_in_use.get("enable_watchdog")->asBool()) {
         task_scheduler.scheduleWithFixedDelay([this](){this->check_watchdog();}, 1000, 1000);
     }
 
-    if (charge_manager_config_in_use.get("verbose")->asBool())
+    if (config_in_use.get("verbose")->asBool())
         this->distribution_log = heap_alloc_array<char>(DISTRIBUTION_LOG_LEN);
 
     initialized = true;
@@ -358,17 +396,17 @@ void ChargeManager::check_watchdog()
     if (!deadline_elapsed(last_available_current_update + WATCHDOG_TIMEOUT_MS))
         return;
 
-    uint32_t default_available_current = this->charge_manager_config_in_use.get("default_available_current")->asUint();
+    uint32_t default_available_current = this->config_in_use.get("default_available_current")->asUint();
 
     logger.printfln("Charge manager watchdog triggered! Received no available current update for %d ms. Setting available current to %u mA", WATCHDOG_TIMEOUT_MS, default_available_current);
 
-    this->charge_manager_available_current.get("current")->updateUint(default_available_current);
+    this->available_current.get("current")->updateUint(default_available_current);
 
     last_available_current_update = millis();
 }
 
 bool ChargeManager::have_chargers() {
-    return charge_manager_state.get("chargers")->count() > 0;
+    return state.get("chargers")->count() > 0;
 }
 
 // Check is not 100% reliable after an uptime of 49 days because last_update might legitimately 0.
@@ -378,10 +416,10 @@ bool ChargeManager::seen_all_chargers() {
         return true;
 
     // Don't claim to have seen "all" chargers when none are configured.
-    if (charge_manager_state.get("chargers")->count() == 0)
+    if (state.get("chargers")->count() == 0)
         return false;
 
-    for (auto &charger : charge_manager_state.get("chargers")) {
+    for (auto &charger : state.get("chargers")) {
         if (charger.get("last_update")->asUint() == 0) {
             return false;
         }
@@ -393,7 +431,7 @@ bool ChargeManager::seen_all_chargers() {
 
 bool ChargeManager::is_charging_stopped(uint32_t last_update_cutoff)
 {
-    for (auto &charger : charge_manager_state.get("chargers")) {
+    for (auto &charger : state.get("chargers")) {
         if (!a_after_b(charger.get("last_update")->asUint(), last_update_cutoff)) {
             return false;
         }
@@ -408,12 +446,12 @@ bool ChargeManager::is_charging_stopped(uint32_t last_update_cutoff)
 
 void ChargeManager::set_all_control_pilot_disconnect(bool disconnect)
 {
-    charge_manager_control_pilot_disconnect.get("disconnect")->updateBool(disconnect);
+    control_pilot_disconnect.get("disconnect")->updateBool(disconnect);
 }
 
 bool ChargeManager::are_all_control_pilot_disconnected(uint32_t last_update_cutoff)
 {
-    for (auto &charger : charge_manager_state.get("chargers")) {
+    for (auto &charger : state.get("chargers")) {
         if (!a_after_b(charger.get("last_update")->asUint(), last_update_cutoff)) {
             return false;
         }
@@ -428,7 +466,7 @@ bool ChargeManager::are_all_control_pilot_disconnected(uint32_t last_update_cuto
 
 bool ChargeManager::is_control_pilot_disconnect_supported(uint32_t last_update_cutoff)
 {
-    for (auto &charger : charge_manager_state.get("chargers")) {
+    for (auto &charger : state.get("chargers")) {
         if (!a_after_b(charger.get("last_update")->asUint(), last_update_cutoff)) {
             return false;
         }
@@ -445,26 +483,26 @@ bool ChargeManager::is_control_pilot_disconnect_supported(uint32_t last_update_c
 
 void ChargeManager::distribute_current()
 {
-    uint32_t available_current_init = charge_manager_available_current.get("current")->asUint();
+    uint32_t available_current_init = available_current.get("current")->asUint();
     uint32_t available_current = available_current_init;
 
-    bool use_3phase_minimum_current = charge_manager_available_phases.get("phases")->asUint() >= 3;
-    uint32_t minimum_current = use_3phase_minimum_current ? charge_manager_config_in_use.get("minimum_current")->asUint() :
-                                                            charge_manager_config_in_use.get("minimum_current_1p")->asUint();
+    bool use_3phase_minimum_current = available_phases.get("phases")->asUint() >= 3;
+    uint32_t minimum_current = use_3phase_minimum_current ? config_in_use.get("minimum_current")->asUint() :
+                                                            config_in_use.get("minimum_current_1p")->asUint();
 
     bool print_local_log = false;
     char *local_log = distribution_log.get();
     if (local_log)
         local_log += snprintf(local_log, DISTRIBUTION_LOG_LEN - (local_log - distribution_log.get()), "Redistributing current%c", '\0');
 
-    auto chargers = charge_manager_state.get("chargers");
-    auto configs = charge_manager_config_in_use.get("chargers");
+    auto chargers = state.get("chargers");
+    auto configs = config_in_use.get("chargers");
 
     uint32_t current_array[MAX_CLIENTS] = {0};
 
     // Update control pilot disconnect
     {
-        bool disconnect_requested = charge_manager_control_pilot_disconnect.get("disconnect")->asBool();
+        bool disconnect_requested = control_pilot_disconnect.get("disconnect")->asBool();
         for (auto &charger : chargers) {
             charger.get("cp_disconnect")->updateBool(disconnect_requested);
         }
@@ -528,9 +566,9 @@ void ChargeManager::distribute_current()
             // Shut down everything.
             available_current = 0;
             LOCAL_LOG("%s", "stage 0: Unreachable, unreactive or misconfigured EVSE(s) found. Setting available current to 0 mA.");
-            charge_manager_state.get("state")->updateUint(2);
+            state.get("state")->updateUint(2);
         } else {
-            charge_manager_state.get("state")->updateUint(1);
+            state.get("state")->updateUint(1);
             if (last_print_local_log_was_error) {
                 last_print_local_log_was_error = false;
                 print_local_log = true;
@@ -555,8 +593,8 @@ void ChargeManager::distribute_current()
             }
         }
 
-        charge_manager_state.get("chargers_requesting_current")->updateInt(chargers_requesting_current);
-        charge_manager_state.get("chargers_requesting_current_low_priority")->updateInt(chargers_requesting_current_low_priority);
+        state.get("chargers_requesting_current")->updateInt(chargers_requesting_current);
+        state.get("chargers_requesting_current_low_priority")->updateInt(chargers_requesting_current_low_priority);
 
         LOCAL_LOG("%d charger%s request%s current. %u mA available.",
                   chargers_requesting_current,
@@ -565,7 +603,7 @@ void ChargeManager::distribute_current()
                   available_current);
 
         std::stable_sort(idx_array, idx_array + chargers->count(), [&chargers](int left, int right) {
-            return chargers->get(left)->get("supported_current")->asUint() < chargers->get(right)->get("supported_current")->asUint();
+            return chargers->get(left)->get("requested_current")->asUint() < chargers->get(right)->get("requested_current")->asUint();
         });
 
         std::stable_sort(idx_array, idx_array + chargers->count(), [&chargers](int left, int right) {
@@ -632,12 +670,12 @@ void ChargeManager::distribute_current()
                 auto charger = chargers->get(idx_array[i]);
                 uint16_t current_per_charger = MIN(32000, available_current / (chargers_allocated_current_to - chargers_reallocated));
 
-                uint16_t supported_current = charger->get("supported_current")->asUint();
+                uint16_t requested_current = charger->get("requested_current")->asUint();
                 // Protect against overflow.
-                if (supported_current < current_array[idx_array[i]])
+                if (requested_current < current_array[idx_array[i]])
                     continue;
 
-                uint16_t current_to_add = MIN(supported_current - current_array[idx_array[i]], current_per_charger);
+                uint16_t current_to_add = MIN(requested_current - current_array[idx_array[i]], current_per_charger);
 
                 ++chargers_reallocated;
 
@@ -791,7 +829,7 @@ void ChargeManager::distribute_current()
         }
     }
 
-    charge_manager_state.get("allocated_current")->updateUint(available_current_init - available_current);
+    state.get("allocated_current")->updateUint(available_current_init - available_current);
 
     if (allocated_current_callback) {
         // Inform callback about how much current we distributed to chargers.
@@ -805,23 +843,23 @@ void ChargeManager::set_allocated_current_callback(std::function<void(uint32_t)>
 
 void ChargeManager::register_urls()
 {
-    api.addPersistentConfig("charge_manager/config", &charge_manager_config, {}, 1000);
-    api.addState("charge_manager/state", &charge_manager_state, {}, 1000);
+    api.addPersistentConfig("charge_manager/config", &config, {}, 1000);
+    api.addState("charge_manager/state", &state, {}, 1000);
 
-    api.addState("charge_manager/available_current", &charge_manager_available_current, {}, 1000);
-    api.addCommand("charge_manager/available_current_update", &charge_manager_available_current_update, {}, [this](){
-        uint32_t current = this->charge_manager_available_current_update.get("current")->asUint();
-        this->charge_manager_available_current.get("current")->updateUint(current);
+    api.addState("charge_manager/available_current", &available_current, {}, 1000);
+    api.addCommand("charge_manager/available_current_update", &available_current_update, {}, [this](){
+        uint32_t current = this->available_current_update.get("current")->asUint();
+        this->available_current.get("current")->updateUint(current);
         this->last_available_current_update = millis();
     }, false);
 
-    api.addState("charge_manager/available_phases", &charge_manager_available_phases, {}, 1000);
-    api.addCommand("charge_manager/available_phases_update", &charge_manager_available_phases_update, {}, [this](){
-        uint32_t phases = this->charge_manager_available_phases_update.get("phases")->asUint();
-        this->charge_manager_available_phases.get("phases")->updateUint(phases);
+    api.addState("charge_manager/available_phases", &available_phases, {}, 1000);
+    api.addCommand("charge_manager/available_phases_update", &available_phases_update, {}, [this](){
+        uint32_t phases = this->available_phases_update.get("phases")->asUint();
+        this->available_phases.get("phases")->updateUint(phases);
         logger.printfln("charge_manager: Available phases: %u", phases);
     }, false);
 
-    //api.addState("charge_manager/control_pilot_disconnect", &charge_manager_control_pilot_disconnect, {}, 1000);
-    //api.addCommand("charge_manager/control_pilot_disconnect_update", &charge_manager_control_pilot_disconnect, {}, [](){}, false);
+    //api.addState("charge_manager/control_pilot_disconnect", &control_pilot_disconnect, {}, 1000);
+    //api.addCommand("charge_manager/control_pilot_disconnect_update", &control_pilot_disconnect, {}, [](){}, false);
 }
