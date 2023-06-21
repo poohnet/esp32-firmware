@@ -20,30 +20,35 @@
 #pragma once
 
 #include <stdint.h>
-#include "ArduinoJson.h"
+
+#include "bindings/bricklet_rs485.h"
 
 #include "config.h"
 #include "module.h"
 
-class MqttMeter final : public IModule
+class ModbusMeterSimulator final : public IModule
 {
 public:
-    MqttMeter(){}
+    ModbusMeterSimulator(){}
     void pre_setup() override;
     void setup() override;
     void register_urls() override;
 
-    void onMqttConnect();
-    bool onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain);
+private:
+    void setupRS485();
+    void checkRS485State();
 
+    void modbus_slave_write_multiple_registers_request_handler(uint8_t request_id, uint32_t starting_address, uint16_t *registers, uint16_t registers_length);
+    void modbus_slave_read_holding_registers_request_handler(uint8_t request_id, uint32_t starting_address, uint16_t count);
+    void modbus_slave_read_input_registers_request_handler(uint8_t request_id, uint32_t starting_address, uint16_t count);
+
+    ConfigRoot state;
     ConfigRoot config;
 
-private:
-    void handle_mqtt_values(const JsonDocument &doc);
-    void handle_mqtt_all_values(const JsonDocument &doc);
+    TF_RS485 bricklet;
 
-    bool enabled = false;
-    uint8_t mqtt_meter_type = 0;
-    String source_meter_values_topic;
-    String source_meter_all_values_topic;
+    uint16_t write_registers_callback_buffer[123];
+
+    uint16_t meter_id = 0;
+    float system_type = 3.0f;
 };

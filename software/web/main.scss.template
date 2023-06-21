@@ -528,9 +528,17 @@ body {
 
 .em-energy-analysis-chart {
     position: relative;
-    aspect-ratio: 2;
+    aspect-ratio: 3;
 }
 
 .d-flex-ni {
     display: flex;
+}
+
+.u-hide-first-series-in-legend .u-legend .u-series:first-child {
+    display: none;
+}
+
+.u-time-in-legend-alone .u-legend .u-series:first-child {
+    display: block;
 }
