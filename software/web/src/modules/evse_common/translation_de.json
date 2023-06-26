@@ -125,7 +125,6 @@
         "script": {
             "error_code": "Fehlercode",
             "set_charging_current_failed": "Konnte Ladestrom nicht setzen",
-            "auto_start_charging_update": "Manuelle Ladefregabe (de)aktivieren fehlgeschlagen.",
             "start_charging_failed": "Ladestart auslösen fehlgeschlagen",
             "stop_charging_failed": "Ladestop auslösen fehlgeschlagen",
             "tab_close_warning": "Die Aufzeichnung des Ladecontroller-Logs wird abgebrochen, wenn der Tab geschlossen wird.",
@@ -140,15 +139,16 @@
             "debug_stopped": "Aufzeichnung des Ladecontroller-Logs gestoppt.",
             "debug_done": "Abgeschlossen.",
 
+            "acc_blocked": "Blockiert",
             "by": "durch",
 
-            "save_failed": "(De-)Aktivieren des Lastmanagements fehlgeschlagen",
+            "save_failed": "Speichern der Ladeeinstellungen fehlgeschlagen",
 
             "reset_slot_failed": "Freigeben der Stromgrenze fehlgeschlagen",
 
-            "slot_disabled": "nicht aktiv",
-            "slot_blocks": "blockiert",
-            "slot_no_limit": "freigegeben",
+            "slot_disabled": "Nicht aktiv",
+            "slot_blocks": "Blockiert",
+            "slot_no_limit": "Freigegeben",
 
             "slot_0": "Zuleitung",
             "slot_1": "Ladekabel",

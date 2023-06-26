@@ -57,7 +57,7 @@ interface EVSESSettingsState {
     boost_mode: API.getType['evse/boost_mode'];
     auto_start_charging: API.getType['evse/auto_start_charging'];
     require_meter_enabled: API.getType['require_meter/config'];
-    led_config: API.getType['evse/led_config'];
+    led_configuration: API.getType['evse/led_configuration'];
     meter_abs: number
     evse_uptime: number
 }
@@ -396,6 +396,10 @@ export class EVSEV2 extends Component<{}, EVSEState> {
                             <InputText value={util.format_timespan(Math.floor(ll_state.charging_time / 1000))}/>
                         </FormRow>
 
+                        <FormRow label={__("evse.content.time_since_dc_fault_check")}>
+                            <InputText value={util.format_timespan(Math.floor(ll_state.time_since_dc_fault_check / 1000.0))}/>
+                        </FormRow>
+
                         <FormRow label={__("evse.content.reset_description")} label_muted={__("evse.content.reset_description_muted")}>
                         <div class="input-group pb-2">
                             <Button variant="primary" className="form-control rounded-right mr-2" onClick={() => API.call('evse/reset', {}, "")}>{__("evse.content.reset_evse")}</Button>
@@ -454,8 +458,8 @@ class EVSEV2Settings extends ConfigComponent<"charge_limits/default_limits", {},
             this.setState({require_meter_enabled: API.get("require_meter/config")});
         })
 
-        util.addApiEventListener("evse/led_config", () => {
-            this.setState({led_config: API.get("evse/led_config")});
+        util.addApiEventListener("evse/led_configuration", () => {
+            this.setState({led_configuration: API.get("evse/led_configuration")});
         })
     }
 
@@ -467,7 +471,7 @@ class EVSEV2Settings extends ConfigComponent<"charge_limits/default_limits", {},
         await API.save('evse/ev_wakeup', {"enabled": this.state.ev_wakeup.enabled}, __("evse.script.save_failed"));
         await API.save('evse/boost_mode', {"enabled": this.state.boost_mode.enabled}, __("evse.script.save_failed"));
         await API.save('require_meter/config', {"config": this.state.require_meter_enabled.config}, __("evse.script.save_failed"));
-        await API.save('evse/led_config', this.state.led_config, __("evse.script.save_failed"));
+        await API.save('evse/led_configuration', this.state.led_configuration, __("evse.script.save_failed"));
         super.sendSave(t, cfg);
     }
 
@@ -481,7 +485,7 @@ class EVSEV2Settings extends ConfigComponent<"charge_limits/default_limits", {},
         await API.save('evse/ev_wakeup', {"enabled": true}, __("evse.script.save_failed"));
         await API.save('evse/boost_mode', {"enabled": false}, __("evse.script.save_failed"));
         await API.reset('require_meter/config', __("evse.script.save_failed"));
-        await API.reset('evse/led_config', __("evse.script.save_failed"));
+        await API.reset('evse/led_configuration', __("evse.script.save_failed"));
         super.sendReset(t);
     }
 
@@ -498,7 +502,7 @@ class EVSEV2Settings extends ConfigComponent<"charge_limits/default_limits", {},
             boost_mode,
             auto_start_charging,
             require_meter_enabled,
-            led_config} = s;
+            led_configuration} = s;
 
         const has_meter = API.hasFeature("meter");
 
@@ -550,10 +554,37 @@ class EVSEV2Settings extends ConfigComponent<"charge_limits/default_limits", {},
                     </FormRow>
 
                     <FormRow label={__("evse.content.enable_led_api")}>
-                        <Switch onClick={async () => this.setState({led_config: {enable_api: !led_config.enable_api}})}
-                                checked={led_config.enable_api}
+                        <Switch onClick={async () => this.setState({led_configuration: {enable_api: !led_configuration.enable_api}})}
+                                checked={led_configuration.enable_api}
                                 desc={__("evse.content.enable_led_api_desc")}/>
                     </FormRow>
+
+                    <FormRow label={__("evse.content.boost_mode_desc")} label_muted={__("evse.content.boost_mode_desc_muted")}>
+                        <Switch desc={__("evse.content.boost_mode")}
+                                checked={boost_mode.enabled}
+                                onClick={async () => this.setState({boost_mode: {enabled: !boost_mode.enabled}})}/>
+                    </FormRow>
+
+                    {require_meter_enabled.config != 0 ? require_meter : <></>}
+
+                    <FormRow label={__("charge_limits.content.duration")} label_muted={__("charge_limits.content.duration_muted")}>
+                        <InputSelect items={[
+                            ["0", __("charge_limits.content.unlimited")],
+                            ["1", __("charge_limits.content.min15")],
+                            ["2", __("charge_limits.content.min30")],
+                            ["3", __("charge_limits.content.min45")],
+                            ["4", __("charge_limits.content.h1")],
+                            ["5", __("charge_limits.content.h2")],
+                            ["6", __("charge_limits.content.h3")],
+                            ["7", __("charge_limits.content.h4")],
+                            ["8", __("charge_limits.content.h6")],
+                            ["9", __("charge_limits.content.h8")],
+                            ["10", __("charge_limits.content.h12")]
+                        ]}
+                        value={s.duration}
+                        onValue={(v) => this.setState({duration: Number(v)})}/>
+                    </FormRow>
+                    {has_meter ? energy_settings : <></>}
 
                     <FormRow label={__("evse.content.button_configuration")} label_muted={__("evse.content.button_configuration_muted")}>
                         <InputSelect items={[
@@ -634,33 +665,6 @@ class EVSEV2Settings extends ConfigComponent<"charge_limits/default_limits", {},
                                 checked={ev_wakeup.enabled}
                                 onClick={async () => this.setState({ev_wakeup: {enabled: !ev_wakeup.enabled}})}/>
                     </FormRow>
-
-                    <FormRow label={__("evse.content.boost_mode_desc")} label_muted={__("evse.content.boost_mode_desc_muted")}>
-                        <Switch desc={__("evse.content.boost_mode")}
-                                checked={boost_mode.enabled}
-                                onClick={async () => this.setState({boost_mode: {enabled: !boost_mode.enabled}})}/>
-                    </FormRow>
-
-                    {require_meter_enabled.config != 0 ? require_meter : <></>}
-
-                    <FormRow label={__("charge_limits.content.duration")} label_muted={__("charge_limits.content.duration_muted")}>
-                        <InputSelect items={[
-                            ["0", __("charge_limits.content.unlimited")],
-                            ["1", __("charge_limits.content.min15")],
-                            ["2", __("charge_limits.content.min30")],
-                            ["3", __("charge_limits.content.min45")],
-                            ["4", __("charge_limits.content.h1")],
-                            ["5", __("charge_limits.content.h2")],
-                            ["6", __("charge_limits.content.h3")],
-                            ["7", __("charge_limits.content.h4")],
-                            ["8", __("charge_limits.content.h6")],
-                            ["9", __("charge_limits.content.h8")],
-                            ["10", __("charge_limits.content.h12")]
-                        ]}
-                        value={s.duration}
-                        onValue={(v) => this.setState({duration: Number(v)})}/>
-                    </FormRow>
-                    {has_meter ? energy_settings : <></>}
                 </ConfigForm>
         </>;
     }

@@ -42,6 +42,7 @@ export interface low_level_state {
     charging_time: number,
     time_since_state_change: number,
     uptime: number,
+    time_since_dc_fault_check: number,
 }
 
 export interface external_current {
@@ -113,6 +114,6 @@ export interface identity {
     device_identifier: number
 }
 
-export interface led_config {
+export interface led_configuration {
     enable_api: boolean
 }

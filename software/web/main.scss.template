@@ -486,13 +486,13 @@ body {
 }
 
 @include media-breakpoint-only(xs) {
-    .config-header {
+    .page-header {
         font-size: 1.75rem;
     }
 }
 
 @include media-breakpoint-up(sm) {
-    .config-header {
+    .page-header {
         font-size: 2rem;
     }
 }
@@ -528,7 +528,14 @@ body {
 
 .em-energy-analysis-chart {
     position: relative;
-    aspect-ratio: 3;
+    aspect-ratio: 1.5;
+}
+
+@include media-breakpoint-up(md) {
+    .em-energy-analysis-chart {
+        position: relative;
+        aspect-ratio: 3;
+    }
 }
 
 .d-flex-ni {
@@ -539,6 +546,19 @@ body {
     display: none;
 }
 
+.u-time-in-legend-alone .u-legend .u-series:first-child th {
+    cursor: default;
+}
+
 .u-time-in-legend-alone .u-legend .u-series:first-child {
     display: block;
+}
+
+.u-time-in-legend-alone .u-legend .u-marker {
+    display: none;
+}
+
+table ul {
+    margin-bottom: 0 !important;
+    padding-left: 1rem !important;
 }

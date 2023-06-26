@@ -93,7 +93,8 @@ void EVSEV2::pre_setup()
             }, new Config{Config::Bool(false)}, 24, 24, Config::type_id<Config::ConfBool>())},
         {"charging_time", Config::Uint32(0)},
         {"time_since_state_change", Config::Uint32(0)},
-        {"uptime", Config::Uint32(0)}
+        {"uptime", Config::Uint32(0)},
+        {"time_since_dc_fault_check", Config::Uint32(0)}
     });
 
     energy_meter_values = Config::Object({
@@ -258,7 +259,7 @@ void EVSEV2::pre_setup()
     require_meter_enabled_update = require_meter_enabled;
 
     gp_output = Config::Object({
-        {"high_impedance", Config::Uint(0, 0, 1)}
+        {"gp_output", Config::Uint(0, 0, 1)}
     });
 
     gp_output_update = gp_output;
@@ -577,7 +578,7 @@ String EVSEV2::get_evse_debug_header()
            "unused (16),"
            "unused (17),"
            "unused (18),"
-           "unused (19),"
+           "unused (19)"
            "\"";
 }
 
@@ -602,7 +603,7 @@ String EVSEV2::get_evse_debug_line()
     bool phases_connected[3];
     uint32_t error_count[6];
 
-    // get_low_level_state - 57 byte
+    // get_low_level_state - 61 byte
     uint8_t led_state;
     uint16_t cp_pwm_duty_cycle;
     uint16_t adc_values[7];
@@ -611,6 +612,7 @@ String EVSEV2::get_evse_debug_line()
     bool gpio[24];
     uint32_t charging_time;
     uint32_t time_since_state_change;
+    uint32_t time_since_dc_fault_check;
     uint32_t uptime;
 
     // get_all_charging_slots - 60 byte
@@ -652,6 +654,7 @@ String EVSEV2::get_evse_debug_line()
                                         gpio,
                                         &charging_time,
                                         &time_since_state_change,
+                                        &time_since_dc_fault_check,
                                         &uptime);
 
     if (rc != TF_E_OK) {
@@ -1132,7 +1135,7 @@ void EVSEV2::register_urls()
 
     api.addState("evse/gp_output", &gp_output, {}, 1000);
     api.addCommand("evse/gp_output_update", &gp_output_update, {}, [this](){
-        is_in_bootloader(tf_evse_v2_set_gp_output(&device, gp_output_update.get("high_impedance")->asUint()));
+        is_in_bootloader(tf_evse_v2_set_gp_output(&device, gp_output_update.get("gp_output")->asUint()));
     }, true);
 
     this->DeviceModule::register_urls();
@@ -1200,7 +1203,7 @@ void EVSEV2::update_all_data()
     bool cp_disconnect;
     bool boost_mode_enabled;
 
-    // get_low_level_state - 57 byte
+    // get_low_level_state - 61 byte
     uint8_t led_state;
     uint16_t cp_pwm_duty_cycle;
     uint16_t adc_values[7];
@@ -1209,6 +1212,7 @@ void EVSEV2::update_all_data()
     bool gpio[24];
     uint32_t charging_time;
     uint32_t time_since_state_change;
+    uint32_t time_since_dc_fault_check;
     uint32_t uptime;
 
     // get_all_charging_slots - 60 byte
@@ -1270,6 +1274,7 @@ void EVSEV2::update_all_data()
                                         gpio,
                                         &charging_time,
                                         &time_since_state_change,
+                                        &time_since_dc_fault_check,
                                         &uptime);
 
     if (rc != TF_E_OK) {
@@ -1372,6 +1377,7 @@ void EVSEV2::update_all_data()
     low_level_state.get("charging_time")->updateUint(charging_time);
     low_level_state.get("time_since_state_change")->updateUint(time_since_state_change);
     low_level_state.get("uptime")->updateUint(uptime);
+    low_level_state.get("time_since_dc_fault_check")->updateUint(time_since_dc_fault_check);
 
     for (int i = 0; i < CHARGING_SLOT_COUNT; ++i) {
         slots.get(i)->get("max_current")->updateUint(max_current[i]);
@@ -1448,7 +1454,7 @@ void EVSEV2::update_all_data()
 
     require_meter_enabled.get("enabled")->updateBool(SLOT_ACTIVE(active_and_clear_on_disconnect[CHARGING_SLOT_REQUIRE_METER]));
 
-    gp_output.get("high_impedance")->updateUint(gpio[10] ? TF_EVSE_V2_OUTPUT_HIGH_IMPEDANCE : TF_EVSE_V2_OUTPUT_CONNECTED_TO_GROUND);
+    gp_output.get("gp_output")->updateUint(gpio[10] ? TF_EVSE_V2_OUTPUT_CONNECTED_TO_GROUND : TF_EVSE_V2_OUTPUT_HIGH_IMPEDANCE);
 
 #if MODULE_WATCHDOG_AVAILABLE()
     static size_t watchdog_handle = watchdog.add("evse_v2_all_data", "EVSE not reachable");

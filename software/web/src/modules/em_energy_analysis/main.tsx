@@ -43,11 +43,13 @@ interface UplotData extends CachedData {
     keys: string[];
     names: string[];
     values: number[][];
+    extras?: number[][];
     stacked: boolean[];
     bars: boolean[];
     value_names?: {[id: number]: string}[];
     value_strokes?: {[id: number]: string}[];
     value_fills?: {[id: number]: string}[];
+    extra_names?: {[id: number]: string}[];
     default_visibilty?: boolean[];
 }
 
@@ -261,6 +263,7 @@ interface UplotFlagsWrapperProps {
     legend_div_ref: RefObject<HTMLDivElement>;
     x_format: Intl.DateTimeFormatOptions;
     x_padding_factor: number;
+    y_sync_ref?: RefObject<UplotWrapper>;
 }
 
 class UplotFlagsWrapper extends Component<UplotFlagsWrapperProps, {}> {
@@ -271,9 +274,10 @@ class UplotFlagsWrapper extends Component<UplotFlagsWrapperProps, {}> {
     visible: boolean = false;
     div_ref = createRef();
     observer: ResizeObserver;
-    bar_height = 20;
-    bar_spacing = 5;
-    x_axis_height = 30;
+    bar_height: number = 20;
+    bar_spacing: number = 5;
+    y_size: number = 0;
+    y_other_size: number = 0;
 
     shouldComponentUpdate() {
         return false;
@@ -332,7 +336,10 @@ class UplotFlagsWrapper extends Component<UplotFlagsWrapperProps, {}> {
             ],
             axes: [
                 {
-                    size: this.x_axis_height,
+                    size: 1,// with size = 0 the width of the whole plot changes relative to the power plot
+                    ticks: {
+                        size: 0
+                    },
                     incrs: [
                         60,
                         60 * 2,
@@ -357,18 +364,40 @@ class UplotFlagsWrapper extends Component<UplotFlagsWrapperProps, {}> {
                     side: 0,
                 },
                 {
-                    size: 80,
+                    size: (self: uPlot, values: string[], axisIdx: number, cycleNum: number): number => {
+                        let size = 0;
+
+                        if (values) {
+                            self.ctx.save();
+                            self.ctx.font = self.axes[axisIdx].font;
+
+                            for (let i = 0; i < values.length; ++i) {
+                                size = Math.max(size, self.ctx.measureText(values[i]).width);
+                            }
+
+                            self.ctx.restore();
+                        }
+
+                        this.y_size = Math.ceil(size / devicePixelRatio) + 10;
+                        size = Math.max(this.y_size, this.y_other_size);
+
+                        if (this.props.y_sync_ref && this.props.y_sync_ref.current) {
+                            this.props.y_sync_ref.current.set_y_other_size(this.y_size);
+                        }
+
+                        return size;
+                    },
                 },
             ],
             scales: {
                 x: {
-                    range: (self: uPlot, from: number, to: number): uPlot.Range.MinMax => {
-                        let pad = (to - from) * this.props.x_padding_factor;
-                        return [from - pad, to + pad];
+                    range: (self: uPlot, initMin: number, initMax: number, scaleKey: string): uPlot.Range.MinMax => {
+                        let pad = (initMax - initMin) * this.props.x_padding_factor;
+                        return [initMin - pad, initMax + pad];
                     },
                 },
             },
-            padding: [null, null, 0, null] as uPlot.Padding,
+            padding: [null, 5, 0, null] as uPlot.Padding,
             legend: {
                 mount: (self: uPlot, legend: HTMLElement) => {
                     if (this.props.legend_div_ref.current) {
@@ -390,6 +419,15 @@ class UplotFlagsWrapper extends Component<UplotFlagsWrapperProps, {}> {
                             this.resize();
                         },
                         addSeries: (self: uPlot, seriesIdx: number) => {
+                            if (this.data && this.data.keys[seriesIdx].startsWith('wb_state_')) {
+                                let series = document.querySelectorAll('.u-time-in-legend-alone .u-legend .u-series');
+                                let element = series[seriesIdx] as HTMLElement;
+
+                                if (element) {
+                                    element.style.display = 'none';
+                                }
+                            }
+
                             this.resize();
                         },
                         delSeries: (self: uPlot, seriesIdx: number) => {
@@ -452,7 +490,19 @@ class UplotFlagsWrapper extends Component<UplotFlagsWrapperProps, {}> {
 
         return {
             width: div.clientWidth,
-            height: count * this.bar_height + Math.max(count - 1, 0) * this.bar_spacing + this.x_axis_height,
+            height: 1 + count * this.bar_height + Math.max(count - 1, 0) * this.bar_spacing + 17,
+        }
+    }
+
+    set_y_other_size(size: number) {
+        if (this.y_other_size == size) {
+            return;
+        }
+
+        this.y_other_size = size;
+
+        if (this.y_other_size != this.y_size) {
+            this.resize();
         }
     }
 
@@ -551,10 +601,13 @@ interface UplotWrapperProps {
     x_padding_factor: number;
     y_min?: number;
     y_max?: number;
-    y_step?: number;
     y_unit: string;
+    y_label: string;
     y_digits: number;
+    y_skip_upper?: boolean;
+    y_sync_ref?: RefObject<UplotFlagsWrapper>;
     default_fill?: boolean;
+    padding?: uPlot.Padding;
 }
 
 class UplotWrapper extends Component<UplotWrapperProps, {}> {
@@ -565,6 +618,11 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
     visible: boolean = false;
     div_ref = createRef();
     observer: ResizeObserver;
+    y_min: number = 0;
+    y_max: number = 0;
+    y_size: number = 0;
+    y_other_size: number = 0;
+    y_label_size: number = 20;
 
     shouldComponentUpdate() {
         return false;
@@ -593,22 +651,14 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             this.visible = false;
         });
 
-        let get_size = () => {
-            let div = this.div_ref.current;
-            let aspect_ratio = parseFloat(getComputedStyle(div).aspectRatio);
+        let padding: uPlot.Padding = this.props.padding;
 
-            if (isNaN(aspect_ratio)) {
-                aspect_ratio = this.props.aspect_ratio;
-            }
-
-            return {
-                width: div.clientWidth,
-                height: Math.floor((div.clientWidth + (window.innerWidth - document.documentElement.clientWidth)) / aspect_ratio),
-            }
+        if (!padding) {
+            padding = [null, null, null, null] as uPlot.Padding;
         }
 
         let options = {
-            ...get_size(),
+            ...this.get_size(),
             pxAlign: 0,
             cursor: {
                 drag: {
@@ -661,34 +711,60 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                     },
                 },
                 {
-                    size: 80,
+                    label: this.props.y_label,
+                    labelSize: this.y_label_size,
+                    labelGap: 2,
+                    labelFont: 'bold 14px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
+                    size: (self: uPlot, values: string[], axisIdx: number, cycleNum: number): number => {
+                        let size = 0;
+
+                        if (values) {
+                            self.ctx.save();
+                            self.ctx.font = self.axes[axisIdx].font;
+
+                            for (let i = 0; i < values.length; ++i) {
+                                size = Math.max(size, self.ctx.measureText(values[i]).width);
+                            }
+
+                            self.ctx.restore();
+                        }
+
+                        this.y_size = Math.ceil(size / devicePixelRatio) + 20;
+                        size = Math.max(this.y_size + this.y_label_size, this.y_other_size) - this.y_label_size;
+
+                        if (this.props.y_sync_ref && this.props.y_sync_ref.current) {
+                            this.props.y_sync_ref.current.set_y_other_size(this.y_size + this.y_label_size);
+                        }
+
+                        return size;
+                    },
                     values: (self: uPlot, splits: number[]) => {
                         let values: string[] = new Array(splits.length);
 
                         for (let i = 0; i < splits.length; ++i) {
-                            values[i] = util.toLocaleFixed(splits[i], this.props.y_digits);
+                            if (this.props.y_skip_upper && splits[i] >= this.y_max) {
+                                values[i] = '';
+                            }
+                            else {
+                                values[i] = util.toLocaleFixed(splits[i], this.props.y_digits);
+                            }
                         }
 
                         return values;
                     },
-                }
+                },
             ],
             scales: {
                 x: {
-                    range: (self: uPlot, from: number, to: number): uPlot.Range.MinMax => {
-                        let pad = (to - from) * this.props.x_padding_factor;
-                        return [from - pad, to + pad];
+                    range: (self: uPlot, initMin: number, initMax: number, scaleKey: string): uPlot.Range.MinMax => {
+                        let pad = (initMax - initMin) * this.props.x_padding_factor;
+                        return [initMin - pad, initMax + pad];
                     },
                 },
                 y: {
-                    range: {
-                        min: {
-                            mode: 1 as uPlot.Range.SoftMode,
-                        },
-                        max: {
-                            mode: 1 as uPlot.Range.SoftMode,
-                        },
-                    },
+                    range: (self: uPlot, initMin: number, initMax: number, scaleKey: string): uPlot.Range.MinMax => {
+                        return uPlot.rangeNum(this.y_min, this.y_max, {min: {}, max: {}});
+                    }
                 },
             },
             legend: {
@@ -698,12 +774,24 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                     }
                 },
             },
+            padding: padding,
             plugins: [
                 {
                     hooks: {
                         setSeries: (self: uPlot, seriesIdx: number, opts: uPlot.Series) => {
                             this.series_visibility[this.data.keys[seriesIdx]] = opts.show;
                             this.update_internal_data();
+
+                            if (this.props.y_sync_ref && this.props.y_sync_ref.current && this.data.keys[seriesIdx].startsWith('wb_power_')) {
+                                let key = this.data.keys[seriesIdx].replace('_power_', '_state_');
+
+                                for (let i = 1; i < this.props.y_sync_ref.current.data.keys.length; ++i) {
+                                    if (this.props.y_sync_ref.current.data.keys[i] == key) {
+                                        this.props.y_sync_ref.current.uplot.setSeries(i, {show: opts.show});
+                                        break;
+                                    }
+                                }
+                            }
                         },
                         drawAxes: [
                             (self: uPlot) => {
@@ -735,7 +823,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                                 ctx.translate(-offset, -offset);
 
                                 ctx.restore();
-                            }
+                            },
                         ],
                     },
                 },
@@ -745,29 +833,19 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
         let div = this.div_ref.current;
         this.uplot = new uPlot(options, [], div);
 
-        let resize = () => {
-            let size = get_size();
-
-            if (size.width == 0 || size.height == 0) {
-                return;
-            }
-
-            this.uplot.setSize(size);
-        };
-
         try {
             this.observer = new ResizeObserver(() => {
-                resize();
+                this.resize();
             });
 
             this.observer.observe(div);
         } catch (e) {
             setInterval(() => {
-                resize();
+                this.resize();
             }, 500);
 
             window.addEventListener("resize", e => {
-                resize();
+                this.resize();
             });
         }
 
@@ -778,6 +856,42 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
 
     render(props?: UplotWrapperProps, state?: Readonly<{}>, context?: any): ComponentChild {
         return <div ref={this.div_ref} class={props.class} style={`display: ${props.show ? 'block' : 'none'}; visibility: hidden;`} />;
+    }
+
+    resize() {
+        let size = this.get_size();
+
+        if (size.width == 0 || size.height == 0) {
+            return;
+        }
+
+        this.uplot.setSize(size);
+    };
+
+    get_size() {
+        let div = this.div_ref.current;
+        let aspect_ratio = parseFloat(getComputedStyle(div).aspectRatio);
+
+        if (isNaN(aspect_ratio)) {
+            aspect_ratio = this.props.aspect_ratio;
+        }
+
+        return {
+            width: div.clientWidth,
+            height: Math.floor((div.clientWidth + (window.innerWidth - document.documentElement.clientWidth)) / aspect_ratio),
+        }
+    }
+
+    set_y_other_size(size: number) {
+        if (this.y_other_size == size) {
+            return;
+        }
+
+        this.y_other_size = size;
+
+        if (this.y_other_size != this.y_size) {
+            this.resize();
+        }
     }
 
     set_loading() {
@@ -807,7 +921,13 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             label: this.props.legend_value_prefix + (name ? ' ' + name: ''),
             value: (self: uPlot, rawValue: number, seriesIdx: number, idx: number | null) => {
                 if (rawValue !== null) {
-                    return util.toLocaleFixed(this.data.values[seriesIdx][idx], this.props.y_digits) + " " + this.props.y_unit;
+                    let prefix = '';
+
+                    if (this.data.extras && this.data.extra_names && this.data.extra_names[seriesIdx]) {
+                        prefix = this.data.extra_names[seriesIdx][this.data.extras[seriesIdx][idx]] + ' / ';
+                    }
+
+                    return prefix + util.toLocaleFixed(this.data.values[seriesIdx][idx], this.props.y_digits) + " " + this.props.y_unit;
                 }
 
                 return null;
@@ -829,7 +949,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
 
         this.uplot.delBand(null);
 
-        for (let i = 1; i < this.data.values.length; ++i) {
+        for (let i = this.data.values.length - 1; i > 0; --i) {
             if (!this.data.stacked[i]) {
                 for (let k = 0; k < this.data.values[i].length; ++k) {
                     let value = this.data.values[i][k];
@@ -884,21 +1004,15 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             y_max = y_min;
         }
 
-        let y_step = this.props.y_step;
-
-        if (y_step !== undefined) {
-            y_min = Math.floor(y_min / y_step) * y_step;
-            y_max = Math.ceil(y_max / y_step) * y_step;
-        }
-
-        this.uplot.setScale('y', {min: y_min, max: y_max});
+        this.y_min = y_min;
+        this.y_max = y_max;
 
         let uplot_values: number[][] = [];
         last_stacked_values = [];
 
-        for (let i = 0; i < this.data.keys.length; ++i) {
+        for (let i = this.data.values.length - 1; i >= 0; --i) {
             if (!this.data.stacked[i] || !this.series_visibility[this.data.keys[i]]) {
-                uplot_values.push(this.data.values[i]);
+                uplot_values.unshift(this.data.values[i]);
             }
             else {
                 let stacked_values: number[] = new Array(this.data.values[i].length);
@@ -914,7 +1028,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                     }
                 }
 
-                uplot_values.push(stacked_values);
+                uplot_values.unshift(stacked_values);
                 last_stacked_values = stacked_values;
             }
         }
@@ -923,7 +1037,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
 
         let last_stacked_index: number = null;
 
-        for (let i = 1; i < this.data.keys.length; ++i) {
+        for (let i = this.data.values.length - 1; i > 0; --i) {
             if (this.data.stacked[i] && this.series_visibility[this.data.keys[i]]) {
                 if (last_stacked_index === null) {
                     this.uplot.delSeries(i);
@@ -1043,8 +1157,10 @@ export class EMEnergyAnalysisStatus extends Component<{}, {force_render: number}
                                               y_min={0}
                                               y_max={1500}
                                               y_unit={"W"}
+                                              y_label={__("em_energy_analysis.script.power") + " [Watt]"}
                                               y_digits={0}
-                                              default_fill={true} />
+                                              default_fill={true}
+                                              padding={[null, 15, null, 5] as uPlot.Padding} />
                             </UplotLoader>
                         </div>
                     </div>
@@ -1412,7 +1528,17 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return;
         }
 
-        uplot_data = {update_timestamp: now, use_timestamp: now, keys: [null], names: [null], values: [null], stacked: [false], bars: [false]};
+        uplot_data = {
+            update_timestamp: now,
+            use_timestamp: now,
+            keys: [null],
+            names: [null],
+            values: [null],
+            extras: [null],
+            stacked: [false],
+            bars: [false],
+            extra_names: [null],
+        };
 
         let slot_count: number = 0;
         let energy_manager_data = this.energy_manager_5min_cache[key];
@@ -1423,8 +1549,10 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             uplot_data.keys.push('em_power');
             uplot_data.names.push(__("em_energy_analysis.script.grid_connection"));
             uplot_data.values.push(energy_manager_data.power_grid);
+            uplot_data.extras.push(null);
             uplot_data.stacked.push(false);
             uplot_data.bars.push(false);
+            uplot_data.extra_names.push(null);
         }
 
         for (let charger of this.chargers) {
@@ -1434,11 +1562,24 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                 if (wallbox_data && !wallbox_data.empty) {
                     slot_count = Math.max(slot_count, wallbox_data.power.length);
 
+                    let state = new Array(wallbox_data.flags.length);
+
+                    for (let i = 0; i < wallbox_data.flags.length; ++i) {
+                        if (wallbox_data.flags[i] === null) {
+                            state[i] = null;
+                        }
+                        else {
+                            state[i] = wallbox_data.flags[i] & 0b111;
+                        }
+                    }
+
                     uplot_data.keys.push('wb_power_' + charger.uid);
                     uplot_data.names.push(charger.name);
                     uplot_data.values.push(wallbox_data.power);
+                    uplot_data.extras.push(state);
                     uplot_data.stacked.push(true);
                     uplot_data.bars.push(false);
+                    uplot_data.extra_names.push(wb_state_names);
                 }
             }
         }
@@ -1666,7 +1807,15 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return;
         }
 
-        uplot_data = {update_timestamp: now, use_timestamp: now, keys: [null], names: [null], values: [null], stacked: [false], bars: [false]};
+        uplot_data = {
+            update_timestamp: now,
+            use_timestamp: now,
+            keys: [null],
+            names: [null],
+            values: [null],
+            stacked: [false],
+            bars: [false],
+        };
 
         let slot_count: number = 0;
         let energy_manager_data = this.energy_manager_5min_cache[key];
@@ -1746,7 +1895,15 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             return;
         }
 
-        uplot_data = {update_timestamp: now, use_timestamp: now, keys: [null], names: [null], values: [null], stacked: [false], bars: [false]};
+        uplot_data = {
+            update_timestamp: now,
+            use_timestamp: now,
+            keys: [null],
+            names: [null],
+            values: [null],
+            stacked: [false],
+            bars: [false],
+        };
 
         let slot_count: number = 0;
         let energy_manager_data = this.energy_manager_daily_cache[key];
@@ -1983,7 +2140,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
         try {
             response = await (await util.put('energy_manager/history_wallbox_5min', {uid: uid, year: year, month: month, day: day})).text();
         } catch (e) {
-            console.log('Could not get wallbox 5min data: ' + e);
+            console.log('Energy Analysis: Could not get wallbox 5min data: ' + e);
             return false;
         }
 
@@ -2049,7 +2206,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
         try {
             response = await (await util.put('energy_manager/history_energy_manager_5min', {year: year, month: month, day: day})).text();
         } catch (e) {
-            console.log('Could not get energy manager 5min data: ' + e);
+            console.log('Energy Analysis: Could not get energy manager 5min data: ' + e);
             return false;
         }
 
@@ -2163,7 +2320,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
         try {
             response = await (await util.put('energy_manager/history_wallbox_daily', {uid: uid, year: year, month: month})).text();
         } catch (e) {
-            console.log('Could not get wallbox daily data: ' + e);
+            console.log('Energy Analysis: Could not get wallbox daily data: ' + e);
             return false;
         }
 
@@ -2232,7 +2389,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
         try {
             response = await (await util.put('energy_manager/history_energy_manager_daily', {year: year, month: month})).text();
         } catch (e) {
-            console.log('Could not get energy manager daily data: ' + e);
+            console.log('Energy Analysis: Could not get energy manager daily data: ' + e);
             return false;
         }
 
@@ -2614,10 +2771,11 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                                                    sync={this.uplot_sync}
                                                    legend_time_label={__("em_energy_analysis.script.time_5min")}
                                                    legend_time_with_minutes={true}
-                                                   legend_value_prefix=""
+                                                   legend_value_prefix={""}
                                                    legend_div_ref={this.uplot_legend_div_5min_flags_ref}
                                                    x_format={{hour: '2-digit', minute: '2-digit'}}
-                                                   x_padding_factor={0} />
+                                                   x_padding_factor={0}
+                                                   y_sync_ref={this.uplot_wrapper_5min_power_ref} />
                                 <UplotWrapper ref={this.uplot_wrapper_5min_power_ref}
                                               id="em_energy_analysis_5min_power_chart"
                                               class="em-energy-analysis-chart"
@@ -2634,9 +2792,12 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                                               x_padding_factor={0}
                                               y_min={0}
                                               y_max={100}
-                                              y_step={10}
                                               y_unit={"W"}
-                                              y_digits={0} />
+                                              y_label={__("em_energy_analysis.script.power") + " [Watt]"}
+                                              y_digits={0}
+                                              y_skip_upper={true}
+                                              y_sync_ref={this.uplot_wrapper_5min_flags_ref}
+                                              padding={[0, 5, null, null] as uPlot.Padding}/>
                                 <div class="uplot u-hz u-time-in-legend-alone" ref={this.uplot_legend_div_5min_flags_ref} style="width: 100%; visibility: hidden;" />
                                 <div class="uplot u-hz u-hide-first-series-in-legend" ref={this.uplot_legend_div_5min_power_ref} style="width: 100%; visibility: hidden;" />
                             </UplotLoader>
@@ -2652,16 +2813,17 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                                               show={false}
                                               legend_time_label={__("em_energy_analysis.script.time_daily")}
                                               legend_time_with_minutes={false}
-                                              legend_value_prefix=""
+                                              legend_value_prefix={""}
                                               aspect_ratio={3}
                                               x_format={{month: '2-digit', day: '2-digit'}}
                                               x_padding_factor={0.015}
                                               y_min={0}
                                               y_max={10}
-                                              y_step={1}
                                               y_unit={"kWh"}
+                                              y_label={__("em_energy_analysis.script.energy") + " [kWh]"}
                                               y_digits={2}
-                                              default_fill={true} />
+                                              default_fill={true}
+                                              padding={[null, 5, null, null] as uPlot.Padding} />
                             </UplotLoader>
                         </div>
                     </div>

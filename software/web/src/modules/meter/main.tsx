@@ -118,7 +118,6 @@ interface UplotWrapperProps {
     y_min?: number;
     y_max?: number;
     y_diff_min?: number;
-    y_step?: number;
 }
 
 class UplotWrapper extends Component<UplotWrapperProps, {}> {
@@ -128,6 +127,8 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
     visible: boolean = false;
     div_ref = createRef();
     observer: ResizeObserver;
+    y_min: number = 0;
+    y_max: number = 0;
 
     shouldComponentUpdate() {
         return false;
@@ -254,7 +255,26 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                     },
                 },
                 {
-                    size: 55,
+                    label: __("meter.script.power") + " [Watt]",
+                    labelSize: 20,
+                    labelGap: 2,
+                    labelFont: 'bold 14px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
+                    size: (self: uPlot, values: string[], axisIdx: number, cycleNum: number): number => {
+                        let size = 0;
+
+                        if (values) {
+                            self.ctx.save();
+                            self.ctx.font = self.axes[axisIdx].font;
+
+                            for (let i = 0; i < values.length; ++i) {
+                                size = Math.max(size, self.ctx.measureText(values[i]).width);
+                            }
+
+                            self.ctx.restore();
+                        }
+
+                        return Math.ceil(size / devicePixelRatio) + 20;
+                    },
                     values: (self: uPlot, splits: number[]) => {
                         let values: string[] = new Array(splits.length);
 
@@ -268,16 +288,12 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             ],
             scales: {
                 y: {
-                    range: {
-                        min: {
-                            mode: 1 as uPlot.Range.SoftMode,
-                        },
-                        max: {
-                            mode: 1 as uPlot.Range.SoftMode,
-                        },
-                    },
+                    range: (self: uPlot, initMin: number, initMax: number, scaleKey: string): uPlot.Range.MinMax => {
+                        return uPlot.rangeNum(this.y_min, this.y_max, {min: {}, max: {}});
+                    }
                 },
             },
+            padding: [null, 20, null, 5] as uPlot.Padding,
             plugins: [
                 {
                     hooks: {
@@ -413,14 +429,9 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             }
         }
 
-        let y_step = this.props.y_step;
+        this.y_min = y_min;
+        this.y_max = y_max;
 
-        if (y_step !== undefined) {
-            y_min = Math.floor(y_min / y_step) * y_step;
-            y_max = Math.ceil(y_max / y_step) * y_step;
-        }
-
-        this.uplot.setScale('y', {min: y_min, max: y_max});
         this.uplot.setData([this.data.timestamps, this.data.samples]);
     }
 
@@ -638,8 +649,7 @@ export class Meter extends Component<{}, MeterState> {
                                           legend_time_with_seconds={true}
                                           x_height={30}
                                           x_include_date={false}
-                                          y_diff_min={100}
-                                          y_step={10} />
+                                          y_diff_min={100} />
                             <UplotWrapper ref={this.uplot_wrapper_history_ref}
                                           id="meter_chart_history"
                                           class="meter-chart"
@@ -652,7 +662,7 @@ export class Meter extends Component<{}, MeterState> {
                                           y_max={1500} />
                         </div>
                         <div class="col-lg-6 col-xl-4">
-                            <FormSeparator heading={__("meter.status.charge_history")} first={true} colClasses={"justify-content-between align-items-center col"} >
+                            <FormSeparator heading={__("meter.content.statistics")} first={true} colClasses={"justify-content-between align-items-center col"} >
                                 <div class="mb-2" style="visibility: hidden;">
                                     <InputSelect items={[["a", "a"]]} />
                                 </div>

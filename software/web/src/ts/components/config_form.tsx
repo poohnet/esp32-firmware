@@ -68,7 +68,7 @@ export class ConfigForm extends Component<ConfigFormProps,ConfigFormState> {
 
     resetButton = () => this.props.onReset ?
             <button onClick={async () => {await this.props.onReset()}} class="btn btn-danger mb-2 ml-sm-2 col" disabled={!this.props.isModified}>
-                {__("component.config_page_header.reset")}
+                {__("component.config_form.reset")}
                 <span class="ml-2 spinner-border spinner-border-sm" role="status" style="vertical-align: middle;" hidden={!this.state.showSpinner} ></span>
             </button> : <></>
 
@@ -78,11 +78,11 @@ export class ConfigForm extends Component<ConfigFormProps,ConfigFormState> {
                 <div class="row sticky-under-top mb-3 pt-3">
                     <div class="col-xl-8 pb-2 border-bottom tab-header-shadow">
                         <div class="row no-gutters">
-                            <h1 class="config-header col-12 col-sm text-center text-sm-left text-nowrap" dangerouslySetInnerHTML={{__html: props.title}}></h1>
+                            <h1 class="page-header col-12 col-sm text-center text-sm-left text-nowrap" dangerouslySetInnerHTML={{__html: props.title}}></h1>
                             <div class="col-12 col-sm row no-gutters">
                                 {this.resetButton()}
                                 <button type="submit" form={props.id} class="btn btn-primary col mb-2 ml-2 ml-md-3 mr-0" disabled={state.saveDisabled}>
-                                    {__("component.config_page_header.save")}
+                                    {__("component.config_form.save")}
                                     <span class="ml-2 spinner-border spinner-border-sm" role="status" style="vertical-align: middle;" hidden={!state.showSpinner}></span>
                                 </button>
                             </div>

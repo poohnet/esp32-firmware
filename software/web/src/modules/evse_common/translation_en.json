@@ -92,8 +92,8 @@
             "external_enable": "Enables an external control system (for example <a href=\"https://evcc.io/\">EVCC</a>) to control this charger",
 
             "boost_mode_desc": "Boost Mode",
-            "boost_mode_desc_muted": "Allows the vehicle's charge controller a slightly higher charge current (+ 0.24 A) to compensate measurement errors of the vehicle. Use only if your vehicle charges with less than the allowed charge current!",
-            "boost_mode": "Boost Mode",
+            "boost_mode_desc_muted": "<a href=\"https://www.warp-charger.com/evcc.html?v=2\">see manual for details</a>",
+            "boost_mode": "Allows the vehicle's charge controller a slightly higher charge current (+ 0.24 A) to compensate measurement errors of the vehicle. Use only if your vehicle charges with less than the allowed charge current!",
 
             "reset_description": "Actions",
             "reset_description_muted": "",
@@ -125,7 +125,6 @@
         "script": {
             "error_code": "Error code",
             "set_charging_current_failed": "Failed to set charging current",
-            "auto_start_charging_update": "Failed to set auto charge.",
             "start_charging_failed": "Failed to start charging",
             "stop_charging_failed": "Failed to stop charging",
             "tab_close_warning": "Charge log capture will be aborted if this tab is closed.",
@@ -140,29 +139,30 @@
             "debug_stopped": "Stopped charge log capture",
             "debug_done": "Done",
 
+            "acc_blocked": "Blocked",
             "by": "by",
 
-            "save_failed": "(De)Activating the charge management failed",
-
-            "slot_disabled": "not active",
-            "slot_blocks": "blocks",
-            "slot_no_limit": "no limit",
+            "save_failed": "Failed to save charge settings",
 
             "reset_slot_failed": "Releasing the current limit failed",
 
-            "slot_0": "Supply cable",
-            "slot_1": "Charging cable",
-            "slot_2": "Shutdown input",
-            "slot_3": "General purpose input",
-            "slot_5": "Configuration",
-            "slot_6": "User",
-            "slot_7": "Charge management",
-            "slot_8": "External control",
+            "slot_disabled": "Not active",
+            "slot_blocks": "Blocks",
+            "slot_no_limit": "Released",
+
+            "slot_0": "supply cable",
+            "slot_1": "charging cable",
+            "slot_2": "shutdown input",
+            "slot_3": "general purpose input",
+            "slot_5": "configuration",
+            "slot_6": "user",
+            "slot_7": "charge management",
+            "slot_8": "external control",
             "slot_9": "Modbus TCP",
             "slot_10": "Modbus TCP clearance",
             "slot_11": "OCPP",
-            "slot_12": "Energy/Time limit",
-            "slot_13": "Meter monitoring",
+            "slot_12": "energy/time limit",
+            "slot_13": "meter monitoring",
 
             "reboot_content_changed": "Charge Settings"
         }
