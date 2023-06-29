@@ -417,7 +417,7 @@ void ModbusTcp::setup()
 {
     api.restorePersistentConfig("modbus_tcp/config", &config);
 
-    if (config.get("enable")->asBool() == true)
+    if (config.get("enable")->asBool())
     {
         void *modbus_handle = NULL;
         esp_err_t err = mbc_slave_init_tcp(&modbus_handle);
@@ -493,12 +493,12 @@ void ModbusTcp::setup()
 
 void ModbusTcp::update_bender_regs()
 {
-    portENTER_CRITICAL(&mtx);
+    taskENTER_CRITICAL(&mtx);
         *bender_general_cpy = *bender_general;
         *bender_dlm_cpy = *bender_dlm;
         *bender_hems_cpy = *bender_hems;
         *bender_write_uid_cpy = *bender_write_uid;
-    portEXIT_CRITICAL(&mtx);
+    taskEXIT_CRITICAL(&mtx);
 
     bool charging = false;
 
@@ -627,14 +627,14 @@ void ModbusTcp::update_bender_regs()
     }
 #endif
 
-    portENTER_CRITICAL(&mtx);
+    taskENTER_CRITICAL(&mtx);
         *bender_charge = *bender_charge_cpy;
         *bender_dlm = *bender_dlm_cpy;
         *bender_general = *bender_general_cpy;
         *bender_hems = *bender_hems_cpy;
         *bender_phases = *bender_phases_cpy;
         *bender_write_uid = *bender_write_uid_cpy;
-    portEXIT_CRITICAL(&mtx);
+    taskEXIT_CRITICAL(&mtx);
 }
 
 static inline void swap_bytes(char *str, size_t len) {
@@ -660,7 +660,7 @@ void ModbusTcp::update_regs()
     // -> Do all work in a copy of the registers.
     // However if we read _and_ write a register, we have to write back the new value immediately.
     // Otherwise we would overwrite and ignore a value that was written between the critical sections.
-    portENTER_CRITICAL(&mtx);
+    taskENTER_CRITICAL(&mtx);
         reset_meter = meter_holding_regs->trigger_reset == meter_holding_regs->TRIGGER_RESET_PASSWORD;
         // Clear the trigger_reset register to make sure the meter is reset only once.
         meter_holding_regs->trigger_reset = fromUint(0);
@@ -704,7 +704,7 @@ void ModbusTcp::update_regs()
             evse_holding_regs->led_blink_duration = fromUint(0);
             evse_holding_regs->led_blink_state = fromUint(-2);
         }
-    portEXIT_CRITICAL(&mtx);
+    taskEXIT_CRITICAL(&mtx);
 
     bool write_allowed = false;
     if (api.hasFeature("evse"))
@@ -762,7 +762,7 @@ void ModbusTcp::update_regs()
             uint32_t current = slots->get(i)->get("max_current")->asUint();
             uint32_t val = 0xFFFFFFFF;
 
-            if (slots->get(i)->get("active")->asBool() == true)
+            if (slots->get(i)->get("active")->asBool())
             {
                 val = current;
             }
@@ -847,7 +847,7 @@ void ModbusTcp::update_regs()
     // If we want to read and write the same register, writing into it
     // has to be done in the first critical section, not this one.
     // Otherwise we would overwrite and ignore a value that was written between the critical sections.
-    portENTER_CRITICAL(&mtx);
+    taskENTER_CRITICAL(&mtx);
         *input_regs = *input_regs_copy;
         *evse_input_regs = *evse_input_regs_copy;
         *meter_input_regs = *meter_input_regs_copy;
@@ -855,7 +855,7 @@ void ModbusTcp::update_regs()
         *discrete_inputs = *discrete_inputs_copy;
         *meter_discrete_inputs = *meter_discrete_inputs_copy;
         *nfc_input_regs = *nfc_input_regs_copy;
-    portEXIT_CRITICAL(&mtx);
+    taskEXIT_CRITICAL(&mtx);
 }
 
 uint32_t keba_get_features()
@@ -938,9 +938,9 @@ static uint32_t export_tag_id_as_uint32(const String &str)
 
 void ModbusTcp::update_keba_regs()
 {
-    portENTER_CRITICAL(&mtx);
+    taskENTER_CRITICAL(&mtx);
         *keba_write_cpy = *keba_write;
-    portEXIT_CRITICAL(&mtx);
+    taskEXIT_CRITICAL(&mtx);
 
     keba_read_general_cpy->features = fromUint(keba_get_features());
     keba_read_general_cpy->firmware_version = fromUint(0x30A1B00);
@@ -1010,87 +1010,91 @@ void ModbusTcp::update_keba_regs()
     }
 #endif
 
-    portENTER_CRITICAL(&mtx);
+    taskENTER_CRITICAL(&mtx);
         *keba_read_charge = *keba_read_charge_cpy;
         *keba_read_general = *keba_read_general_cpy;
         *keba_read_max = *keba_read_max_cpy;
-    portEXIT_CRITICAL(&mtx);
+    taskEXIT_CRITICAL(&mtx);
 }
 
 void ModbusTcp::register_urls()
 {
     api.addPersistentConfig("modbus_tcp/config", &config, {}, 1000);
 
-    if (config.get("enable")->asBool() == true)
+    if (!config.get("enable")->asBool()) {
+        return;
+    }
+
+    spinlock_initialize(&mtx);
+
+    if (config.get("table")->asUint() == 0)
     {
-        spinlock_initialize(&mtx);
+        uint16_t allowed_current = 32000;
+        bool enable_charging = false;
+        bool autostart_button = false;
 
-        if (config.get("table")->asUint() == 0)
-        {
-
-            uint16_t allowed_current = 32000;
-            bool enable_charging = false;
-            bool autostart_button = false;
-
-    #if MODULE_EVSE_V2_AVAILABLE() || MODULE_EVSE_AVAILABLE()
-            if (api.hasFeature("evse"))
-            {
-                auto slots = api.getState("evse/slots");
-                allowed_current = slots->get(CHARGING_SLOT_MODBUS_TCP)->get("max_current")->asUint();
-                enable_charging = slots->get(CHARGING_SLOT_MODBUS_TCP_ENABLE)->get("max_current")->asUint() == 32000;
-                autostart_button = slots->get(CHARGING_SLOT_AUTOSTART_BUTTON)->get("max_current")->asUint() == 32000;
-            }
-    #endif
-
-            portENTER_CRITICAL(&mtx);
-                input_regs->table_version = fromUint(MODBUS_TABLE_VERSION);
-                input_regs->box_id = fromUint(local_uid_num);
-                input_regs->firmware_major = fromUint(BUILD_VERSION_MAJOR);
-                input_regs->firmware_minor = fromUint(BUILD_VERSION_MINOR);
-                input_regs->firmware_patch = fromUint(BUILD_VERSION_PATCH);
-                input_regs->firmware_build_ts = fromUint(build_timestamp());
-
-                evse_holding_regs->allowed_current = fromUint(allowed_current);
-                evse_holding_regs->enable_charging = fromUint(enable_charging);
-
-                evse_coils->autostart_button = autostart_button;
-                evse_coils_copy->autostart_button = autostart_button;
-
-                evse_coils->enable_charging = enable_charging;
-                evse_coils_copy->enable_charging = enable_charging;
-            portEXIT_CRITICAL(&mtx);
-
-            task_scheduler.scheduleWithFixedDelay([this]() {
-                this->update_regs();
-            }, 0, 500);
-        }
-        else if (config.get("table")->asUint() == 1)
-        {
-            if (api.hasFeature("evse"))
-            {
 #if MODULE_EVSE_V2_AVAILABLE() || MODULE_EVSE_AVAILABLE()
-                portENTER_CRITICAL(&mtx);
-                    bender_hems->hems_limit = api.getState("evse/slots")->get(CHARGING_SLOT_MODBUS_TCP)->get("max_current")->asUint() / 1000;
-                    bender_general->chargepoint_available = api.getState("evse/slots")->get(CHARGING_SLOT_MODBUS_TCP_ENABLE)->get("max_current")->asUint() == 32000 ? 1 : 0;
-                portEXIT_CRITICAL(&mtx);
-#endif
-            }
-
-            task_scheduler.scheduleWithFixedDelay([this]() {
-                this->update_bender_regs();
-            }, 0, 500);
+        if (api.hasFeature("evse"))
+        {
+            auto slots = api.getState("evse/slots");
+            allowed_current = slots->get(CHARGING_SLOT_MODBUS_TCP)->get("max_current")->asUint();
+            enable_charging = slots->get(CHARGING_SLOT_MODBUS_TCP_ENABLE)->get("max_current")->asUint() == 32000;
+            autostart_button = slots->get(CHARGING_SLOT_AUTOSTART_BUTTON)->get("max_current")->asUint() == 32000;
         }
-        else if (config.get("table")->asUint() == 2)
+#endif
+
+        taskENTER_CRITICAL(&mtx);
+            input_regs->table_version = fromUint(MODBUS_TABLE_VERSION);
+            input_regs->box_id = fromUint(local_uid_num);
+            input_regs->firmware_major = fromUint(BUILD_VERSION_MAJOR);
+            input_regs->firmware_minor = fromUint(BUILD_VERSION_MINOR);
+            input_regs->firmware_patch = fromUint(BUILD_VERSION_PATCH);
+            input_regs->firmware_build_ts = fromUint(build_timestamp());
+
+            evse_holding_regs->allowed_current = fromUint(allowed_current);
+            evse_holding_regs->enable_charging = fromUint(enable_charging);
+
+            evse_coils->autostart_button = autostart_button;
+            evse_coils_copy->autostart_button = autostart_button;
+
+            evse_coils->enable_charging = enable_charging;
+            evse_coils_copy->enable_charging = enable_charging;
+        taskEXIT_CRITICAL(&mtx);
+
+        task_scheduler.scheduleWithFixedDelay([this]() {
+            this->update_regs();
+        }, 0, 500);
+    }
+    else if (config.get("table")->asUint() == 1)
+    {
+        if (api.hasFeature("evse"))
         {
 #if MODULE_EVSE_V2_AVAILABLE() || MODULE_EVSE_AVAILABLE()
-                portENTER_CRITICAL(&mtx);
-                    keba_write->set_charging_current = api.getState("evse/slots")->get(CHARGING_SLOT_MODBUS_TCP)->get("max_current")->asUint() / 1000;
-                    keba_write->enable_station = api.getState("evse/slots")->get(CHARGING_SLOT_MODBUS_TCP_ENABLE)->get("max_current")->asUint() == 32000 ? 1 : 0;
-                portEXIT_CRITICAL(&mtx);
+            uint16_t current = api.getState("evse/slots")->get(CHARGING_SLOT_MODBUS_TCP)->get("max_current")->asUint() / 1000;
+            uint16_t enable = api.getState("evse/slots")->get(CHARGING_SLOT_MODBUS_TCP_ENABLE)->get("max_current")->asUint() == 32000 ? 1 : 0;
+            taskENTER_CRITICAL(&mtx);
+                bender_hems->hems_limit = current;
+                bender_general->chargepoint_available = enable;
+            taskEXIT_CRITICAL(&mtx);
 #endif
-            task_scheduler.scheduleWithFixedDelay([this]() {
-                this->update_keba_regs();
-            }, 0, 500);
         }
+
+        task_scheduler.scheduleWithFixedDelay([this]() {
+            this->update_bender_regs();
+        }, 0, 500);
+    }
+    else if (config.get("table")->asUint() == 2)
+    {
+#if MODULE_EVSE_V2_AVAILABLE() || MODULE_EVSE_AVAILABLE()
+            uint16_t current = api.getState("evse/slots")->get(CHARGING_SLOT_MODBUS_TCP)->get("max_current")->asUint() / 1000;
+            uint16_t enable = api.getState("evse/slots")->get(CHARGING_SLOT_MODBUS_TCP_ENABLE)->get("max_current")->asUint() == 32000 ? 1 : 0;
+            taskENTER_CRITICAL(&mtx);
+                keba_write->set_charging_current = current;
+                keba_write->enable_station = enable;
+            taskEXIT_CRITICAL(&mtx);
+#endif
+        task_scheduler.scheduleWithFixedDelay([this]() {
+            this->update_keba_regs();
+        }, 0, 500);
     }
 }

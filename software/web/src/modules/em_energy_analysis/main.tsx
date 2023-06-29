@@ -30,6 +30,7 @@ import { InputMonth } from "../../ts/components/input_month";
 import { InputSelect } from "../../ts/components/input_select";
 import { FormRow } from "../../ts/components/form_row";
 import { OutputFloat } from "src/ts/components/output_float";
+import { SubPage } from "src/ts/components/sub_page";
 import uPlot from 'uplot';
 import { InputText } from "src/ts/components/input_text";
 import { uPlotTimelinePlugin } from "../../ts/uplot-plugins";
@@ -206,7 +207,6 @@ const em_relay_fills: {[id: number]: string} = {
 
 interface UplotLoaderProps {
     show: boolean;
-    marker_width_reduction: number;
     marker_class: 'h3'|'h4';
     children: VNode | VNode[];
 };
@@ -239,10 +239,10 @@ class UplotLoader extends Component<UplotLoaderProps, {}> {
     render(props?: UplotLoaderProps, state?: Readonly<{}>, context?: any): ComponentChild {
         return (
             <>
-                <div ref={this.no_data_ref} style={`position: absolute; width: calc(100% - ${props.marker_width_reduction}px); height: 100%; visibility: hidden; display: ${props.show ? 'flex' : 'none'};`}>
+                <div ref={this.no_data_ref} style={`position: absolute; width: 100%; height: 100%; visibility: hidden; display: ${props.show ? 'flex' : 'none'};`}>
                     <span class={props.marker_class} style="margin: auto;">{__("em_energy_analysis.content.no_data")}</span>
                 </div>
-                <div ref={this.loading_ref} style={`position: absolute; width: calc(100% - ${props.marker_width_reduction}px); height: 100%; visibility: ${props.show ? 'visible' : 'hidden'}; display: ${props.show ? 'flex' : 'none'};`}>
+                <div ref={this.loading_ref} style={`position: absolute; width: 100%; height: 100%; visibility: ${props.show ? 'visible' : 'hidden'}; display: ${props.show ? 'flex' : 'none'};`}>
                     <span class={props.marker_class} style="margin: auto;">{__("em_energy_analysis.content.loading")}</span>
                 </div>
                 {props.children}
@@ -741,12 +741,27 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                     values: (self: uPlot, splits: number[]) => {
                         let values: string[] = new Array(splits.length);
 
-                        for (let i = 0; i < splits.length; ++i) {
-                            if (this.props.y_skip_upper && splits[i] >= this.y_max) {
-                                values[i] = '';
+                        for (let digits = 0; digits <= 3; ++digits) {
+                            let last_value: string = null;
+                            let unique = true;
+
+                            for (let i = 0; i < splits.length; ++i) {
+                                if (this.props.y_skip_upper && splits[i] >= this.y_max) {
+                                    values[i] = '';
+                                }
+                                else {
+                                    values[i] = util.toLocaleFixed(splits[i], digits);
+                                }
+
+                                if (last_value == values[i]) {
+                                    unique = false;
+                                }
+
+                                last_value = values[i];
                             }
-                            else {
-                                values[i] = util.toLocaleFixed(splits[i], this.props.y_digits);
+
+                            if (unique) {
+                                break;
                             }
                         }
 
@@ -1137,10 +1152,9 @@ export class EMEnergyAnalysisStatus extends Component<{}, {force_render: number}
             <>
                 <FormRow label={__("em_energy_analysis_status.status.history")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4" hidden={!show}>
                     <div class="card pl-1 pb-1">
-                        <div>
+                        <div style="position: relative;"> {/* this plain div is neccessary to make the size calculation stable in safari. without this div the height continues to grow */}
                             <UplotLoader ref={this.uplot_loader_ref}
                                          show={true}
-                                         marker_width_reduction={8}
                                          marker_class={'h4'} >
                                 <UplotWrapper ref={this.uplot_wrapper_ref}
                                               id="em_energy_analysis_status_chart"
@@ -2632,7 +2646,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
 
             if (has_grid_in || has_grid_out) {
                 rows.push(
-                    <FormRow label={__("em_energy_analysis.script.grid_in") + ' / ' + __("em_energy_analysis.script.grid_out")} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                    <FormRow label={__("em_energy_analysis.script.grid_in") + ' / ' + __("em_energy_analysis.script.grid_out")}>
                         <div class="row">
                             <div class="col-md-6">
                                 {has_grid_in ?
@@ -2656,7 +2670,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
 
                 if (util.hasValue(energy_total)) {
                     rows.push(
-                        <FormRow label={charger.name} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                        <FormRow label={charger.name}>
                             <div class="row">
                                 <div class="col-md-6">
                                     <OutputFloat value={energy_total} digits={2} scale={0} unit="kWh"/>
@@ -2679,7 +2693,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
 
             if (util.hasValue(energy_total) && (util.hasValue(energy_total.grid_in) || util.hasValue(energy_total.grid_out))) {
                 rows.push(
-                    <FormRow label={__("em_energy_analysis.script.grid_in") + ' / ' + __("em_energy_analysis.script.grid_out")} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                    <FormRow label={__("em_energy_analysis.script.grid_in") + ' / ' + __("em_energy_analysis.script.grid_out")}>
                         <div class="row">
                             <div class="col-md-6">
                                 {util.hasValue(energy_total.grid_in) ?
@@ -2703,7 +2717,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
 
                 if (util.hasValue(energy_total)) {
                     rows.push(
-                        <FormRow label={charger.name} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                        <FormRow label={charger.name}>
                             <div class="row">
                                 <div class="col-md-6">
                                     <OutputFloat value={energy_total} digits={2} scale={0} unit="kWh"/>
@@ -2748,84 +2762,80 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                 ]}/>;
 
         return (
-            <>
-                <PageHeader title={__("em_energy_analysis.content.em_energy_analysis")} colClasses="col-xl-10">
+            <SubPage colClasses="col-xl-10">
+                <PageHeader title={__("em_energy_analysis.content.em_energy_analysis")}>
                     <div>
                         {state.data_type == '5min'
                         ? <InputDate date={state.current_5min_date} onDate={this.set_current_5min_date.bind(this)} buttons="day" style="width: 11rem">{data_select}</InputDate>
                         : <InputMonth date={state.current_daily_date} onDate={this.set_current_daily_date.bind(this)} buttons="month" style="width: 11rem">{data_select}</InputMonth>}
                     </div>
                 </PageHeader>
-                <div class="row">
-                    <div class="col-xl-10 mb-3">
-                        <div>
-                            <UplotLoader ref={this.uplot_loader_5min_ref}
-                                         show={true}
-                                         marker_width_reduction={30}
-                                         marker_class={'h3'} >
-                                <UplotFlagsWrapper ref={this.uplot_wrapper_5min_flags_ref}
-                                                   id="em_energy_analysis_5min_flags_chart"
-                                                   class="em-energy-analysis-flags-chart"
-                                                   sidebar_id="em_energy_analysis"
-                                                   show={true}
-                                                   sync={this.uplot_sync}
-                                                   legend_time_label={__("em_energy_analysis.script.time_5min")}
-                                                   legend_time_with_minutes={true}
-                                                   legend_value_prefix={""}
-                                                   legend_div_ref={this.uplot_legend_div_5min_flags_ref}
-                                                   x_format={{hour: '2-digit', minute: '2-digit'}}
-                                                   x_padding_factor={0}
-                                                   y_sync_ref={this.uplot_wrapper_5min_power_ref} />
-                                <UplotWrapper ref={this.uplot_wrapper_5min_power_ref}
-                                              id="em_energy_analysis_5min_power_chart"
-                                              class="em-energy-analysis-chart"
-                                              sidebar_id="em_energy_analysis"
-                                              color_cache_group="analsyis"
-                                              show={true}
-                                              sync={this.uplot_sync}
-                                              legend_time_label={__("em_energy_analysis.script.time_5min")}
-                                              legend_time_with_minutes={true}
-                                              legend_value_prefix=""
-                                              legend_div_ref={this.uplot_legend_div_5min_power_ref}
-                                              aspect_ratio={3}
-                                              x_format={{hour: '2-digit', minute: '2-digit'}}
-                                              x_padding_factor={0}
-                                              y_min={0}
-                                              y_max={100}
-                                              y_unit={"W"}
-                                              y_label={__("em_energy_analysis.script.power") + " [Watt]"}
-                                              y_digits={0}
-                                              y_skip_upper={true}
-                                              y_sync_ref={this.uplot_wrapper_5min_flags_ref}
-                                              padding={[0, 5, null, null] as uPlot.Padding}/>
-                                <div class="uplot u-hz u-time-in-legend-alone" ref={this.uplot_legend_div_5min_flags_ref} style="width: 100%; visibility: hidden;" />
-                                <div class="uplot u-hz u-hide-first-series-in-legend" ref={this.uplot_legend_div_5min_power_ref} style="width: 100%; visibility: hidden;" />
-                            </UplotLoader>
-                            <UplotLoader ref={this.uplot_loader_daily_ref}
-                                         show={false}
-                                         marker_width_reduction={30}
-                                         marker_class={'h3'} >
-                                <UplotWrapper ref={this.uplot_wrapper_daily_ref}
-                                              id="em_energy_analysis_daily_chart"
-                                              class="em-energy-analysis-chart"
-                                              sidebar_id="em_energy_analysis"
-                                              color_cache_group="analsyis"
-                                              show={false}
-                                              legend_time_label={__("em_energy_analysis.script.time_daily")}
-                                              legend_time_with_minutes={false}
-                                              legend_value_prefix={""}
-                                              aspect_ratio={3}
-                                              x_format={{month: '2-digit', day: '2-digit'}}
-                                              x_padding_factor={0.015}
-                                              y_min={0}
-                                              y_max={10}
-                                              y_unit={"kWh"}
-                                              y_label={__("em_energy_analysis.script.energy") + " [kWh]"}
-                                              y_digits={2}
-                                              default_fill={true}
-                                              padding={[null, 5, null, null] as uPlot.Padding} />
-                            </UplotLoader>
-                        </div>
+                <div class="mb-3">
+                    <div style="position: relative;"> {/* this plain div is neccessary to make the size calculation stable in safari. without this div the height continues to grow */}
+                        <UplotLoader ref={this.uplot_loader_5min_ref}
+                                        show={true}
+                                        marker_class={'h3'} >
+                            <UplotFlagsWrapper ref={this.uplot_wrapper_5min_flags_ref}
+                                                id="em_energy_analysis_5min_flags_chart"
+                                                class="em-energy-analysis-flags-chart"
+                                                sidebar_id="em_energy_analysis"
+                                                show={true}
+                                                sync={this.uplot_sync}
+                                                legend_time_label={__("em_energy_analysis.script.time_5min")}
+                                                legend_time_with_minutes={true}
+                                                legend_value_prefix={""}
+                                                legend_div_ref={this.uplot_legend_div_5min_flags_ref}
+                                                x_format={{hour: '2-digit', minute: '2-digit'}}
+                                                x_padding_factor={0}
+                                                y_sync_ref={this.uplot_wrapper_5min_power_ref} />
+                            <UplotWrapper ref={this.uplot_wrapper_5min_power_ref}
+                                            id="em_energy_analysis_5min_power_chart"
+                                            class="em-energy-analysis-chart"
+                                            sidebar_id="em_energy_analysis"
+                                            color_cache_group="analsyis"
+                                            show={true}
+                                            sync={this.uplot_sync}
+                                            legend_time_label={__("em_energy_analysis.script.time_5min")}
+                                            legend_time_with_minutes={true}
+                                            legend_value_prefix=""
+                                            legend_div_ref={this.uplot_legend_div_5min_power_ref}
+                                            aspect_ratio={3}
+                                            x_format={{hour: '2-digit', minute: '2-digit'}}
+                                            x_padding_factor={0}
+                                            y_min={0}
+                                            y_max={100}
+                                            y_unit={"W"}
+                                            y_label={__("em_energy_analysis.script.power") + " [Watt]"}
+                                            y_digits={0}
+                                            y_skip_upper={true}
+                                            y_sync_ref={this.uplot_wrapper_5min_flags_ref}
+                                            padding={[0, 5, null, null] as uPlot.Padding}/>
+                            <div class="uplot u-hz u-time-in-legend-alone" ref={this.uplot_legend_div_5min_flags_ref} style="width: 100%; visibility: hidden;" />
+                            <div class="uplot u-hz u-hide-first-series-in-legend" ref={this.uplot_legend_div_5min_power_ref} style="width: 100%; visibility: hidden;" />
+                        </UplotLoader>
+                        <UplotLoader ref={this.uplot_loader_daily_ref}
+                                        show={false}
+                                        marker_class={'h3'} >
+                            <UplotWrapper ref={this.uplot_wrapper_daily_ref}
+                                            id="em_energy_analysis_daily_chart"
+                                            class="em-energy-analysis-chart"
+                                            sidebar_id="em_energy_analysis"
+                                            color_cache_group="analsyis"
+                                            show={false}
+                                            legend_time_label={__("em_energy_analysis.script.time_daily")}
+                                            legend_time_with_minutes={false}
+                                            legend_value_prefix={""}
+                                            aspect_ratio={3}
+                                            x_format={{month: '2-digit', day: '2-digit'}}
+                                            x_padding_factor={0.015}
+                                            y_min={0}
+                                            y_max={10}
+                                            y_unit={"kWh"}
+                                            y_label={__("em_energy_analysis.script.energy") + " [kWh]"}
+                                            y_digits={2}
+                                            default_fill={true}
+                                            padding={[null, 5, null, null] as uPlot.Padding} />
+                        </UplotLoader>
                     </div>
                 </div>
                 {state.data_type == '5min' ?
@@ -2840,7 +2850,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                         }
                     </>
                 }
-            </>
+            </SubPage>
         )
     }
 }

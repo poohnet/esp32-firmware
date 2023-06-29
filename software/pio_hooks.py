@@ -302,6 +302,7 @@ def main():
     frontend_debug = env.GetProjectOption("custom_frontend_debug") == "true"
     web_only = env.GetProjectOption("custom_web_only") == "true"
     monitor_speed = env.GetProjectOption("monitor_speed")
+    nightly = "-DNIGHTLY" in build_flags
 
     is_release = len(subprocess.run(["git", "tag", "--contains", "HEAD"], check=True, capture_output=True).stdout) > 0
     is_dirty = len(subprocess.run(["git", "diff"], check=True, capture_output=True).stdout) > 0
@@ -414,8 +415,9 @@ def main():
         f.write('const char *build_filename_str(void);')
         f.write('const char *build_commit_id_str(void);')
 
-    firmware_basename = '{}_firmware{}_{}_{:x}{}'.format(
+    firmware_basename = '{}_firmware{}{}_{}_{:x}{}'.format(
         name,
+        "-NIGHTLY" if nightly else "",
         "-WITH-WIFI-PASSPHRASE-DO-NOT-DISTRIBUTE" if not_for_distribution else "",
         '_'.join(version),
         timestamp,
@@ -435,6 +437,9 @@ def main():
         f.write(firmware_basename)
 
     frontend_modules = [FlavoredName(x).get() for x in env.GetProjectOption("custom_frontend_modules").splitlines()]
+    if nightly:
+        frontend_modules.append(FlavoredName("Nightly").get())
+
     branding_module = find_branding_module(frontend_modules)
 
     # Handle backend modules
@@ -506,6 +511,17 @@ def main():
 
     for frontend_module in frontend_modules:
         mod_path = os.path.join('web', 'src', 'modules', frontend_module.under)
+
+        if os.path.exists(os.path.join(mod_path, "prepare.py")):
+            print('Preparing frontend module:', frontend_module.space)
+
+            environ = dict(os.environ)
+            environ['PLATFORMIO_PROJECT_DIR'] = env.subst('$PROJECT_DIR')
+            environ['PLATFORMIO_BUILD_DIR'] = env.subst('$BUILD_DIR')
+
+            abs_branding_module = os.path.abspath(branding_module)
+            with ChangedDirectory(mod_path):
+                subprocess.check_call([env.subst('$PYTHONEXE'), "-u", "prepare.py", abs_branding_module], env=environ)
 
         if os.path.exists(os.path.join(mod_path, 'navbar.html')):
             with open(os.path.join(mod_path, 'navbar.html'), 'r', encoding='utf-8') as f:

@@ -30,6 +30,7 @@ import { FormRow } from "../../ts/components/form_row";
 import { InputText } from "../../ts/components/input_text";
 import { InputFile } from "../../ts/components/input_file";
 import { Button } from "react-bootstrap";
+import { SubPage } from "src/ts/components/sub_page";
 
 type FirmwareUpdateConfig = API.getType['info/version'];
 
@@ -99,12 +100,23 @@ export class FirmwareUpdate extends Component<{}, FirmwareUpdateConfig> {
         if (API.hasModule("users"))
             show_config_reset = true;
 
+        let build_time: string = '';
+
+        try {
+            let timestamp = parseInt(state.firmware.split('-')[1], 16);
+
+            if (util.hasValue(timestamp) && !isNaN(timestamp)) {
+                build_time = __("firmware_update.script.build_time") + util.timestamp_sec_to_date(timestamp);
+            }
+        } catch {
+        }
+
         return (
-            <>
+            <SubPage>
                 <PageHeader title={__("firmware_update.content.firmware_update")} />
 
                 <FormRow label={__("firmware_update.content.current_firmware")}>
-                    <InputText value={state.firmware}/>
+                    <InputText value={state.firmware + build_time}/>
                 </FormRow>
 
                 <FormRow label={__("firmware_update.content.firmware_update_label")} label_muted={__("firmware_update.content.firmware_update_desc")}>
@@ -190,7 +202,7 @@ export class FirmwareUpdate extends Component<{}, FirmwareUpdateConfig> {
                         }
                     }}>{__("firmware_update.content.factory_reset")}</Button>
                 </FormRow>
-            </>
+            </SubPage>
         );
     }
 }

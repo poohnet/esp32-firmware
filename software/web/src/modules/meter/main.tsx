@@ -34,6 +34,7 @@ import { Zap, ZapOff } from "react-feather";
 import uPlot from 'uplot';
 import { InputText } from "src/ts/components/input_text";
 import { FormSeparator } from "../../ts/components/form_separator";
+import { SubPage } from "src/ts/components/sub_page";
 
 interface DetailedViewEntry {
     i: number,
@@ -278,8 +279,23 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
                     values: (self: uPlot, splits: number[]) => {
                         let values: string[] = new Array(splits.length);
 
-                        for (let i = 0; i < splits.length; ++i) {
-                            values[i] = util.toLocaleFixed(splits[i]); // FIXME: assuming that no fractional part is necessary
+                        for (let digits = 0; digits <= 3; ++digits) {
+                            let last_value: string = null;
+                            let unique = true;
+
+                            for (let i = 0; i < splits.length; ++i) {
+                                values[i] = util.toLocaleFixed(splits[i], digits);
+
+                                if (last_value == values[i]) {
+                                    unique = false;
+                                }
+
+                                last_value = values[i];
+                            }
+
+                            if (unique) {
+                                break;
+                            }
                         }
 
                         return values;
@@ -371,6 +387,7 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
     }
 
     render(props?: UplotWrapperProps, state?: Readonly<{}>, context?: any): ComponentChild {
+        // the plain div is neccessary to make the size calculation stable in safari. without this div the height continues to grow
         return <div><div ref={this.div_ref} id={props.id} class={props.class} style={`display: ${props.show ? 'block' : 'none'};`} /></div>;
     }
 
@@ -613,8 +630,8 @@ export class Meter extends Component<{}, MeterState> {
         }
 
         return (
-            <>
-                <PageHeader title={__("meter.content.energy_meter")} colClasses="col-xl-10"/>
+            <SubPage colClasses="col-xl-10">
+                <PageHeader title={__("meter.content.energy_meter")}/>
                     <div class="row">
                         <div class="col-lg-6">
                             <FormSeparator heading={__("meter.status.charge_history")} first={true} colClasses={"justify-content-between align-items-center col"} extraClasses={"pr-0 pr-lg-3"} >
@@ -661,7 +678,7 @@ export class Meter extends Component<{}, MeterState> {
                                           y_min={0}
                                           y_max={1500} />
                         </div>
-                        <div class="col-lg-6 col-xl-4">
+                        <div class="col-lg-6">
                             <FormSeparator heading={__("meter.content.statistics")} first={true} colClasses={"justify-content-between align-items-center col"} >
                                 <div class="mb-2" style="visibility: hidden;">
                                     <InputSelect items={[["a", "a"]]} />
@@ -726,9 +743,9 @@ export class Meter extends Component<{}, MeterState> {
                         </div>
                     </div>
                     {API.hasFeature("meter_all_values") ?
-                    <CollapsedSection colClasses="col-xl-10" label={__("meter.content.detailed_values")}>
+                    <CollapsedSection label={__("meter.content.detailed_values")}>
                         {
-                        entries.filter(e => this.state.all_values[e.i] != null).map(e => <FormRow label={e.name} label_muted={e.desc} labelColClasses="col-lg-3 col-xl-3" contentColClasses="col-lg-9 col-xl-7">
+                        entries.filter(e => this.state.all_values[e.i] != null).map(e => <FormRow label={e.name} label_muted={e.desc}>
                             {e.three_phase ? <div class="row">
                                 <div class="mb-1 col-12 col-sm-4">
                                     <OutputFloat value={this.state.all_values[e.i + 0]} digits={e.digits} scale={0} unit={e.unit}/>
@@ -743,7 +760,7 @@ export class Meter extends Component<{}, MeterState> {
                         </FormRow>)
                         }
                     </CollapsedSection> : undefined}
-            </>
+            </SubPage>
         )
     }
 }
