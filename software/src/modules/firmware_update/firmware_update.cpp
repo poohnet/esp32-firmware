@@ -38,8 +38,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-extern const char *DISPLAY_NAME;
-
 extern bool firmware_update_allowed;
 extern int8_t green_led_pin;
 
@@ -75,11 +73,8 @@ void factory_reset(bool restart_esp)
             tskIDLE_PRIORITY,
             &xTaskBuffer);
 
-#if MODULE_EVSE_AVAILABLE()
-    evse.factory_reset();
-#endif
-#if MODULE_EVSE_V2_AVAILABLE()
-    evse_v2.factory_reset();
+#if MODULE_EVSE_COMMON_AVAILABLE()
+    evse_common.factory_reset();
 #endif
 
     LittleFS.end();
@@ -163,9 +158,9 @@ String FirmwareUpdate::check_firmware_info(bool firmware_info_found, bool detect
             return "{\"error\":\"firmware_update.script.info_page_corrupted\"}";
         }
 
-        if (strncmp(DISPLAY_NAME, info.firmware_name, ARRAY_SIZE(info.firmware_name)) != 0) {
+        if (strncmp(BUILD_DISPLAY_NAME, info.firmware_name, ARRAY_SIZE(info.firmware_name)) != 0) {
             if (log) {
-                logger.printfln("Failed to update: Firmware is for a %.*s but this is a %s!", static_cast<int>(ARRAY_SIZE(info.firmware_name)), info.firmware_name, DISPLAY_NAME);
+                logger.printfln("Failed to update: Firmware is for a %.*s but this is a %s!", static_cast<int>(ARRAY_SIZE(info.firmware_name)), info.firmware_name, BUILD_DISPLAY_NAME);
             }
             return "{\"error\":\"firmware_update.script.wrong_firmware_type\"}";
         }
@@ -377,11 +372,9 @@ void FirmwareUpdate::register_urls()
 
         task_scheduler.scheduleOnce([](){
             logger.printfln("Config reset requested");
-#if MODULE_EVSE_AVAILABLE()
-            evse.factory_reset();
-#endif
-#if MODULE_EVSE_V2_AVAILABLE()
-            evse_v2.factory_reset();
+
+#if MODULE_EVSE_COMMON_AVAILABLE()
+        evse_common.factory_reset();
 #endif
 
 #if MODULE_USERS_AVAILABLE()

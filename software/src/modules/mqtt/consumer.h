@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2023 Mattias Schäffersmann <mattias@tinkerforge.com>
+ * Copyright (C) 2023 Erik Fleckstein <erik@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,25 +19,12 @@
 
 #pragma once
 
-#include "config.h"
-#include "module.h"
-#include "modules/mqtt/consumer.h"
+#include <stddef.h>
 
-class EmPvFaker final : public IModule, public IMqttConsumer
-{
+class IMqttConsumer {
 public:
-    EmPvFaker(){}
-    void pre_setup() override;
-    void setup() override;
-    void register_urls() override;
+    virtual ~IMqttConsumer() = default;
 
-    void onMqttConnect() override;
-    bool onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain) override;
-
-    ConfigRoot state;
-
-private:
-    ConfigRoot config;
-    ConfigRoot runtime_config;
-    ConfigRoot runtime_config_update;
+    virtual void onMqttConnect() {}
+    virtual bool onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain) { return false;}
 };

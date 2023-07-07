@@ -71,15 +71,8 @@ void CMNetworking::register_urls()
             MDNS.addServiceTxt("tf-warp-cm", "udp", "display_name", device_name.display_name.get("display_name")->asString());
         #endif
 
-            bool management_enabled = false;
-        #if MODULE_EVSE_AVAILABLE()
-            management_enabled = evse.management_enabled.get("enabled")->asBool();
-        #elif MODULE_EVSE_V2_AVAILABLE()
-            management_enabled = evse_v2.management_enabled.get("enabled")->asBool();
-        #endif
-
         // Keep "enabled" updated because it is retrieved from the EVSE.
-        MDNS.addServiceTxt("tf-warp-cm", "udp", "enabled", management_enabled ? "true" : "false");
+        MDNS.addServiceTxt("tf-warp-cm", "udp", "enabled", evse_common.get_management_enabled() ? "true" : "false");
     }, 0, 10000);
 #endif
 }
