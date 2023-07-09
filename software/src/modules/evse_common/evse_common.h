@@ -22,43 +22,143 @@
 #include "config.h"
 #include "module.h"
 
+#define CHARGING_SLOT_COUNT 14
+#define CHARGING_SLOT_COUNT_SUPPORTED_BY_EVSE 20
+
+#define CHARGING_SLOT_INCOMING_CABLE 0
+#define CHARGING_SLOT_OUTGOING_CABLE 1
+#define CHARGING_SLOT_SHUTDOWN_INPUT 2
+#define CHARGING_SLOT_GP_INPUT 3
+#define CHARGING_SLOT_AUTOSTART_BUTTON 4
+#define CHARGING_SLOT_GLOBAL 5
+#define CHARGING_SLOT_USER 6
+#define CHARGING_SLOT_CHARGE_MANAGER 7
+#define CHARGING_SLOT_EXTERNAL 8
+#define CHARGING_SLOT_MODBUS_TCP 9
+#define CHARGING_SLOT_MODBUS_TCP_ENABLE 10
+#define CHARGING_SLOT_OCPP 11
+#define CHARGING_SLOT_CHARGE_LIMITS 12
+#define CHARGING_SLOT_REQUIRE_METER 13
+
+#define IEC_STATE_A 0
+#define IEC_STATE_B 1
+#define IEC_STATE_C 2
+#define IEC_STATE_D 3
+#define IEC_STATE_EF 4
+
+#define CHARGER_STATE_NOT_PLUGGED_IN 0
+#define CHARGER_STATE_WAITING_FOR_RELEASE 1
+#define CHARGER_STATE_READY_TO_CHARGE 2
+#define CHARGER_STATE_CHARGING 3
+#define CHARGER_STATE_ERROR 4
+
+#define DATA_STORE_PAGE_CHARGE_TRACKER 0
+#define DATA_STORE_PAGE_RECOVERY 15
+
+#define SLOT_ACTIVE(x) ((bool)(x & 0x01))
+#define SLOT_CLEAR_ON_DISCONNECT(x) ((bool)(x & 0x02))
+
 class IEvseBackend : virtual public IModule {
-public:
+    friend class EvseCommon;
+protected:
     IEvseBackend() {}
     virtual ~IEvseBackend() {}
 
     virtual void post_setup() = 0;
     virtual void post_register_urls() = 0;
 
-    virtual String get_evse_debug_header() = 0;
-    virtual String get_evse_debug_line() = 0;
+    // Pass through to DeviceModule if used
+    virtual bool setup_device() = 0;
+    virtual bool is_in_bootloader(int rc) = 0;
 
-    virtual int get_charging_slot(uint8_t, uint16_t*, bool*, bool*) = 0;
-    virtual int set_charging_slot(uint8_t, uint16_t, bool, bool) = 0;
-
-    virtual void update_all_data() = 0;
-
+    // Pass through to bindings functions
     virtual void factory_reset() = 0;
+    virtual void reset() = 0;
 
     virtual void set_data_storage(uint8_t, const uint8_t*) = 0;
     virtual void get_data_storage(uint8_t, uint8_t*) = 0;
-    virtual void set_indicator_led(int16_t, uint16_t, uint8_t*) = 0;
 
-    virtual void check_debug() = 0;
+    virtual void set_indicator_led(int16_t, uint16_t, uint8_t*) = 0;
 
     virtual void set_control_pilot_disconnect(bool, bool*) = 0;
     virtual bool get_control_pilot_disconnect() = 0;
 
     virtual void set_boost_mode(bool enabled) = 0;
 
+    virtual int get_charging_slot(uint8_t, uint16_t*, bool*, bool*) = 0;
+    virtual int set_charging_slot(uint8_t, uint16_t, bool, bool) = 0;
     virtual void set_charging_slot_max_current(uint8_t slot, uint16_t current) = 0;
     virtual void set_charging_slot_clear_on_disconnect(uint8_t slot, bool clear_on_disconnect) = 0;
     virtual void set_charging_slot_active(uint8_t slot, bool enabled) = 0;
     virtual int get_charging_slot_default(uint8_t slot, uint16_t *ret_max_current, bool *ret_enabled, bool *ret_clear_on_disconnect) = 0;
     virtual int set_charging_slot_default(uint8_t slot, uint16_t current, bool enabled, bool clear_on_disconnect) = 0;
+    // End: Pass through to bindings functions
 
-    virtual bool is_in_bootloader(int rc) = 0;
+    virtual String get_evse_debug_header() = 0;
+    virtual String get_evse_debug_line() = 0;
+    virtual void update_all_data() = 0;
+};
 
+class EvseCommon final : public IModule {
+    // TODO: It's a bit ugly that we have to declare all specific EVSE modules as friends here.
+    // But this allows us to make the configs private, to enforce all access happens via the public methods below.
+    friend class EVSE;
+    friend class EVSEV2;
+
+private:
+    IEvseBackend *backend = nullptr;
+
+public:
+    EvseCommon();
+
+    void pre_setup() override;
+    void setup() override;
+    void register_urls() override;
+    void loop() override;
+
+    void setup_evse();
+
+    void set_managed_current(uint16_t);
+
+    void set_user_current(uint16_t);
+
+    void set_modbus_current(uint16_t);
+    void set_modbus_enabled(bool);
+
+    void set_require_meter_blocking(bool);
+    void set_require_meter_enabled(bool);
+    bool get_require_meter_blocking();
+    bool get_require_meter_enabled();
+
+    void set_charge_limits_slot(uint16_t, bool);
+
+    void set_ocpp_current(uint16_t);
+    uint16_t get_ocpp_current();
+
+    void factory_reset();
+    void reset();
+
+    void set_data_storage(uint8_t, const uint8_t*);
+    void get_data_storage(uint8_t, uint8_t*);
+    void set_indicator_led(int16_t, uint16_t, uint8_t*);
+
+    bool apply_slot_default(uint8_t slot, uint16_t current, bool enabled, bool clear);
+    void apply_defaults();
+
+    ConfigRoot& get_state();
+    ConfigRoot& get_slots();
+    ConfigRoot& get_low_level_state();
+    bool get_management_enabled();
+
+    void check_debug();
+
+    uint32_t last_current_update = 0;
+    bool shutdown_logged = false;
+
+    uint32_t last_debug_keep_alive = 0;
+    bool debug = false;
+
+private:
     ConfigRoot low_level_state;
     ConfigRoot management_enabled;
     ConfigRoot management_enabled_update;
@@ -92,55 +192,4 @@ public:
     ConfigRoot ocpp_enabled_update;
     ConfigRoot require_meter_enabled;
     ConfigRoot require_meter_enabled_update;
-
-    uint32_t last_debug_check = 0;
-
-    bool debug = false;
-};
-
-class EvseCommon final : public IModule {
-private:
-    IEvseBackend *backend = NULL;
-
-public:
-    EvseCommon();
-
-    void pre_setup() override;
-    void setup() override;
-    void register_urls() override;
-    void loop() override;
-
-    void set_managed_current(uint16_t);
-
-    void set_user_current(uint16_t);
-
-    void set_modbus_current(uint16_t);
-    void set_modbus_enabled(bool);
-
-    void set_require_meter_blocking(bool);
-    void set_require_meter_enabled(bool);
-    bool get_require_meter_blocking();
-    bool get_require_meter_enabled();
-
-    void set_charge_limits_slot(uint16_t, bool);
-
-    void set_ocpp_current(uint16_t);
-    uint16_t get_ocpp_current();
-
-    void factory_reset();
-
-    void set_data_storage(uint8_t, const uint8_t*);
-    void get_data_storage(uint8_t, uint8_t*);
-    void set_indicator_led(int16_t, uint16_t, uint8_t*);
-
-    bool apply_slot_default(uint8_t slot, uint16_t current, bool enabled, bool clear);
-    void apply_defaults();
-
-    ConfigRoot& get_state();
-    ConfigRoot& get_slots();
-    ConfigRoot& get_low_level_state();
-    bool get_management_enabled();
-
-    uint32_t last_current_update = 0;
-    bool shutdown_logged = false;
 };
