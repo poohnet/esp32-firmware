@@ -22,7 +22,9 @@ import { h, Component, createContext, Context, VNode, cloneElement, toChildArray
 export interface FormGroupProps {
     label: string
     label_muted?: string
+    // Don't use ComponentChildren here: We want to pass in the idContext. This only works on VNodes.
     children: VNode | VNode[]
+    valueClassList?: string
 }
 
 let id_counter = 0;
@@ -45,7 +47,7 @@ export class FormGroup extends Component<FormGroupProps, any> {
                     <span class={"form-label" + (props.label_muted ? " pr-2" : "")} dangerouslySetInnerHTML={{__html: props.label}}></span>
                     {props.label_muted ? <span class="text-muted" dangerouslySetInnerHTML={{__html: props.label_muted}}></span> : ""}
                 </label>
-                <div>
+                <div class={props.valueClassList}>
                     {(toChildArray(props.children) as VNode[]).map(c => cloneElement(c, {idContext: this.idContext}))}
                 </div>
             </div>

@@ -23,7 +23,6 @@
 
 #include "api.h"
 #include "config.h"
-#include "consumer.h"
 
 enum class MqttConnectionState {
     NOT_CONFIGURED,
@@ -34,8 +33,9 @@ enum class MqttConnectionState {
 
 struct MqttCommand {
     String topic;
-    std::function<void(char *, size_t)> callback;
+    std::function<void(const char *, size_t, char *, size_t)> callback;
     bool forbid_retained;
+    bool starts_with_global_topic_prefix;
 };
 
 struct MqttState {
@@ -53,12 +53,11 @@ public:
     void register_events() override;
     void connect();
 
-    void publish_with_prefix(const String &path, const String &payload);
-    void subscribe_with_prefix(const String &path, std::function<void(char *, size_t)> callback, bool forbid_retained);
+    // Retain messages by default because we only send on change.
+    void publish_with_prefix(const String &path, const String &payload, bool retain=true);
+    void subscribe_with_prefix(const String &path, std::function<void(const char *, size_t, char *, size_t)> callback, bool forbid_retained);
     void publish(const String &topic, const String &payload, bool retain);
-    void subscribe(const String &topic, std::function<void(char *, size_t)> callback, bool forbid_retained);
-
-    void register_consumer(IMqttConsumer *consumer);
+    void subscribe(const String &topic, std::function<void(const char *, size_t, char *, size_t)> callback, bool forbid_retained);
 
     // IAPIBackend implementation
     void addCommand(size_t commandIdx, const CommandRegistration &reg) override;
@@ -79,10 +78,9 @@ public:
 
     std::vector<MqttCommand> commands;
     std::vector<MqttState> states;
+private:
     esp_mqtt_client_handle_t client;
 
     uint32_t last_connected_ms = 0;
     bool was_connected = false;
-
-    std::vector<IMqttConsumer *> consumers;
 };

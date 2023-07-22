@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2023 Erik Fleckstein <erik@tinkerforge.com>
+ * Copyright (C) 2022 Olaf Lüke <olaf@tinkerforge.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,12 +19,39 @@
 
 #pragma once
 
-#include <stddef.h>
+#include <stdint.h>
 
-class IMqttConsumer {
-public:
-    virtual ~IMqttConsumer() = default;
+typedef struct {
+    uint32_t last_update;
+    bool is_valid;
 
-    virtual void onMqttConnect() {}
-    virtual bool onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain) { return false;}
+    bool contactor_value;
+
+    uint8_t rgb_value_r;
+    uint8_t rgb_value_g;
+    uint8_t rgb_value_b;
+
+    float power;
+    float energy_import;
+    float energy_export;
+
+    uint8_t energy_meter_type;
+    uint32_t error_count[6];
+
+    bool input[2];
+    bool relay;
+    uint16_t voltage;
+    uint8_t contactor_check_state;
+    uint32_t uptime;
+} EnergyManagerAllData;
+
+struct sdcard_info {
+    uint32_t sd_status;
+    uint32_t lfs_status;
+    uint32_t card_type;
+    uint32_t sector_count;
+    uint16_t sector_size;
+    uint8_t  manufacturer_id;
+    uint8_t  product_rev;
+    char     product_name[6];
 };

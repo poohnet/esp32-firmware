@@ -28,6 +28,8 @@
 #include "event_log.h"
 #include "build.h"
 
+#include "matchTopicFilter.h"
+
 extern char local_uid_str[32];
 
 #if MODULE_ESP32_ETHERNET_BRICK_AVAILABLE()
@@ -69,16 +71,16 @@ void Mqtt::pre_setup()
     });
 }
 
-void Mqtt::subscribe_with_prefix(const String &path, std::function<void(char *, size_t)> callback, bool forbid_retained)
+void Mqtt::subscribe_with_prefix(const String &path, std::function<void(const char *, size_t, char *, size_t)> callback, bool forbid_retained)
 {
     const String &prefix = config_in_use.get("global_topic_prefix")->asString();
     String topic = prefix + "/" + path;
     subscribe(topic, callback, forbid_retained);
 }
 
-void Mqtt::subscribe(const String &topic, std::function<void(char *, size_t)> callback, bool forbid_retained)
+void Mqtt::subscribe(const String &topic, std::function<void(const char *, size_t, char *, size_t)> callback, bool forbid_retained)
 {
-    this->commands.push_back({topic, callback, forbid_retained});
+    this->commands.push_back({topic, callback, forbid_retained, topic.startsWith(config_in_use.get("global_topic_prefix")->asString())});
 
     esp_mqtt_client_unsubscribe(client, topic.c_str());
     esp_mqtt_client_subscribe(client, topic.c_str(), 0);
@@ -109,12 +111,11 @@ void Mqtt::addResponse(size_t responseIdx, const ResponseRegistration &reg)
 {
 }
 
-void Mqtt::publish_with_prefix(const String &path, const String &payload)
+void Mqtt::publish_with_prefix(const String &path, const String &payload, bool retain)
 {
     const String &prefix = config_in_use.get("global_topic_prefix")->asString();
     String topic = prefix + "/" + path;
-    // Retain messages because we only send on change.
-    publish(topic, payload, true);
+    publish(topic, payload, retain);
 }
 
 void Mqtt::publish(const String &topic, const String &payload, bool retain)
@@ -147,7 +148,6 @@ void Mqtt::onMqttConnect()
     logger.printfln("MQTT: Connected to broker.");
     this->state.get("connection_state")->updateInt((int)MqttConnectionState::CONNECTED);
 
-    this->commands.clear();
     for (size_t i = 0; i < api.commands.size(); ++i) {
         auto &reg = api.commands[i];
         this->addCommand(i, reg);
@@ -160,14 +160,17 @@ void Mqtt::onMqttConnect()
         publish_with_prefix(reg.path, reg.config->to_string_except(reg.keys_to_censor));
     }
 
-    for (auto *consumer : this->consumers) {
-        consumer->onMqttConnect();
-    }
-
     const String &prefix = config_in_use.get("global_topic_prefix")->asString();
     String topic = prefix + "/#";
     esp_mqtt_client_unsubscribe(client, topic.c_str());
     esp_mqtt_client_subscribe(client, topic.c_str(), 0);
+
+    for (auto &cmd : this->commands) {
+        if (cmd.starts_with_global_topic_prefix)
+            continue;
+        esp_mqtt_client_unsubscribe(client, cmd.topic.c_str());
+        esp_mqtt_client_subscribe(client, cmd.topic.c_str(), 0);
+    }
 }
 
 void Mqtt::onMqttDisconnect()
@@ -193,16 +196,8 @@ void Mqtt::onMqttDisconnect()
 
 void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain)
 {
-    for (auto *consumer : this->consumers) {
-        if (consumer->onMqttMessage(topic, topic_len, data, data_len, retain)) {
-            return;
-        }
-    }
-
     for (auto &c : commands) {
-        if (c.topic.length() != topic_len)
-            continue;
-        if (memcmp(c.topic.c_str(), topic, topic_len) != 0)
+        if (!matchTopicFilter(topic, topic_len, c.topic.c_str(), c.topic.length()))
             continue;
 
         if (retain && c.forbid_retained) {
@@ -210,7 +205,7 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
             return;
         }
 
-        c.callback(data, data_len);
+        c.callback(topic, topic_len, data, data_len);
         return;
     }
 
@@ -235,13 +230,10 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
             return;
         }
 
-        String error = reg.config->update_from_cstr(data, data_len);
-        if(error == "") {
-            task_scheduler.scheduleOnce([reg](){reg.callback();}, 0);
-            return;
-        }
+        String error = api.callCommand(reg, data, data_len);
 
-        logger.printfln("MQTT: Failed to update %s from MQTT payload: %s", reg.path.c_str(), error.c_str());
+        if (error != "")
+            logger.printfln("MQTT: Failed to update %s from MQTT payload: %s", reg.path.c_str(), error.c_str());
         return;
     }
 
@@ -361,10 +353,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         default:
             break;
     }
-}
-
-void Mqtt::register_consumer(IMqttConsumer *consumer) {
-    this->consumers.push_back(consumer);
 }
 
 void Mqtt::setup()

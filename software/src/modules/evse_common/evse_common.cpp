@@ -18,7 +18,7 @@
  */
 
 #include "evse_common.h"
-#include "modules.h"
+#include "module_dependencies.h"
 
 extern uint32_t local_uid_num;
 
@@ -416,7 +416,7 @@ void EvseCommon::register_urls() {
         if (enabled)
             backend->set_charging_slot(CHARGING_SLOT_CHARGE_MANAGER, 0, true, true);
         else
-            backend->set_charging_slot(CHARGING_SLOT_CHARGE_MANAGER, 32000, true, true);
+            backend->set_charging_slot(CHARGING_SLOT_CHARGE_MANAGER, 32000, false, false);
 
         if (enabled)
             apply_slot_default(CHARGING_SLOT_CHARGE_MANAGER, 0, true, true);
@@ -441,7 +441,7 @@ void EvseCommon::register_urls() {
         if (enabled)
             backend->set_charging_slot(CHARGING_SLOT_USER, 0, true, true);
         else
-            backend->set_charging_slot(CHARGING_SLOT_USER, 0, true, true);
+            backend->set_charging_slot(CHARGING_SLOT_USER, 32000, false, false);
 
         if (enabled)
             apply_slot_default(CHARGING_SLOT_USER, 0, true, true);
