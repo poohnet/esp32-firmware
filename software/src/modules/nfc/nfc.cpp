@@ -25,7 +25,7 @@
 #include "event_log.h"
 #include "tools.h"
 #include "task_scheduler.h"
-#include "modules.h"
+#include "module_dependencies.h"
 
 #define AUTHORIZED_TAG_LIST_LENGTH 16
 
@@ -168,7 +168,7 @@ void NFC::tag_seen(tag_info_t *tag, bool injected)
         piezo_speaker.beep();
 #endif
 #if MODULE_USERS_AVAILABLE()
-        users.trigger_charge_action(user_id, injected ? CHARGE_TRACKER_AUTH_TYPE_NFC_INJECTION : CHARGE_TRACKER_AUTH_TYPE_NFC, Config::Object({
+        users.trigger_charge_action(user_id, injected ? USERS_AUTH_TYPE_NFC_INJECTION : USERS_AUTH_TYPE_NFC, Config::Object({
                 {"tag_type", Config::Uint8(tag->tag_type)},
                 {"tag_id", Config::Str(tag->tag_id, 0, 30)}}).value,
                 injected ? tag_injection_action : TRIGGER_CHARGE_ANY);

@@ -42,6 +42,7 @@ import { EVSE_SLOT_USER } from "../evse_common/api";
 import { ItemModal } from "src/ts/components/item_modal";
 import { SubPage } from "src/ts/components/sub_page";
 import { Table } from "../../ts/components/table";
+import { Check } from "react-feather";
 
 const MAX_ACTIVE_USERS = 17;
 
@@ -190,6 +191,18 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
                 u.password !== undefined &&
                 u.password !== null &&      // password will be changed/set
                 u.password !== "")          // password will not be removed, an empty string as password would mean to remove the password
+    }
+
+    get_password_replacement(u: User) {
+        if (!this.user_has_password(u)) {
+            return '';
+        }
+
+        if (u.password !== undefined && u.password !== null) {
+            return '\u2022'.repeat(u.password.length);
+        }
+
+        return <span style="color: rgb(85,85,85);">{__("component.input_password.unchanged")}</span>;
     }
 
     http_auth_allowed() {
@@ -369,20 +382,20 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
 
                     <FormRow label={__("users.content.authorized_users")}>
 
-                        <Table columnNames={[__("users.script.username"), __("users.script.display_name"), __("users.script.current"), __("users.script.password")]}
+                        <Table columnNames={[__("users.content.table_username"), __("users.content.table_display_name"), __("users.content.table_current"), __("users.content.table_password")]}
                             rows={state.users.slice(1).map((user, i) =>
                                 { return {
                                     columnValues: [
-                                        user.username,
-                                        user.display_name,
-                                        util.toLocaleFixed(user.current / 1000, 3) + ' A',
-                                        this.user_has_password(user) ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : ''
+                                        [user.username],
+                                        [user.display_name],
+                                        [util.toLocaleFixed(user.current / 1000, 3) + ' A'],
+                                        this.user_has_password(user) ? [<Check/>, this.get_password_replacement(user)] : ['', <span style="color: rgb(85,85,85);">{__("users.script.login_disabled")}</span>]
                                     ],
                                     editTitle: __("users.content.edit_user_title"),
                                     onEditStart: async () => this.setState({editUser: {id: user.id, roles: user.roles, username: user.username, display_name: user.display_name, current: user.current, digest_hash: user.digest_hash, password: user.password, is_invalid: user.is_invalid}}),
                                     onEditGetRows: () => [
                                         {
-                                            name: __("users.script.username"),
+                                            name: __("users.content.edit_user_username"),
                                             value: <InputText
                                                         value={state.editUser.username}
                                                         onValue={(v) => this.setState({editUser: {...state.editUser, username: v}})}
@@ -393,7 +406,7 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
                                                         invalidFeedback={this.errorMessage(state.editUser)}/>
                                         },
                                         {
-                                            name: __("users.script.display_name"),
+                                            name: __("users.content.edit_user_display_name"),
                                             value: <InputText
                                                         value={state.editUser.display_name}
                                                         onValue={(v) => this.setState({editUser: {...state.editUser, display_name: v}})}
@@ -402,7 +415,7 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
                                                         required/>
                                         },
                                         {
-                                            name: __("users.script.current"),
+                                            name: __("users.content.edit_user_current"),
                                             value: <InputFloat
                                                         unit="A"
                                                         value={state.editUser.current}
@@ -412,7 +425,7 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
                                                         max={32000}/>
                                         },
                                         {
-                                            name: __("users.script.password"),
+                                            name: __("users.content.edit_user_password"),
                                             value: <InputPassword
                                                         required={this.require_password(state.editUser)}
                                                         maxLength={64}
@@ -442,10 +455,10 @@ export class Users extends ConfigComponent<'users/config', {}, UsersState> {
                                     }}
                                 })
                             }
-                            // One user slot is always taken by the unknown user, so display MAX_ACTIVE_USERS - 1 as the maximum number of users that can be added.
-                            maxRowCount={MAX_ACTIVE_USERS - 1}
+                            addEnabled={API.get('users/config').next_user_id != 0 && state.users.length < MAX_ACTIVE_USERS}
                             addTitle={__("users.content.add_user_title")}
-                            addMessage={__("users.script.add_user_prefix") + (state.users.length - 1) + __("users.script.add_user_infix") + (MAX_ACTIVE_USERS - 1) + __("users.script.add_user_suffix")}
+                            // One user slot is always taken by the unknown user, so display MAX_ACTIVE_USERS - 1 as the maximum number of users that can be added.
+                            addMessage={API.get('users/config').next_user_id == 0 ? __("users.content.add_user_user_ids_exhausted") : __("users.content.add_user_prefix") + (state.users.length - 1) + __("users.content.add_user_infix") + (MAX_ACTIVE_USERS - 1) + __("users.content.add_user_suffix")}
                             onAddStart={async () => this.setState({addUser: {id: -1, roles: 0xFFFF, username: "", display_name: "", current: 32000, digest_hash: "", password: "", is_invalid: 0}})}
                             onAddGetRows={() => [
                                 {

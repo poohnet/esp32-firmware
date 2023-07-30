@@ -32,7 +32,7 @@ export interface TableModalRow {
 }
 
 export interface TableRow {
-    columnValues: ComponentChild[]
+    columnValues: ComponentChild[][]
     editTitle?: string
     onEditStart?: () => Promise<void>
     onEditGetRows?: () => TableModalRow[]
@@ -45,7 +45,7 @@ export interface TableRow {
 export interface TableProps {
     columnNames: string[]
     rows: TableRow[]
-    maxRowCount?: number
+    addEnabled?: boolean
     addMessage?: string
     addTitle?: string
     onAddStart?: () => Promise<void>
@@ -60,6 +60,14 @@ interface TableState {
     showAddModal: boolean
     showEditModal: number
 }
+
+const get_column_value = (value: ComponentChild[], i: number): ComponentChild => {
+    if (i < value.length) {
+        return value[i];
+    }
+
+    return value[0];
+};
 
 export class Table extends Component<TableProps, TableState> {
     constructor() {
@@ -93,7 +101,7 @@ export class Table extends Component<TableProps, TableState> {
                         {props.rows.map((row, i) =>
                             <tr>
                                 {row.columnValues.map((value) => (
-                                    <td class="text-break" style="vertical-align: middle;">{value}</td>
+                                    <td class="text-break" style="vertical-align: middle;">{get_column_value(value, 0)}</td>
                                 ))}
                                 <td style="width: 1%; white-space: nowrap; vertical-align: middle;">
                                     <Button variant="primary"
@@ -119,14 +127,14 @@ export class Table extends Component<TableProps, TableState> {
                             <td colSpan={props.columnNames.length} style="vertical-align: middle; width: 100%;">
                                 {props.addMessage}
                             </td>
-                            <td style="text-align: right;">
+                            <td style="text-align: right; vertical-align: middle;">
                                 <Button variant="primary"
                                         size="sm"
                                         onClick={async () => {
                                             await props.onAddStart();
                                             this.setState({showAddModal: true});
                                         }}
-                                        disabled={props.maxRowCount !== undefined && props.rows.length >= props.maxRowCount}>
+                                        disabled={!props.addEnabled}>
                                     <Plus/>
                                 </Button>
                             </td>
@@ -138,8 +146,8 @@ export class Table extends Component<TableProps, TableState> {
 
                 <div class={`d-block d-${props.tableTill ? props.tableTill : 'sm'}-none`}>
                     {props.rows.map((row, i) => <Card className="mb-3">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="text-break" style="margin-bottom: 0;">{row.columnValues[0]}</h5>
+                        <div class="card-header d-flex justify-content-between align-items-center" style="padding: 1rem;">
+                            <h5 class="text-break" style="margin-bottom: 0;">{get_column_value(row.columnValues[0], 1)}</h5>
                             <div style="white-space: nowrap; vertical-align: middle;">
                                 <Button variant="primary"
                                         size="sm"
@@ -160,15 +168,15 @@ export class Table extends Component<TableProps, TableState> {
                                 </Button>
                             </div>
                         </div>
-                        <Card.Body style="padding-bottom: 0.5rem;">
-                        {props.columnNames.slice(1).map((columnName, i) =>
-                        <FormGroup label={columnName}>
-                            <span class="form-control" style="height: unset;" readonly>{row.columnValues[1 + i] ? row.columnValues[1 + i] : <>&nbsp;</>}</span>
+                        <Card.Body style="padding: 1rem;">
+                        {props.columnNames.slice(1).map((columnName, i, array) =>
+                        <FormGroup label={columnName} classList={i == array.length - 1 ? " mb-0" : ""}>
+                            <span class="form-control" style="height: unset;" readonly>{get_column_value(row.columnValues[1 + i], 1) ? get_column_value(row.columnValues[1 + i], 1) : <>&nbsp;</>}</span>
                         </FormGroup>)}
                     </Card.Body></Card>)}
                     {props.onAddStart ?
                     <Card className="mb-0">
-                        <div class="card-body d-flex justify-content-between align-items-center">
+                        <div class="card-body d-flex justify-content-between align-items-center" style="padding: 1rem;">
                             <span class="text-break" style="font-size: 1rem;">{props.addMessage}</span>
                             <div style="white-space: nowrap; vertical-align: middle;">
                             <Button variant="primary"
@@ -178,7 +186,7 @@ export class Table extends Component<TableProps, TableState> {
                                         await props.onAddStart();
                                         this.setState({showAddModal: true});
                                     }}
-                                    disabled={props.maxRowCount !== undefined && props.rows.length >= props.maxRowCount}>
+                                    disabled={!props.addEnabled}>
                                 <Plus/>
                             </Button>
                             </div>
@@ -216,8 +224,8 @@ export class Table extends Component<TableProps, TableState> {
                     no_text={__("component.table.abort")}
                     yes_text={__("component.table.add")}>
                     {state.showAddModal && props.onAddGetRows ?
-                        props.onAddGetRows().map((addRow) =>
-                        <FormGroup label={addRow.name} valueClassList={addRow.valueClassList}>
+                        props.onAddGetRows().map((addRow, i, array) =>
+                        <FormGroup label={addRow.name} classList={i == array.length - 1 ? " mb-0" : ""} valueClassList={addRow.valueClassList}>
                             {addRow.value}
                         </FormGroup>) : undefined}
                 </ItemModal>
@@ -251,8 +259,8 @@ export class Table extends Component<TableProps, TableState> {
                     no_text={__("component.table.abort")}
                     yes_text={__("component.table.apply")}>
                     {state.showEditModal !== null && props.rows[state.showEditModal].onEditGetRows ?
-                        props.rows[state.showEditModal].onEditGetRows().map((editRow) =>
-                        <FormGroup label={editRow.name} valueClassList={editRow.valueClassList}>
+                        props.rows[state.showEditModal].onEditGetRows().map((editRow, i, array) =>
+                        <FormGroup label={editRow.name} classList={i == array.length - 1 ? " mb-0" : ""} valueClassList={editRow.valueClassList}>
                             {editRow.value}
                         </FormGroup>) : undefined}
                 </ItemModal>
