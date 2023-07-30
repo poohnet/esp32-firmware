@@ -17,7 +17,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "dual_ac_relay.h"
+#include "industrial_dual_ac_relay.h"
 
 #include "bindings/errors.h"
 
@@ -35,41 +35,41 @@ extern TaskScheduler task_scheduler;
 extern API api;
 
 
-DualACRelay::DualACRelay()
-  : DeviceModule("dual_ac_relay", "Dual AC Relay", "Dual AC Relay", std::bind(&DualACRelay::setup_DualACRelay, this))
+IndustrialDualACRelay::IndustrialDualACRelay()
+  : DeviceModule("industrial_dual_ac_relay", "Industrial Dual AC Relay", "Industrial Dual AC Relay", std::bind(&IndustrialDualACRelay::setup_IndustrialDualACRelay, this))
 {
 }
 
-DualACRelay::~DualACRelay()
+IndustrialDualACRelay::~IndustrialDualACRelay()
 {
 }
 
-void DualACRelay::pre_setup()
+void IndustrialDualACRelay::pre_setup()
 {
 }
 
-void DualACRelay::setup_DualACRelay()
+void IndustrialDualACRelay::setup_IndustrialDualACRelay()
 {
   if (!this->DeviceModule::setup_device()) {
     return;
   }
 }
 
-void DualACRelay::setup()
+void IndustrialDualACRelay::setup()
 {
-  setup_DualACRelay();
+  setup_IndustrialDualACRelay();
 
   if (!device_found) {
     return;
   }
 }
 
-void DualACRelay::register_urls()
+void IndustrialDualACRelay::register_urls()
 {
   this->DeviceModule::register_urls();
 }
 
-void DualACRelay::loop()
+void IndustrialDualACRelay::loop()
 {
   this->DeviceModule::loop();
 }

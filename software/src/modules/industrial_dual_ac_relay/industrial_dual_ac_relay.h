@@ -25,7 +25,7 @@
 #include "bindings/bricklet_industrial_dual_ac_relay.h"
 #include "industrial_dual_ac_relay_bricklet_firmware_bin.embedded.h"
 
-class DualACRelay : public DeviceModule<TF_IndustrialDualACRelay,
+class IndustrialDualACRelay : public DeviceModule<TF_IndustrialDualACRelay,
                                 industrial_dual_ac_relay_bricklet_firmware_bin_data,
                                 industrial_dual_ac_relay_bricklet_firmware_bin_length,
                                 tf_industrial_dual_ac_relay_create,
@@ -33,8 +33,8 @@ class DualACRelay : public DeviceModule<TF_IndustrialDualACRelay,
                                 tf_industrial_dual_ac_relay_reset,
                                 tf_industrial_dual_ac_relay_destroy> {
 public:
-    DualACRelay();
-    ~DualACRelay();
+    IndustrialDualACRelay();
+    ~IndustrialDualACRelay();
 
     void pre_setup();
     void setup();
@@ -42,5 +42,5 @@ public:
     void loop();
 
 private:
-    void setup_DualACRelay();
+    void setup_IndustrialDualACRelay();
 };
