@@ -34,12 +34,12 @@ class IndustrialDualACRelay : public DeviceModule<TF_IndustrialDualACRelay,
                                 tf_industrial_dual_ac_relay_destroy> {
 public:
     IndustrialDualACRelay();
-    ~IndustrialDualACRelay();
+    ~IndustrialDualACRelay() override;
 
-    void pre_setup();
-    void setup();
-    void register_urls();
-    void loop();
+    void pre_setup() override;
+    void setup() override;
+    void register_urls() override;
+    void loop() override;
 
 private:
     void setup_IndustrialDualACRelay();

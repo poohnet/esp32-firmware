@@ -36,7 +36,7 @@ extern API api;
 
 
 IndustrialDualACRelay::IndustrialDualACRelay()
-  : DeviceModule("industrial_dual_ac_relay", "Industrial Dual AC Relay", "Industrial Dual AC Relay", std::bind(&IndustrialDualACRelay::setup_IndustrialDualACRelay, this))
+  : DeviceModule("industrial_dual_ac_relay", "Industrial Dual AC Relay", "Industrial Dual AC Relay", [this](){this->setup_IndustrialDualACRelay();})
 {
 }
 

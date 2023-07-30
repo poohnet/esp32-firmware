@@ -34,12 +34,12 @@ class IndustrialQuadRelay : public DeviceModule<TF_IndustrialQuadRelayV2,
                                 tf_industrial_quad_relay_v2_destroy> {
 public:
     IndustrialQuadRelay();
-    ~IndustrialQuadRelay();
+    ~IndustrialQuadRelay() override;
 
-    void pre_setup();
-    void setup();
-    void register_urls();
-    void loop();
+    void pre_setup() override;
+    void setup() override;
+    void register_urls() override;
+    void loop() override;
 
 private:
     void setup_IndustrialQuadRelay();

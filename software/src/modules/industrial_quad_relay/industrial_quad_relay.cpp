@@ -36,7 +36,7 @@ extern API api;
 
 
 IndustrialQuadRelay::IndustrialQuadRelay()
-  : DeviceModule("industrial_quad_relay", "Industrial Quad Relay", "Industrial Quad Relay", std::bind(&IndustrialQuadRelay::setup_IndustrialQuadRelay, this))
+  : DeviceModule("industrial_quad_relay", "Industrial Quad Relay", "Industrial Quad Relay", [this](){this->setup_IndustrialQuadRelay();})
 {
 }
 
