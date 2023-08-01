@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2020-2021 Erik Fleckstein <erik@tinkerforge.com>
+ * Copyright (C) 2023 Thomas Hein
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,22 +19,6 @@
 
 #include "industrial_quad_relay.h"
 
-#include "bindings/errors.h"
-
-#include "api.h"
-#include "event_log.h"
-#include "tools.h"
-#include "task_scheduler.h"
-#include "modules.h"
-
-extern EventLog logger;
-
-extern TF_HAL hal;
-extern TaskScheduler task_scheduler;
-
-extern API api;
-
-
 IndustrialQuadRelay::IndustrialQuadRelay()
   : DeviceModule("industrial_quad_relay", "Industrial Quad Relay", "Industrial Quad Relay", [this](){this->setup_IndustrialQuadRelay();})
 {
@@ -53,6 +37,14 @@ void IndustrialQuadRelay::setup_IndustrialQuadRelay()
   if (!this->DeviceModule::setup_device()) {
     return;
   }
+
+  tf_industrial_quad_relay_v2_set_status_led_config(&device, TF_INDUSTRIAL_QUAD_RELAY_V2_STATUS_LED_CONFIG_SHOW_STATUS);
+
+  for (uint8_t channel = 0; channel < 4; channel++) {
+    tf_industrial_quad_relay_v2_set_channel_led_config(&device, channel, TF_INDUSTRIAL_QUAD_RELAY_V2_CHANNEL_LED_CONFIG_SHOW_CHANNEL_STATUS);
+  }
+
+  initialized = true;
 }
 
 void IndustrialQuadRelay::setup()
@@ -72,4 +64,35 @@ void IndustrialQuadRelay::register_urls()
 void IndustrialQuadRelay::loop()
 {
   this->DeviceModule::loop();
+}
+
+bool IndustrialQuadRelay::getValue(uint8_t channel)
+{
+  if (channel < 4) {
+    bool values[4] = { false };
+    int rc = tf_industrial_quad_relay_v2_get_value(&device, values);
+
+    if (rc == TF_E_OK) {
+      return values[channel];
+    }
+
+    logger.printfln("tf_industrial_quad_relay_v2_get_value returned %d", rc);
+    is_in_bootloader(rc);
+  }
+
+  return false;
+}
+
+void IndustrialQuadRelay::setValue(uint8_t channel, bool value)
+{
+  if (channel < 4) {
+    int rc = tf_industrial_quad_relay_v2_set_selected_value(&device, channel, value);
+
+    if (rc == TF_E_OK) {
+      return;
+    }
+
+    logger.printfln("tf_industrial_quad_relay_v2_set_selected_value returned %d", rc);
+    is_in_bootloader(rc);
+  }
 }

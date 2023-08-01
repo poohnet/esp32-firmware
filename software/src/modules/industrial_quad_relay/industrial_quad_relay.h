@@ -19,7 +19,6 @@
 
 #pragma once
 
-#include "config.h"
 #include "device_module.h"
 
 #include "bindings/bricklet_industrial_quad_relay_v2.h"
@@ -33,14 +32,17 @@ class IndustrialQuadRelay : public DeviceModule<TF_IndustrialQuadRelayV2,
                                 tf_industrial_quad_relay_v2_reset,
                                 tf_industrial_quad_relay_v2_destroy> {
 public:
-    IndustrialQuadRelay();
-    ~IndustrialQuadRelay() override;
+  IndustrialQuadRelay();
+  ~IndustrialQuadRelay() override;
 
-    void pre_setup() override;
-    void setup() override;
-    void register_urls() override;
-    void loop() override;
+  void pre_setup() override;
+  void setup() override;
+  void register_urls() override;
+  void loop() override;
+
+  bool getValue(uint8_t channel);
+  void setValue(uint8_t channel, bool value);
 
 private:
-    void setup_IndustrialQuadRelay();
+  void setup_IndustrialQuadRelay();
 };
