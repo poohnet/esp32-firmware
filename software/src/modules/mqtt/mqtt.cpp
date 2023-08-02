@@ -30,6 +30,7 @@
 
 #include "matchTopicFilter.h"
 
+extern Mqtt mqtt;
 extern char local_uid_str[32];
 
 #if MODULE_ESP32_ETHERNET_BRICK_AVAILABLE()
@@ -69,6 +70,24 @@ void Mqtt::pre_setup()
         {"connection_end", Config::Uint32(0)},
         {"last_error", Config::Int(0)}
     });
+
+#if MODULE_CRON_AVAILABLE()
+    ConfUnionPrototype proto;
+    proto.tag = CRON_TRIGGER_MQTT;
+    proto.config = Config::Object({
+            {"topic", Config::Str("", 0, 64)},
+            {"payload", Config::Str("", 0, 64)},
+            {"retain", Config::Bool(false)}
+        });
+
+    cron.register_trigger(proto);
+
+    proto.tag = CRON_ACTION_MQTT;
+
+    cron.register_action(proto, [this](const Config *cfg) {
+        publish(cfg->get("topic")->asString(), cfg->get("payload")->asString(), cfg->get("retain")->asBool());
+    });
+#endif
 }
 
 void Mqtt::subscribe_with_prefix(const String &path, std::function<void(const char *, size_t, char *, size_t)> callback, bool forbid_retained)
@@ -194,6 +213,12 @@ void Mqtt::onMqttDisconnect()
     }
 }
 
+#if MODULE_CRON_AVAILABLE()
+static bool trigger_action(Config *cfg, void *data) {
+    return mqtt.action_triggered(cfg, data);
+}
+#endif
+
 void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain)
 {
     for (auto &c : commands) {
@@ -208,7 +233,6 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
         c.callback(topic, topic_len, data, data_len);
         return;
     }
-
     const String &prefix = this->config_in_use.get("global_topic_prefix")->asString();
     if (topic_len < prefix.length() + 1) // + 1 because we will check for the / between the prefix and the topic.
         return;
@@ -261,6 +285,15 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
             continue;
         return;
     }
+
+#if MODULE_CRON_AVAILABLE()
+    MqttMessage msg;
+    msg.topic = String(topic).substring(0, topic_len);
+    msg.payload = String(data).substring(0, data_len);
+    msg.retained = retain;
+    if (cron.trigger_action(CRON_TRIGGER_MQTT, &msg, &trigger_action))
+        return;
+#endif
 
     // Don't print error message if this packet was received because it was retained (as opposed to a newly published message)
     // The spec says:
@@ -414,6 +447,32 @@ void Mqtt::register_urls()
 {
     api.addPersistentConfig("mqtt/config", &config, {"broker_password"}, 1000);
     api.addState("mqtt/state", &state, {}, 1000);
+
+#if MODULE_CRON_AVAILABLE()
+    if (cron.is_trigger_active(CRON_TRIGGER_MQTT)) {
+        ConfigVec trigger_config = cron.get_configured_triggers(CRON_TRIGGER_MQTT);
+        std::vector<String> subscribed_topics;
+        for (auto &conf: trigger_config) {
+            bool already_subscribed = false;
+            for (auto &new_topic: subscribed_topics) {
+                if (conf.second->get("topic")->asString() == new_topic)
+                    already_subscribed = true;
+            }
+            const size_t idx = conf.first;
+            if (!already_subscribed) {
+                subscribe(conf.second->get("topic")->asString(), [this, idx](const char *tpic, size_t tpic_len, char * data, size_t data_len) {
+                    MqttMessage msg;
+                    msg.topic = String(tpic).substring(0, tpic_len);
+                    msg.payload = String(data).substring(0, data_len);
+                    msg.retained = false;
+                    if (cron.trigger_action(CRON_TRIGGER_MQTT, &msg, &trigger_action))
+                        return;
+                }, false);
+                subscribed_topics.push_back(conf.second->get("topic")->asString());
+            }
+        }
+    }
+#endif
 }
 
 void Mqtt::register_events() {
@@ -436,3 +495,21 @@ void Mqtt::register_events() {
             esp_mqtt_client_start(client);
         }, 20000);
 }
+
+#if MODULE_CRON_AVAILABLE()
+bool Mqtt::action_triggered(Config *config, void *data) {
+    Config *cfg = (Config*)config->get();
+    MqttMessage *msg = (MqttMessage *)data;
+    switch (config->getTag())
+    {
+    case CRON_TRIGGER_MQTT:
+        if (cfg->get("payload")->asString() == msg->payload)
+            return true;
+        break;
+
+    default:
+        break;
+    }
+    return false;
+}
+#endif

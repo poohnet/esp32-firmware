@@ -43,6 +43,12 @@ struct MqttState {
     uint32_t last_send_ms;
 };
 
+struct MqttMessage {
+    String topic;
+    String payload;
+    bool retained;
+};
+
 class Mqtt final : public IAPIBackend
 {
 public:
@@ -70,6 +76,8 @@ public:
     void onMqttConnect();
     void onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_len, bool retain);
     void onMqttDisconnect();
+
+    bool action_triggered(Config *config, void *data);
 
     ConfigRoot config;
     ConfigRoot state;
