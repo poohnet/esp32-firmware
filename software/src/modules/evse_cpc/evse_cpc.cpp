@@ -42,7 +42,7 @@ void EvseCPC::setup()
   initialized = true;
   api.addFeature("cp_disconnect");
 
-  logger.printfln("EvseCPC: Enabling CP.");
+  logger.printfln("EvseCPC: Enabling Control Pilot.");
   industrial_quad_relay.setValue(0, true);
 }
 
