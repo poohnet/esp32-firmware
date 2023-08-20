@@ -639,14 +639,7 @@ void EVSE::update_all_data()
 
 void EVSE::set_control_pilot_disconnect(bool cp_disconnect, bool *cp_disconnected) {
 #if MODULE_EVSE_CPC_AVAILABLE()
-    auto iec61851_state = evse_common.state.get("iec61851_state")->asUint();
-
-    if ((iec61851_state == IEC_STATE_A) || (iec61851_state == IEC_STATE_B)) {
-        evse_cpc.set_control_pilot_disconnect(cp_disconnect, cp_disconnected);
-    }
-    else {
-        logger.printfln("EVSE: Control pilot cannot be (dis)connected: IEC state is not A or B.");
-    }
+    evse_cpc.set_control_pilot_disconnect(cp_disconnect, cp_disconnected);
 #endif
 }
 
