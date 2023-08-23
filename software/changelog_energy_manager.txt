@@ -106,14 +106,14 @@
 <unknown>: 1.0.7 (<unknown>)
 - Add y-axis label to energy analysis and meter plots
 - Merge identical legend entries in energy analysis plot
-- Fix loading of RTC time on Sundays
 - Fix wrong size of energy analysis plot
+- Fix loading of RTC time on Sundays
 - Show firmware build time in human readable format
-- Don't allow to submit invalid config changes
 - Add subnet mask to WiFi and network state
 - Allow full subnet mask (/0 to /32) for WireGuard
+- Fix serialization mismatch between current_charge and last_charges
 - Switch from cards to table in charge manager UI
-- Don't lose MQTT command subscriptions on disconnect
+- Stop using disabled items in InputSelect as placeholder
 - Fix recovery API call payloads
 - Fix invalid feedback if no subnet mask is selected
 - Fix potential deadlock when calling API commands
