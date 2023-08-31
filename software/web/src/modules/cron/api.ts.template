@@ -1,0 +1,40 @@
+{{{imports}}}
+import { h } from 'preact'
+import { Cron } from './main'
+import { TableModalRow } from 'src/ts/components/table'
+
+export interface config {
+    tasks: Task[]
+}
+
+export interface Task {
+    trigger: cron_trigger,
+    action: cron_action
+}
+
+export interface cron_trigger {
+    0: [0, {}] | {{{trigger}}}
+}
+
+export interface cron_action {
+    0: [0, {}] | {{{action}}}
+}
+
+interface CronTriggerComponent {
+    table_row: (cron: cron_trigger) => string,
+    config_component: (cron_object: Cron, state: cron_trigger) => TableModalRow[],
+    config_builder: () => cron_trigger,
+    name: string,
+    require_feature?: string
+}
+
+interface CronActionComponent {
+    table_row: (cron: cron_action) => string,
+    config_component: (cron_object: Cron, state: cron_action) => TableModalRow[],
+    config_builder: () => cron_action,
+    name: string,
+    require_feature?: string
+}
+
+export const cron_trigger_components: {[key: number]: CronTriggerComponent} = [];
+export const cron_action_components: {[key: number]: CronActionComponent} = [];
