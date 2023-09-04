@@ -1,4 +1,4 @@
-import { cron_trigger, cron_trigger_components } from "../cron/api"
+import { CronComponent, cron_trigger, cron_trigger_components } from "../cron/api"
 import { h } from 'preact'
 import { Cron } from "../cron/main"
 import { __ } from "src/ts/translation"
@@ -25,9 +25,17 @@ export interface EvseButtonCronTrigger {
     }
 }
 
-function EvseButtonCronTriggerComponent(cron: cron_trigger) {
+function EvseButtonCronTriggerComponent(cron: cron_trigger): CronComponent {
     const props = (cron as any as EvseButtonCronTrigger)[1];
-    return props.button_pressed ? __("evse.content.button_pressed") : __("evse.content.button_released");
+    return {
+        text: props.button_pressed ? __("evse.content.button_pressed") : __("evse.content.button_released"),
+        fieldNames: [
+
+        ],
+        fieldValues: [
+            props.button_pressed ? __("evse.content.button_pressed") : __("evse.content.button_released")
+        ]
+    }
 }
 
 function EvseButtonCronTriggerConfig(cron_object: Cron, props: cron_trigger) {
@@ -65,12 +73,21 @@ cron_trigger_components[4] = {
     config_builder: EvseButtonCronTriggerFactory,
     config_component: EvseButtonCronTriggerConfig,
     table_row: EvseButtonCronTriggerComponent,
-    name: __("evse.content.button_configuration")
+    name: __("evse.content.button_configuration"),
+    require_feature: "button_configuration"
 };
 
-function EvseShutdownTriggerComponent(cron: cron_trigger) {
+function EvseShutdownTriggerComponent(cron: cron_trigger): CronComponent {
     const props = (cron as any as EvseSdCronTrigger)[1];
-    return props.high ? __("evse.content.active_high_suffix") : __("evse.content.active_low_suffix");
+    return {
+        text: props.high ? __("evse.content.active_high") : __("evse.content.active_low"),
+        fieldNames: [
+            __("evse.content.gpio_state")
+        ],
+        fieldValues: [
+            props.high ? __("evse.content.active_high") : __("evse.content.active_low")
+        ]
+    }
 }
 
 function EvseShutdownTriggerConfig(cron_object: Cron, props: cron_trigger) {
@@ -80,8 +97,8 @@ function EvseShutdownTriggerConfig(cron_object: Cron, props: cron_trigger) {
             name: __("evse.content.gpio_shutdown"),
             value: <InputSelect
                 items={[
-                    ["0", __("evse.content.active_low_suffix")],
-                    ["1", __("evse.content.active_high_suffix")]
+                    ["0", __("evse.content.active_low")],
+                    ["1", __("evse.content.active_high")]
                 ]}
                 value={state[1].high ? "1" : "0"}
                 onValue={(v) => {
@@ -105,12 +122,21 @@ cron_trigger_components[7] = {
     config_component: EvseShutdownTriggerConfig,
     table_row: EvseShutdownTriggerComponent,
     config_builder: EvseShutdownTriggerFactory,
-    name: __("evse.content.gpio_shutdown")
+    name: __("evse.content.gpio_shutdown"),
+    require_feature: "button_configuration"
 };
 
-function EvseGpioInputCronTriggerComponent(cron: cron_trigger) {
+function EvseGpioInputCronTriggerComponent(cron: cron_trigger): CronComponent {
     const props = (cron as any as EvseGpioCronTrigger)[1];
-    return props.high ? __("evse.content.active_high_suffix") : __("evse.content.active_low_suffix");
+    return {
+        text: props.high ? __("evse.content.active_high") : __("evse.content.active_low"),
+        fieldNames: [
+            __("evse.content.gpio_state")
+        ],
+        fieldValues: [
+            props.high ? __("evse.content.active_high") : __("evse.content.active_low")
+        ]
+    }
 }
 
 function EvseGpioInputCrontTriggerConfigComponent(cron_object: Cron, props: cron_trigger) {
@@ -120,8 +146,8 @@ function EvseGpioInputCrontTriggerConfigComponent(cron_object: Cron, props: cron
             name: __("evse.content.gpio_in"),
             value: <InputSelect
                 items={[
-                    ["0", __("evse.content.active_low_suffix")],
-                    ["1", __("evse.content.active_high_suffix")]
+                    ["0", __("evse.content.active_low")],
+                    ["1", __("evse.content.active_high")]
                 ]}
                 value={state[1].high ? "1" : "0"}
                 onValue={(v) => {
@@ -145,5 +171,6 @@ cron_trigger_components[8] = {
     config_builder: EvseGpioInputCronTriggerConfigFactory,
     config_component: EvseGpioInputCrontTriggerConfigComponent,
     table_row: EvseGpioInputCronTriggerComponent,
-    name: __("evse.content.gpio_in")
+    name: __("evse.content.gpio_in"),
+    require_feature: "button_configuration"
 }

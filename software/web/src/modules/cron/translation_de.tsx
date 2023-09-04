@@ -3,16 +3,19 @@ import { h } from "preact";
 let x = {
     "cron": {
         "navbar": {
-            "cron": "Cron"
+            "cron": "Events"
         },
         "content": {
+            "cron": "Events",
+            "task": "Aufgabe",
             "category": "Kategorie",
             "condition_category": "Kategorie Bedingung",
             "action_category": "Kategorie Aktion",
             "condition": "Bedingung",
             "action": "Aktion",
             "add_rule": "Regel hinzufügen",
-            "select": "Auswählen"
+            "edit_rule": "Regel bearbeiten",
+            "select": "Auswählen..."
         }
     }
 }

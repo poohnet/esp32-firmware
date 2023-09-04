@@ -7,13 +7,14 @@ export interface ChargeLimitsCronAction {
 }
 
 import * as util from "../../ts/util";
+import * as API from "../../ts/api"
 import { h } from "preact"
 import { __ } from "src/ts/translation";
 import { Cron } from "../cron/main";
-import { cron_action, cron_action_components } from "../cron/api";
+import { CronComponent, cron_action, cron_action_components } from "../cron/api";
 import { InputSelect } from "src/ts/components/input_select";
 
-function ChargeLimitsCronActionComponent(cron: cron_action) {
+function ChargeLimitsCronActionComponent(cron: cron_action): CronComponent {
     const props = (cron as any as ChargeLimitsCronAction)[1];
     const durations = [
         __("charge_limits.content.unlimited"),
@@ -28,9 +29,26 @@ function ChargeLimitsCronActionComponent(cron: cron_action) {
         __("charge_limits.content.h8"),
         __("charge_limits.content.h12")
     ]
-    let ret = __("charge_limits.content.energy") + ": " + (props.energy_wh != 0 ? props.energy_wh / 1000 + " kWh\n" : __("charge_limits.content.unlimited")) +"\n";
-    ret += __("charge_limits.content.duration") + ": " + durations[props.duration];
-    return ret;
+
+    let fieldNames = [
+        __("charge_limits.content.duration")
+    ];
+    let fieldValues = [
+        durations[props.duration]
+    ];
+    let ret =  __("charge_limits.content.duration") + ": " + durations[props.duration];
+    if (API.hasFeature("meter")) {
+        fieldNames = fieldNames.concat([__("charge_limits.content.energy")]);
+        fieldValues = fieldValues.concat([(props.energy_wh != 0 ? props.energy_wh / 1000 + " kWh" : __("charge_limits.content.unlimited"))]);
+
+        ret += ", " + __("charge_limits.content.energy") + ": " + (props.energy_wh != 0 ? props.energy_wh / 1000 + " kWh" : __("charge_limits.content.unlimited"));
+    }
+
+    return {
+        text: ret,
+        fieldNames: fieldNames,
+        fieldValues: fieldValues
+    };
 }
 
 function ChargeLimitsCronActionConfig(cron_object: Cron, props: cron_action) {
@@ -66,7 +84,7 @@ function ChargeLimitsCronActionConfig(cron_object: Cron, props: cron_action) {
         ["10", __("charge_limits.content.h12")]
     ];
 
-    return [
+    const meter_entry = API.hasFeature("meter") ? [
         {
             name: __("charge_limits.content.energy"),
             value:  <InputSelect
@@ -76,18 +94,17 @@ function ChargeLimitsCronActionConfig(cron_object: Cron, props: cron_action) {
                         state[1].energy_wh = parseInt(v);
                         cron_object.setActionFromComponent(state as any)
                     }}/>
-        },
-        {
-            name: __("charge_limits.content.duration"),
-            value: <InputSelect
-                items={duration_items}
-                value={state[1].duration.toString()}
-                onValue={(v) => {
-                    state[1].duration = parseInt(v);
-                    cron_object.setActionFromComponent(state as any);
-                }}/>
-        }
-    ]
+        }] : [];
+    return [{
+        name: __("charge_limits.content.duration"),
+        value: <InputSelect
+            items={duration_items}
+            value={state[1].duration.toString()}
+            onValue={(v) => {
+                state[1].duration = parseInt(v);
+                cron_object.setActionFromComponent(state as any);
+            }}/>
+    }].concat(meter_entry);
 }
 
 function ChargeLimitsCronActionFactory(): cron_action {

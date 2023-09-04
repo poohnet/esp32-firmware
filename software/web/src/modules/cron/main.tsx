@@ -22,7 +22,7 @@ import $ from "../../ts/jq";
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
 
-import { Fragment, render, h } from "preact";
+import { Fragment, render, h, ComponentChild } from "preact";
 import { ConfigComponent } from "src/ts/components/config_component";
 import { ConfigForm } from "src/ts/components/config_form";
 import { Table, TableModalRow, TableRow } from "src/ts/components/table";
@@ -79,6 +79,8 @@ export class Cron extends ConfigComponent<'cron/config', {}, CronState> {
         let trigger: [string, string][] = [];
         for (let i in cron_trigger_components) {
             const entry: [string, string] = [i, cron_trigger_components[i].name]
+            if (cron_trigger_components[i].require_feature && !API.hasFeature(cron_trigger_components[i].require_feature))
+                continue;
             trigger.push(entry);
         }
 
@@ -93,6 +95,7 @@ export class Cron extends ConfigComponent<'cron/config', {}, CronState> {
         let triggerSelector: TableModalRow[] = [{
             name: __("cron.content.condition_category"),
             value: <InputSelect
+                        placeholder={__("cron.content.select")}
                         items={trigger}
                         onValue={(v) => {
                             if (v == "0") {
@@ -108,19 +111,20 @@ export class Cron extends ConfigComponent<'cron/config', {}, CronState> {
                                 }
                             })
                         }}
-                        value={this.state.displayed_trigger}/>
+                        value={this.state.displayed_trigger.toString()}/>
         }];
         if (this.state.displayed_trigger != 0) {
             const trigger_config = cron_trigger_components[this.state.displayed_trigger].config_component(this, this.state.edit_task.trigger);
             triggerSelector = triggerSelector.concat(trigger_config);
         }
-        triggerSelector = triggerSelector.concat({name: "", value: <></>, valueClassList: "border-bottom"});
+        triggerSelector = triggerSelector.concat({name: null, value: <hr/>});
 
         let actionSelector: TableModalRow[] = [{
             name: __("cron.content.action_category"),
             value: <>
             <InputSelect
                         items={action}
+                        placeholder={__("cron.content.select")}
                         onValue={(v) => {
                             if (v == "0") {
                                 this.setState({displayed_action: this.state.displayed_action});
@@ -135,7 +139,7 @@ export class Cron extends ConfigComponent<'cron/config', {}, CronState> {
                                 }
                             });
                         }}
-                        value={this.state.displayed_action}/></>
+                        value={this.state.displayed_action.toString()}/></>
         }]
 
         if (this.state.displayed_action != 0) {
@@ -177,14 +181,26 @@ export class Cron extends ConfigComponent<'cron/config', {}, CronState> {
                 action: [action, {...action_obj}] as any as cron_action,
                 trigger: [trigger, {...trigger_obj}] as any as cron_trigger
             };
+            const trigger_row = TriggerComponent.table_row(task.trigger);
+            const action_row = ActionComponent.table_row(task.action);
+            trigger_row.fieldNames = [__("cron.content.condition")].concat(trigger_row.fieldNames);
+            trigger_row.fieldValues = [TriggerComponent.name as ComponentChild].concat(trigger_row.fieldValues);
+            trigger_row.fieldNames.push(null);
+            trigger_row.fieldValues.push(<hr/>);
+
+            action_row.fieldNames = [__("cron.content.action")].concat(action_row.fieldNames);
+            action_row.fieldValues = [ActionComponent.name as ComponentChild].concat(action_row.fieldValues);
+
             let row: TableRow = {
                 columnValues: [
-                    [idx],
+                    [idx + 1],
                     [TriggerComponent.name],
-                    [TriggerComponent.table_row(task.trigger)],
+                    [trigger_row.text],
                     [ActionComponent.name],
-                    [ActionComponent.table_row(task.action)]
+                    [action_row.text]
                 ],
+                fieldNames: [""].concat(trigger_row.fieldNames.concat(action_row.fieldNames)),
+                fieldValues: [__("cron.content.task") + " #" + (idx + 1) as ComponentChild].concat(trigger_row.fieldValues.concat(action_row.fieldValues)),
                 onEditStart: async () => {
                     this.setState(
                         {
@@ -211,7 +227,8 @@ export class Cron extends ConfigComponent<'cron/config', {}, CronState> {
                 onRemoveClick: async () => {
                     this.setState({tasks: this.state.tasks.filter((_, k) => idx != k)})
                     this.hackToAllowSave();
-                }
+                },
+                editTitle: __("cron.content.edit_rule")
             };
             rows.push(row);
         })
@@ -224,7 +241,7 @@ export class Cron extends ConfigComponent<'cron/config', {}, CronState> {
 
         return <ConfigForm
                 id="cron-config-form"
-                title="Cron config"
+                title={__("cron.content.cron")}
                 isModified={this.isModified()}
                 onSave={this.save}
                 onReset={this.reset}
@@ -234,10 +251,10 @@ export class Cron extends ConfigComponent<'cron/config', {}, CronState> {
                     <Table tableTill="md"
                         columnNames={[
                             "#",
-                            __("cron.content.category"),
                             __("cron.content.condition"),
-                            __("cron.content.category"),
-                             __("cron.content.action")]}
+                            "",
+                            __("cron.content.action"),
+                            ""]}
                         rows={this.assembleTable()}
                         addEnabled={this.state.tasks.length < 20}
                         addTitle={__("cron.content.add_rule")}
@@ -277,16 +294,16 @@ export function update_sidebar_state(module_init: any) {
     $('#sidebar-cron').prop('hidden', !module_init.cron);
 }
 
-cron_trigger_components[0] = {
-    config_builder: () => [0 as any, {}],
-    config_component: () => [],
-    table_row: () => "",
-    name: __("cron.content.select")
-};
+// cron_trigger_components[0] = {
+//     config_builder: () => [0 as any, {}],
+//     config_component: () => [],
+//     table_row: () => "",
+//     name: __("cron.content.select")
+// };
 
-cron_action_components[0] = {
-    config_builder: () => [0 as any, {}],
-    config_component: () => [],
-    table_row: () => "",
-    name: __("cron.content.select")
-}
+// cron_action_components[0] = {
+//     config_builder: () => [0 as any, {}],
+//     config_component: () => [],
+//     table_row: () => "",
+//     name: __("cron.content.select")
+// }
