@@ -73,7 +73,7 @@ void Mqtt::pre_setup()
 
 #if MODULE_CRON_AVAILABLE()
     ConfUnionPrototype proto;
-    proto.tag = CRON_TRIGGER_MQTT;
+    proto.tag = static_cast<uint8_t>(CronTrigger::MQTT);
     proto.config = Config::Object({
             {"topic", Config::Str("", 0, 64)},
             {"payload", Config::Str("", 0, 64)},
@@ -82,7 +82,7 @@ void Mqtt::pre_setup()
 
     cron.register_trigger(proto);
 
-    proto.tag = CRON_ACTION_MQTT;
+    proto.tag = static_cast<uint8_t>(CronAction::MQTT);
 
     cron.register_action(proto, [this](const Config *cfg) {
         publish(cfg->get("topic")->asString(), cfg->get("payload")->asString(), cfg->get("retain")->asBool());
@@ -101,7 +101,6 @@ void Mqtt::subscribe(const String &topic, std::function<void(const char *, size_
 {
     this->commands.push_back({topic, callback, forbid_retained, topic.startsWith(config_in_use.get("global_topic_prefix")->asString())});
 
-    esp_mqtt_client_unsubscribe(client, topic.c_str());
     esp_mqtt_client_subscribe(client, topic.c_str(), 0);
 }
 
@@ -139,16 +138,13 @@ bool Mqtt::publish_with_prefix(const String &path, const String &payload, bool r
 
 bool Mqtt::publish(const String &topic, const String &payload, bool retain)
 {
-    esp_mqtt_client_publish(this->client, topic.c_str(), payload.c_str(), payload.length(), 0, retain);
-    // We always publish with QoS 0.
-    // esp_mqtt_client_publish will thus always return 0
-    // (because it returns the message ID on success _only_ if QoS is not 0)
-    // But we've set MQTT_SKIP_PUBLISH_IF_DISCONNECTED
-    // so esp_mqtt_client_publish will return -1 if there is no connection to the broker.
-    // We don't care that this is the case, because a) onMqttConnect sends all states anyway
-    // and b) we publish with QoS 0, so message loss is expected.
-    // -> Return true in any case to clear the config's dirty flag.
-    return true;
+    // ESP-MQTT does this check but we only want to allow publishing after
+    // onMqttConnect was called (in the main thread!)
+    // ESP-MQTT's check can asynchronously flip to connected.
+    if (this->state.get("connection_state")->asInt() != (int)MqttConnectionState::CONNECTED)
+        return false;
+
+    return esp_mqtt_client_publish(this->client, topic.c_str(), payload.c_str(), payload.length(), 0, retain) >= 0;
 }
 
 bool Mqtt::pushStateUpdate(size_t stateIdx, const String &payload, const String &path)
@@ -172,6 +168,19 @@ bool Mqtt::pushRawStateUpdate(const String &payload, const String &path)
     return this->publish_with_prefix(path, payload);
 }
 
+void Mqtt::resubscribe() {
+    const String &prefix = config_in_use.get("global_topic_prefix")->asString();
+    String topic = prefix + "/#";
+    esp_mqtt_client_subscribe(client, topic.c_str(), 0);
+
+    for (auto &cmd : this->commands) {
+        if (cmd.starts_with_global_topic_prefix)
+            continue;
+
+        esp_mqtt_client_subscribe(client, cmd.topic.c_str(), 0);
+    }
+}
+
 void Mqtt::onMqttConnect()
 {
     last_connected_ms = millis();
@@ -189,20 +198,10 @@ void Mqtt::onMqttConnect()
         this->addRawCommand(i, reg);
     }
     for (auto &reg : api.states) {
-        publish_with_prefix(reg.path, reg.config->to_string_except(reg.keys_to_censor));
+        reg.config->set_updated(1 << this->backend_idx);
     }
 
-    const String &prefix = config_in_use.get("global_topic_prefix")->asString();
-    String topic = prefix + "/#";
-    esp_mqtt_client_unsubscribe(client, topic.c_str());
-    esp_mqtt_client_subscribe(client, topic.c_str(), 0);
-
-    for (auto &cmd : this->commands) {
-        if (cmd.starts_with_global_topic_prefix)
-            continue;
-        esp_mqtt_client_unsubscribe(client, cmd.topic.c_str());
-        esp_mqtt_client_subscribe(client, cmd.topic.c_str(), 0);
-    }
+    this->resubscribe();
 }
 
 void Mqtt::onMqttDisconnect()
@@ -303,7 +302,7 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
     msg.topic = String(topic).substring(0, topic_len);
     msg.payload = String(data).substring(0, data_len);
     msg.retained = retain;
-    if (cron.trigger_action(CRON_TRIGGER_MQTT, &msg, &trigger_action))
+    if (cron.trigger_action(CronTrigger::MQTT, &msg, &trigger_action))
         return;
 #endif
 
@@ -430,7 +429,7 @@ void Mqtt::setup()
         return;
     }
 
-    api.registerBackend(this);
+    this->backend_idx = api.registerBackend(this);
 
     esp_log_level_set("MQTT_CLIENT", ESP_LOG_NONE);
     esp_log_level_set("TRANSPORT_BASE", ESP_LOG_NONE);
@@ -452,6 +451,10 @@ void Mqtt::setup()
     client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, this);
 
+    task_scheduler.scheduleWithFixedDelay([this](){
+        this->resubscribe();
+    }, 60000, 60000);
+
     initialized = true;
 }
 
@@ -461,8 +464,8 @@ void Mqtt::register_urls()
     api.addState("mqtt/state", &state, {}, 1000);
 
 #if MODULE_CRON_AVAILABLE()
-    if (cron.is_trigger_active(CRON_TRIGGER_MQTT)) {
-        ConfigVec trigger_config = cron.get_configured_triggers(CRON_TRIGGER_MQTT);
+    if (cron.is_trigger_active(CronTrigger::MQTT)) {
+        ConfigVec trigger_config = cron.get_configured_triggers(CronTrigger::MQTT);
         std::vector<String> subscribed_topics;
         for (auto &conf: trigger_config) {
             bool already_subscribed = false;
@@ -477,7 +480,7 @@ void Mqtt::register_urls()
                     msg.topic = String(tpic).substring(0, tpic_len);
                     msg.payload = String(data).substring(0, data_len);
                     msg.retained = false;
-                    if (cron.trigger_action(CRON_TRIGGER_MQTT, &msg, &trigger_action))
+                    if (cron.trigger_action(CronTrigger::MQTT, &msg, &trigger_action))
                         return;
                 }, false);
                 subscribed_topics.push_back(conf.second->get("topic")->asString());
@@ -512,9 +515,9 @@ void Mqtt::register_events() {
 bool Mqtt::action_triggered(Config *config, void *data) {
     Config *cfg = (Config*)config->get();
     MqttMessage *msg = (MqttMessage *)data;
-    switch (config->getTag())
+    switch (static_cast<CronTrigger>(config->getTag()))
     {
-    case CRON_TRIGGER_MQTT:
+        case CronTrigger::MQTT:
         if (cfg->get("payload")->asString() == msg->payload)
             return true;
         break;

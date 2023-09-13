@@ -1,5 +1,7 @@
+import { CronAction } from "../cron/cron_defs";
+
 export interface ChargeLimitsCronAction {
-    0: 8,
+    0: CronAction.ChargeLimits,
     1: {
         duration: number,
         energy_wh: number
@@ -9,10 +11,10 @@ export interface ChargeLimitsCronAction {
 import * as util from "../../ts/util";
 import * as API from "../../ts/api"
 import { h } from "preact"
-import { __ } from "src/ts/translation";
+import { __ } from "../../ts/translation";
 import { Cron } from "../cron/main";
 import { CronComponent, cron_action, cron_action_components } from "../cron/api";
-import { InputSelect } from "src/ts/components/input_select";
+import { InputSelect } from "../../ts/components/input_select";
 
 function ChargeLimitsCronActionComponent(cron: cron_action): CronComponent {
     const props = (cron as any as ChargeLimitsCronAction)[1];
@@ -109,7 +111,7 @@ function ChargeLimitsCronActionConfig(cron_object: Cron, props: cron_action) {
 
 function ChargeLimitsCronActionFactory(): cron_action {
     return [
-        8 as any,
+        CronAction.ChargeLimits as any,
         {
             duration: 0,
             energy_wh: 0
@@ -117,9 +119,11 @@ function ChargeLimitsCronActionFactory(): cron_action {
     ];
 }
 
-cron_action_components[8] = {
-    config_builder: ChargeLimitsCronActionFactory,
-    config_component: ChargeLimitsCronActionConfig,
-    table_row: ChargeLimitsCronActionComponent,
-    name: __("charge_limits.content.charge_limits")
-};
+export function init() {
+    cron_action_components[CronAction.ChargeLimits] = {
+        config_builder: ChargeLimitsCronActionFactory,
+        config_component: ChargeLimitsCronActionConfig,
+        table_row: ChargeLimitsCronActionComponent,
+        name: __("charge_limits.content.charge_limits")
+    };
+}

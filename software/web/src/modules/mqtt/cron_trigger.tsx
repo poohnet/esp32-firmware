@@ -1,5 +1,7 @@
+import { CronTrigger } from "../cron/cron_defs";
+
 export interface MqttCronTrigger {
-    0: 3,
+    0: CronTrigger.MQTT,
     1: {
         topic: string,
         payload: string,
@@ -8,11 +10,11 @@ export interface MqttCronTrigger {
 }
 
 import { h } from "preact"
-import { __ } from "src/ts/translation";
+import { __ } from "../../ts/translation";
 import { CronComponent, cron_trigger,cron_trigger_components } from "../cron/api";
 import { Cron } from "../cron/main";
-import { InputText } from "src/ts/components/input_text";
-import { Switch } from "src/ts/components/switch";
+import { InputText } from "../../ts/components/input_text";
+import { Switch } from "../../ts/components/switch";
 
 export function MqttCronTriggerComponent(cron: cron_trigger): CronComponent {
     const props = (cron as any as MqttCronTrigger)[1];
@@ -72,7 +74,7 @@ export function MqttCronTriggerConfig(cron_object: Cron, state: cron_trigger) {
 
 function MqttCronTriggerFactory(): cron_trigger {
     return [
-        3 as any,
+        CronTrigger.MQTT as any,
         {
             topic: "",
             payload: "",
@@ -81,9 +83,11 @@ function MqttCronTriggerFactory(): cron_trigger {
     ]
 }
 
-cron_trigger_components[3] = {
-    table_row: MqttCronTriggerComponent,
-    config_builder: MqttCronTriggerFactory,
-    config_component: MqttCronTriggerConfig,
-    name: __("mqtt.content.mqtt")
-};
+export function init() {
+    cron_trigger_components[CronTrigger.MQTT] = {
+        table_row: MqttCronTriggerComponent,
+        config_builder: MqttCronTriggerFactory,
+        config_component: MqttCronTriggerConfig,
+        name: __("mqtt.content.mqtt")
+    };
+}

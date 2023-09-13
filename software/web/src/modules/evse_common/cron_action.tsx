@@ -1,25 +1,27 @@
+import { CronAction } from "../cron/cron_defs";
+
 export interface EvseCronAction {
-    0: 3,
+    0: CronAction.SetCurrent,
     1: {
         current: number
     }
 }
 
 export interface EvseLedCronAction {
-    0: 4,
+    0: CronAction.LED,
     1: {
         state: number,
         duration: number
     }
 }
 
-import { __ } from "src/ts/translation"
+import { __ } from "../../ts/translation"
 import { CronComponent, cron_action, cron_action_components } from "../cron/api"
 import { Cron } from "../cron/main"
-import { InputSelect } from "src/ts/components/input_select"
-import { InputFloat } from "src/ts/components/input_float"
+import { InputSelect } from "../../ts/components/input_select"
+import { InputFloat } from "../../ts/components/input_float"
 import { h } from 'preact'
-import { InputNumber } from "src/ts/components/input_number"
+import { InputNumber } from "../../ts/components/input_number"
 
 function EvseSetCurrentCronActionComponent(cron: cron_action): CronComponent {
     const props = (cron as any as EvseCronAction)[1];
@@ -51,18 +53,11 @@ function EvseSetCurrentCronActionConfigComponent(cron_object: Cron, props: cron_
 
 function EvseSetCurrentCronActionConfigFactory(): cron_action {
     return [
-        3 as any,
+        CronAction.SetCurrent as any,
         {
             current: 0
         }
     ]
-}
-
-cron_action_components[3] = {
-    config_builder: EvseSetCurrentCronActionConfigFactory,
-    config_component: EvseSetCurrentCronActionConfigComponent,
-    table_row: EvseSetCurrentCronActionComponent,
-    name: __("evse.content.allowed_charging_current")
 }
 
 function EvseLedCronActionComponent(cron: cron_action): CronComponent {
@@ -142,7 +137,7 @@ function EvseLedCronActionConfigComponent(cron_object: Cron, props: cron_action)
 
 function EvseLedCronActionConfigFactory(): cron_action {
     return [
-        4 as any,
+        CronAction.LED as any,
         {
             duration: 0,
             state: 0
@@ -150,9 +145,18 @@ function EvseLedCronActionConfigFactory(): cron_action {
     ]
 }
 
-cron_action_components[4] = {
-    config_builder: EvseLedCronActionConfigFactory,
-    config_component: EvseLedCronActionConfigComponent,
-    table_row: EvseLedCronActionComponent,
-    name: __("evse.content.led_state")
-};
+export function init() {
+    cron_action_components[CronAction.SetCurrent] = {
+        config_builder: EvseSetCurrentCronActionConfigFactory,
+        config_component: EvseSetCurrentCronActionConfigComponent,
+        table_row: EvseSetCurrentCronActionComponent,
+        name: __("evse.content.allowed_charging_current")
+    };
+
+    cron_action_components[CronAction.LED] = {
+        config_builder: EvseLedCronActionConfigFactory,
+        config_component: EvseLedCronActionConfigComponent,
+        table_row: EvseLedCronActionComponent,
+        name: __("evse.content.led_state")
+    };
+}

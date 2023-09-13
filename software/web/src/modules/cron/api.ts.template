@@ -1,7 +1,8 @@
 {{{imports}}}
+
 import { h, ComponentChild } from 'preact'
 import { Cron } from './main'
-import { TableModalRow } from 'src/ts/components/table'
+import { TableModalRow } from '../../ts/components/table'
 
 export interface config {
     tasks: Task[]
@@ -13,11 +14,13 @@ export interface Task {
 }
 
 export interface cron_trigger {
-    0: [0, {}] | {{{trigger}}}
+    0: [0, {}]
+    | {{{triggers}}}
 }
 
 export interface cron_action {
-    0: [0, {}] | {{{action}}}
+    0: [0, {}]
+    | {{{actions}}}
 }
 
 export interface CronComponent {

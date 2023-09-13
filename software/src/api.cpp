@@ -79,28 +79,36 @@ void API::setup()
     version.get("config_type")->updateString(config_type);
 
     task_scheduler.scheduleWithFixedDelay([this]() {
+        bool skip_high_latency_states = state_update_counter % 4 != 0;
+        ++state_update_counter;
+
         for (size_t state_idx = 0; state_idx < states.size(); ++state_idx) {
             auto &reg = states[state_idx];
 
-            if (!deadline_elapsed(reg.last_update + reg.interval)) {
+            if (skip_high_latency_states && !reg.low_latency)
                 continue;
-            }
-
-            reg.last_update = millis();
 
             size_t backend_count = this->backends.size();
 
+            uint8_t to_send = reg.config->was_updated((1 << backend_count) - 1);
             // If the config was not updated for any API, we don't have to serialize the payload.
-            if (!reg.config->was_updated((1 << backend_count) - 1)) {
+            if (to_send == 0) {
                 continue;
             }
 
             String payload = reg.config->to_string_except(reg.keys_to_censor);
 
+            uint8_t sent = 0;
+
             for (size_t backend_idx = 0; backend_idx < this->backends.size(); ++backend_idx) {
+                if ((to_send & (1 << backend_idx)) == 0)
+                    continue;
+
                 if (this->backends[backend_idx]->pushStateUpdate(state_idx, payload, reg.path))
-                    reg.config->set_update_handled(1 << backend_idx);
+                    sent |= 1 << backend_idx;
             }
+
+            reg.config->clear_updated(sent);
         }
     }, 250, 250);
 }
@@ -123,7 +131,7 @@ void API::addState(const String &path, ConfigRoot *config, std::initializer_list
     if (already_registered(path, "state"))
         return;
 
-    states.push_back({path, config, keys_to_censor, interval_ms, millis()});
+    states.push_back({path, config, keys_to_censor, interval_ms < 1000});
     auto stateIdx = states.size() - 1;
 
     for (auto *backend : this->backends) {
@@ -179,7 +187,7 @@ bool API::addPersistentConfig(const String &path, ConfigRoot *config, std::initi
     addCommand(path + "_reset", Config::Null(), {}, [path, conf_modified]() {
         API::removeConfig(path);
         conf_modified->get("modified")->updateUint(1);
-    }, false);
+    }, true);
 
     return true;
 }

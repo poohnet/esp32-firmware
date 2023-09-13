@@ -1,14 +1,16 @@
+import { CronAction } from "../cron/cron_defs";
+
 export interface EvseGpOutputCronAction {
-    0: 9,
+    0: CronAction.EVSEGPOutput,
     1: {
         state: number
     }
 }
 
-import { __ } from "src/ts/translation";
+import { __ } from "../../ts/translation";
 import { CronComponent, cron_action, cron_action_components} from "../cron/api";
 import { h } from 'preact'
-import { InputSelect } from "src/ts/components/input_select";
+import { InputSelect } from "../../ts/components/input_select";
 import { Cron } from "../cron/main";
 
 function EvseGpioOutputCronActionComponent(cron: cron_action): CronComponent {
@@ -43,17 +45,19 @@ function EvseGpioOutputCronActionConfigComponent(cron_object: Cron, props: cron_
 
 function EvseGpioOutputCronActionConfigFactory(): cron_action {
     return [
-        9 as any,
+        CronAction.EVSEGPOutput as any,
         {
             state: 0
         }
     ];
 }
 
-cron_action_components[9] = {
-    config_builder: EvseGpioOutputCronActionConfigFactory,
-    config_component: EvseGpioOutputCronActionConfigComponent,
-    table_row: EvseGpioOutputCronActionComponent,
-    name: __("evse.content.gpio_out"),
-    require_feature: "button_configuration"
+export function init() {
+    cron_action_components[CronAction.EVSEGPOutput] = {
+        config_builder: EvseGpioOutputCronActionConfigFactory,
+        config_component: EvseGpioOutputCronActionConfigComponent,
+        table_row: EvseGpioOutputCronActionComponent,
+        name: __("evse.content.gpio_out"),
+        require_feature: "button_configuration"
+    };
 }

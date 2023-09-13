@@ -1,12 +1,13 @@
+import { CronAction } from "../cron/cron_defs";
+
 export interface MeterCronAction {
-    0: 5,
+    0: CronAction.MeterReset,
     1: {}
 }
 
-import { __ } from "src/ts/translation";
+import { __ } from "../../ts/translation";
 import { Cron } from "../cron/main";
 import { CronComponent, cron_action,cron_action_components } from "../cron/api";
-import * as API from "../../ts/api"
 
 function MeterResetCronActionComponent(_: cron_action): CronComponent {
     return {
@@ -22,15 +23,17 @@ function MeterResetCronActionConfigComponent(_: Cron, __: cron_action): any {
 
 function MeterResetCronActionConfigFactory(): cron_action {
     return [
-        5 as any,
+        CronAction.MeterReset as any,
         {}
     ];
 }
 
-cron_action_components[5] = {
-    config_builder: MeterResetCronActionConfigFactory,
-    config_component: MeterResetCronActionConfigComponent,
-    table_row: MeterResetCronActionComponent,
-    name: __("meter.content.meter_reset"),
-    require_feature: "meter"
+export function init() {
+    cron_action_components[CronAction.MeterReset] = {
+        config_builder: MeterResetCronActionConfigFactory,
+        config_component: MeterResetCronActionConfigComponent,
+        table_row: MeterResetCronActionComponent,
+        name: __("meter.content.meter_reset"),
+        require_feature: "meter"
+    };
 }

@@ -1,14 +1,16 @@
+import { CronTrigger } from "../cron/cron_defs";
+
 export interface EvseStateCronTrigger {
-    0: 2,
+    0: CronTrigger.IECChange,
     1: {
         charger_state: number
     }
 }
 
-import { __ } from "src/ts/translation";
+import { __ } from "../../ts/translation";
 import { Cron } from "../cron/main";
 import { CronComponent, cron_trigger, cron_trigger_components } from "../cron/api";
-import { InputSelect } from "src/ts/components/input_select";
+import { InputSelect } from "../../ts/components/input_select";
 import { h } from "preact"
 
 export function EvseStateCronComponent(cron: cron_trigger): CronComponent {
@@ -37,7 +39,7 @@ export function EvseStateCronComponent(cron: cron_trigger): CronComponent {
 
 function EvseStateCronFactory(): cron_trigger {
     return [
-        2 as any,
+        CronTrigger.IECChange as any,
         {
             charger_state: 0
         }
@@ -67,9 +69,11 @@ export function EvseStateCronConfig(cron_object: Cron, state: cron_trigger) {
     }]
 }
 
-cron_trigger_components[2] = {
-    config_builder: EvseStateCronFactory,
-    config_component: EvseStateCronConfig,
-    table_row: EvseStateCronComponent,
-    name: __("evse.content.state_change")
-};
+export function init() {
+    cron_trigger_components[CronTrigger.IECChange] = {
+        config_builder: EvseStateCronFactory,
+        config_component: EvseStateCronConfig,
+        table_row: EvseStateCronComponent,
+        name: __("evse.content.state_change")
+    };
+}

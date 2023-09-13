@@ -1,2 +1,3 @@
 api.ts
-sideeffects.tsx
+plugins.tsx
+cron_defs.ts

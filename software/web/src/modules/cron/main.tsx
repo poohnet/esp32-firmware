@@ -23,13 +23,13 @@ import * as util from "../../ts/util";
 import * as API from "../../ts/api";
 
 import { Fragment, render, h, ComponentChild } from "preact";
-import { ConfigComponent } from "src/ts/components/config_component";
-import { ConfigForm } from "src/ts/components/config_form";
-import { Table, TableModalRow, TableRow } from "src/ts/components/table";
+import { ConfigComponent } from "../../ts/components/config_component";
+import { ConfigForm } from "../../ts/components/config_form";
+import { Table, TableModalRow, TableRow } from "../../ts/components/table";
 import { cron_action, cron_action_components, cron_trigger, cron_trigger_components, Task } from "./api";
-import { InputSelect } from "src/ts/components/input_select";
-import { __ } from "src/ts/translation";
-import "./sideeffects"
+import { InputSelect } from "../../ts/components/input_select";
+import { __ } from "../../ts/translation";
+import { plugins_init } from "./plugins";
 
 type CronState = {
     edit_task: Task,
@@ -285,6 +285,7 @@ export class Cron extends ConfigComponent<'cron/config', {}, CronState> {
 render(<Cron/>, $('#cron')[0]);
 
 export function init() {
+    plugins_init();
 }
 
 export function add_event_listeners(source: API.APIEventTarget) {

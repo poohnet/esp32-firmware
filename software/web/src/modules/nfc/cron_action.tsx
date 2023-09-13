@@ -1,5 +1,7 @@
+import { CronAction } from "../cron/cron_defs";
+
 export interface NfcCronAction {
-    0: 7,
+    0: CronAction.NFCInjectTag,
     1: {
         tag_type: number,
         tag_id: string,
@@ -8,11 +10,11 @@ export interface NfcCronAction {
 }
 
 import { h } from "preact"
-import { __, translate_unchecked } from "src/ts/translation";
+import { __, translate_unchecked } from "../../ts/translation";
 import { CronComponent, cron_action, cron_action_components } from "../cron/api";
 import { Cron } from "../cron/main";
-import { InputText } from "src/ts/components/input_text";
-import { InputSelect } from "src/ts/components/input_select";
+import { InputText } from "../../ts/components/input_text";
+import { InputSelect } from "../../ts/components/input_select";
 
 const TRIGGER_CHARGE_ANY = 0;
 const TRIGGER_CHARGE_START = 1;
@@ -98,7 +100,7 @@ function NFCTagInjectCronActionConfig(cron_object: Cron, props: cron_action) {
 
 function NfCTagInjectCronActionFactory(): cron_action {
     return [
-        7 as any,
+        CronAction.NFCInjectTag as any,
         {
             tag_id: "",
             tag_type: 0,
@@ -107,9 +109,11 @@ function NfCTagInjectCronActionFactory(): cron_action {
     ]
 }
 
-cron_action_components[7] = {
-    table_row: NFCTagInjectCronActionComponent,
-    config_builder: NfCTagInjectCronActionFactory,
-    config_component: NFCTagInjectCronActionConfig,
-    name: __("nfc.content.nfc")
+export function init() {
+    cron_action_components[CronAction.NFCInjectTag] = {
+        table_row: NFCTagInjectCronActionComponent,
+        config_builder: NfCTagInjectCronActionFactory,
+        config_component: NFCTagInjectCronActionConfig,
+        name: __("nfc.content.nfc")
+    };
 }

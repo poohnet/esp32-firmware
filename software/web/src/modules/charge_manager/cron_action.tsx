@@ -1,15 +1,17 @@
+import { CronAction } from "../cron/cron_defs";
+
 export interface ChargeManagerCronAction {
-    0: 6,
+    0: CronAction.SetManagerCurrent,
     1: {
         current: number
     }
 }
 
 import { h } from "preact"
-import { __ } from "src/ts/translation";
+import { __ } from "../../ts/translation";
 import { Cron } from "../cron/main";
 import { CronComponent, cron_action, cron_action_components } from "../cron/api";
-import { InputFloat } from "src/ts/components/input_float";
+import { InputFloat } from "../../ts/components/input_float";
 
 export function ChargeManagerCronComponent(cron: cron_action): CronComponent {
     let action_props = cron as any as ChargeManagerCronAction;
@@ -40,16 +42,18 @@ export function ChargeManagerCronConfigComponent(cron_object: Cron, state: cron_
 
 function ChargeManagerCronActionFactory(): cron_action {
     return [
-        6 as any,
+        CronAction.SetManagerCurrent as any,
         {
             current: 0
         }
     ]
 }
 
-cron_action_components[6] = {
-    config_builder: ChargeManagerCronActionFactory,
-    config_component: ChargeManagerCronConfigComponent,
-    table_row: ChargeManagerCronComponent,
-    name: __("charge_manager.content.set_charge_manager")
-};
+export function init() {
+    cron_action_components[CronAction.SetManagerCurrent] = {
+        config_builder: ChargeManagerCronActionFactory,
+        config_component: ChargeManagerCronConfigComponent,
+        table_row: ChargeManagerCronComponent,
+        name: __("charge_manager.content.set_charge_manager")
+    };
+}
