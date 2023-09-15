@@ -43,6 +43,9 @@ struct ConfArraySlot;
 struct ConfObjectSlot;
 struct ConfUnionSlot;
 
+struct ConfUnionPrototypeInternal;
+
+template<typename T>
 struct ConfUnionPrototype;
 
 struct Config {
@@ -55,6 +58,8 @@ struct Config {
     public:
         static bool slotEmpty(size_t i);
         static constexpr const char *variantName = "ConfString";
+        static Slot *allocSlotBuf(size_t elements);
+        static void freeSlotBuf(Slot *buf);
 
         CoolString *getVal();
         const CoolString *getVal() const;
@@ -76,6 +81,8 @@ struct Config {
     public:
         static bool slotEmpty(size_t i);
         static constexpr const char *variantName = "ConfFloat";
+        static Slot *allocSlotBuf(size_t elements);
+        static void freeSlotBuf(Slot *buf);
 
         float *getVal();
         const float *getVal() const;
@@ -97,6 +104,8 @@ struct Config {
     public:
         static bool slotEmpty(size_t i);
         static constexpr const char *variantName = "ConfInt";
+        static Slot *allocSlotBuf(size_t elements);
+        static void freeSlotBuf(Slot *buf);
 
         int32_t *getVal();
         const int32_t *getVal() const;
@@ -118,6 +127,8 @@ struct Config {
     public:
         static bool slotEmpty(size_t i);
         static constexpr const char *variantName = "ConfUint";
+        static Slot *allocSlotBuf(size_t elements);
+        static void freeSlotBuf(Slot *buf);
 
         uint32_t *getVal();
         const uint32_t *getVal() const;
@@ -147,6 +158,8 @@ struct Config {
     public:
         static bool slotEmpty(size_t i);
         static constexpr const char *variantName = "ConfArray";
+        static Slot *allocSlotBuf(size_t elements);
+        static void freeSlotBuf(Slot *buf);
 
         Config *get(uint16_t i);
         const Config *get(uint16_t i) const;
@@ -170,6 +183,8 @@ struct Config {
     public:
         static bool slotEmpty(size_t i);
         static constexpr const char *variantName = "ConfObject";
+        static Slot *allocSlotBuf(size_t elements);
+        static void freeSlotBuf(Slot *buf);
 
         Config *get(const String &s);
         const Config *get(const String &s) const;
@@ -193,6 +208,8 @@ struct Config {
     public:
         static bool slotEmpty(size_t i);
         static constexpr const char *variantName = "ConfUnion";
+        static Slot *allocSlotBuf(size_t elements);
+        static void freeSlotBuf(Slot *buf);
 
         uint8_t getTag() const;
         bool changeUnionVariant(uint8_t tag);
@@ -201,7 +218,7 @@ struct Config {
         const Config *getVal() const;
         const Slot *getSlot() const;
 
-        ConfUnion(const Config &val, uint8_t tag, uint8_t prototypes_len, const ConfUnionPrototype prototypes[]);
+        ConfUnion(const Config &val, uint8_t tag, uint8_t prototypes_len, const ConfUnionPrototypeInternal prototypes[]);
         ConfUnion(const ConfUnion &cpy);
         ~ConfUnion();
 
@@ -524,7 +541,20 @@ struct Config {
 
     static Config Object(std::initializer_list<std::pair<String, Config>> obj);
 
-    static Config Union(Config value, uint8_t tag, const ConfUnionPrototype prototypes[], uint8_t prototypes_len);
+    template<typename T>
+    static void check_enum_template_type() {
+        static_assert(std::is_enum<T>::value, "ConfUnion tag type must be enum");
+        //static_assert(std::is_same<std::underlying_type<T>::type, uint8_t>::value, "Underlying type of ConfUnion tag type must be uint8_t");
+    }
+
+    template<typename T>
+    static Config Union(Config value, T tag, const ConfUnionPrototype<T> prototypes[], uint8_t prototypes_len) {
+        Config::check_enum_template_type<T>();
+        return Union(value, (uint8_t) tag, (ConfUnionPrototypeInternal*) prototypes, prototypes_len);
+    }
+private:
+    static Config Union(Config value, uint8_t tag, const ConfUnionPrototypeInternal prototypes[], uint8_t prototypes_len);
+public:
 
     static ConfigRoot *Null();
 
@@ -684,13 +714,15 @@ struct Config {
         this->asArray().swap(other->asArray());
     }
 
-    uint8_t getTag() const {
+    template<typename T>
+    T getTag() const {
+        Config::check_enum_template_type<T>();
         if (!this->is<Config::ConfUnion>()) {
             logger.printfln("Tried to get tag of a node that is not a union!");
             delay(100);
-            return -1;
+            return (T) -1;
         }
-        return this->get<ConfUnion>()->getTag();
+        return (T) this->get<ConfUnion>()->getTag();
     }
 
     template<typename ConfigT>
@@ -908,7 +940,17 @@ private:
     String get_updated_copy(T visitor, Config *out_config);
 };
 
+template<typename T>
 struct ConfUnionPrototype {
+    T tag;
+    Config config;
+
+    ConfUnionPrototype(T tag, Config config) : tag(tag), config(config) {
+        Config::check_enum_template_type<T>();
+    }
+};
+
+struct ConfUnionPrototypeInternal {
     uint8_t tag;
     Config config;
 };

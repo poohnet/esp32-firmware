@@ -72,21 +72,26 @@ void Mqtt::pre_setup()
     });
 
 #if MODULE_CRON_AVAILABLE()
-    ConfUnionPrototype proto;
-    proto.tag = static_cast<uint8_t>(CronTrigger::MQTT);
-    proto.config = Config::Object({
+    cron.register_trigger(
+        CronTriggerID::MQTT,
+        Config::Object({
             {"topic", Config::Str("", 0, 64)},
             {"payload", Config::Str("", 0, 64)},
             {"retain", Config::Bool(false)}
-        });
+        })
+    );
 
-    cron.register_trigger(proto);
-
-    proto.tag = static_cast<uint8_t>(CronAction::MQTT);
-
-    cron.register_action(proto, [this](const Config *cfg) {
-        publish(cfg->get("topic")->asString(), cfg->get("payload")->asString(), cfg->get("retain")->asBool());
-    });
+    cron.register_action(
+        CronActionID::MQTT,
+        Config::Object({
+            {"topic", Config::Str("", 0, 64)},
+            {"payload", Config::Str("", 0, 64)},
+            {"retain", Config::Bool(false)}
+        }),
+        [this](const Config *cfg) {
+            publish(cfg->get("topic")->asString(), cfg->get("payload")->asString(), cfg->get("retain")->asBool());
+        }
+    );
 #endif
 }
 
@@ -99,9 +104,9 @@ void Mqtt::subscribe_with_prefix(const String &path, std::function<void(const ch
 
 void Mqtt::subscribe(const String &topic, std::function<void(const char *, size_t, char *, size_t)> callback, bool forbid_retained)
 {
-    this->commands.push_back({topic, callback, forbid_retained, topic.startsWith(config_in_use.get("global_topic_prefix")->asString())});
+    bool subscribed = esp_mqtt_client_subscribe(client, topic.c_str(), 0) >= 0;
 
-    esp_mqtt_client_subscribe(client, topic.c_str(), 0);
+    this->commands.push_back({topic, callback, forbid_retained, topic.startsWith(config_in_use.get("global_topic_prefix")->asString()), subscribed});
 }
 
 void Mqtt::addCommand(size_t commandIdx, const CommandRegistration &reg)
@@ -169,15 +174,23 @@ bool Mqtt::pushRawStateUpdate(const String &payload, const String &path)
 }
 
 void Mqtt::resubscribe() {
-    const String &prefix = config_in_use.get("global_topic_prefix")->asString();
-    String topic = prefix + "/#";
-    esp_mqtt_client_subscribe(client, topic.c_str(), 0);
+    if (this->state.get("connection_state")->asInt() != (int)MqttConnectionState::CONNECTED)
+        return;
+
+    if (!global_topic_prefix_subscribed) {
+        const String &prefix = config_in_use.get("global_topic_prefix")->asString();
+        String topic = prefix + "/#";
+        global_topic_prefix_subscribed = esp_mqtt_client_subscribe(client, topic.c_str(), 0) >= 0;
+    }
 
     for (auto &cmd : this->commands) {
         if (cmd.starts_with_global_topic_prefix)
             continue;
 
-        esp_mqtt_client_subscribe(client, cmd.topic.c_str(), 0);
+        if (cmd.subscribed)
+            continue;
+
+        cmd.subscribed = esp_mqtt_client_subscribe(client, cmd.topic.c_str(), 0) >= 0;
     }
 }
 
@@ -201,6 +214,14 @@ void Mqtt::onMqttConnect()
         reg.config->set_updated(1 << this->backend_idx);
     }
 
+    this->global_topic_prefix_subscribed = false;
+    for (auto &cmd : this->commands) {
+        cmd.subscribed = false;
+    }
+
+    // Resubscribe now to prioritize re-subscription
+    // of the first topics (for example the global topic prefix)
+    // over sending state updates.
     this->resubscribe();
 }
 
@@ -302,7 +323,7 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
     msg.topic = String(topic).substring(0, topic_len);
     msg.payload = String(data).substring(0, data_len);
     msg.retained = retain;
-    if (cron.trigger_action(CronTrigger::MQTT, &msg, &trigger_action))
+    if (cron.trigger_action(CronTriggerID::MQTT, &msg, &trigger_action))
         return;
 #endif
 
@@ -453,7 +474,7 @@ void Mqtt::setup()
 
     task_scheduler.scheduleWithFixedDelay([this](){
         this->resubscribe();
-    }, 60000, 60000);
+    }, 1000, 1000);
 
     initialized = true;
 }
@@ -464,8 +485,8 @@ void Mqtt::register_urls()
     api.addState("mqtt/state", &state, {}, 1000);
 
 #if MODULE_CRON_AVAILABLE()
-    if (cron.is_trigger_active(CronTrigger::MQTT)) {
-        ConfigVec trigger_config = cron.get_configured_triggers(CronTrigger::MQTT);
+    if (cron.is_trigger_active(CronTriggerID::MQTT)) {
+        ConfigVec trigger_config = cron.get_configured_triggers(CronTriggerID::MQTT);
         std::vector<String> subscribed_topics;
         for (auto &conf: trigger_config) {
             bool already_subscribed = false;
@@ -480,7 +501,7 @@ void Mqtt::register_urls()
                     msg.topic = String(tpic).substring(0, tpic_len);
                     msg.payload = String(data).substring(0, data_len);
                     msg.retained = false;
-                    if (cron.trigger_action(CronTrigger::MQTT, &msg, &trigger_action))
+                    if (cron.trigger_action(CronTriggerID::MQTT, &msg, &trigger_action))
                         return;
                 }, false);
                 subscribed_topics.push_back(conf.second->get("topic")->asString());
@@ -515,9 +536,9 @@ void Mqtt::register_events() {
 bool Mqtt::action_triggered(Config *config, void *data) {
     Config *cfg = (Config*)config->get();
     MqttMessage *msg = (MqttMessage *)data;
-    switch (static_cast<CronTrigger>(config->getTag()))
+    switch (config->getTag<CronTriggerID>())
     {
-        case CronTrigger::MQTT:
+        case CronTriggerID::MQTT:
         if (cfg->get("payload")->asString() == msg->payload)
             return true;
         break;

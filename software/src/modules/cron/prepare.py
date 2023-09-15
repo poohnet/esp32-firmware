@@ -19,7 +19,9 @@ if 'software' not in sys.modules:
 
 from software import util
 
+# NEVER EVER EDIT OR REMOVE IDS. Only append new ones. Changing or removing IDs is a breaking API and config change!
 triggers = [
+    ('None', 0),
     ('Cron', 1),
     ('IEC Change', 2),
     ('MQTT', 3),
@@ -30,7 +32,9 @@ triggers = [
     ('EVSE GP Input', 8),
 ]
 
+# NEVER EVER EDIT OR REMOVE IDS. Only append new ones. Changing or removing IDs is a breaking API and config change!
 actions = [
+    ('None', 0),
     ('Print', 1),
     ('MQTT', 2),
     ('Set Current', 3),
@@ -53,19 +57,20 @@ for action in actions:
 
 with open('cron_defs.h', 'w') as f:
     f.write('// WARNING: This file is generated.\n\n')
+    f.write('#include <stdint.h>\n\n')
     f.write('#pragma once\n\n')
-    f.write('enum class CronTrigger {\n')
+    f.write('enum class CronTriggerID : uint8_t {\n')
     f.write(''.join(trigger_values))
     f.write('};\n\n')
-    f.write('enum class CronAction {\n')
+    f.write('enum class CronActionID : uint8_t {\n')
     f.write(''.join(action_values))
     f.write('};\n')
 
 with open('../../../web/src/modules/cron/cron_defs.ts', 'w') as f:
     f.write('// WARNING: This file is generated.\n\n')
-    f.write('export const enum CronTrigger {\n')
+    f.write('export const enum CronTriggerID {\n')
     f.write(''.join(trigger_values))
     f.write('};\n\n')
-    f.write('export const enum CronAction {\n')
+    f.write('export const enum CronActionID {\n')
     f.write(''.join(action_values))
     f.write('};\n')

@@ -385,7 +385,7 @@ def find_frontend_plugins(host_module_name, plugin_name):
 
     metadata = json.loads(metadata_json)
     plugins = []
-    plugin_file_base = host_module_name.under + '_' + plugin_name.under
+    plugin_file_base = 'plugin_' + host_module_name.under + '_' + plugin_name.under
     plugin_file_names = [plugin_file_base + '.ts', plugin_file_base + '.tsx']
 
     for module_name in metadata['frontend_modules']:
@@ -397,8 +397,8 @@ def find_frontend_plugins(host_module_name, plugin_name):
 
             file_path = os.path.join(module_path, file_name)
             interface_names = []
-            #interface_re = re.compile(r'^export\s+interface\s+({0}_{1}_[A-Za-z0-9_]+)\s*{{?$'.format(host_module_name.camel, plugin_name.camel))
-            interface_re = re.compile(r'^export\s+interface\s+([A-Za-z0-9_]+{0}{1})\s*{{?$'.format(host_module_name.camel, plugin_name.camel))
+            #interface_re = re.compile(r'^export\s+(?:interface|type)\s+({0}_{1}_[A-Za-z0-9_]+)[^A-Za-z0-9_]*$'.format(host_module_name.camel, plugin_name.camel))
+            interface_re = re.compile(r'^export\s+(?:interface|type)\s+([A-Za-z0-9_]+{0}{1})[^A-Za-z0-9_]*$'.format(host_module_name.camel, plugin_name.camel))
 
             with open(file_path, 'r', encoding='utf-8') as f:
                 for line in f:

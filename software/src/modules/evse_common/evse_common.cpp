@@ -138,22 +138,21 @@ void EvseCommon::pre_setup() {
     require_meter_enabled_update = require_meter_enabled;
 
 #if MODULE_CRON_AVAILABLE()
-    ConfUnionPrototype proto;
-    proto.tag = static_cast<uint8_t>(CronTrigger::IECChange);
-    proto.config = Config::Object({
-        {"charger_state", Config::Uint(0, 0, 4)}
-    });
+    cron.register_trigger(
+        CronTriggerID::IECChange,
+        Config::Object({
+            {"charger_state", Config::Uint(0, 0, 4)}
+        }));
 
-    cron.register_trigger(proto);
-
-    proto.tag = static_cast<uint8_t>(CronAction::SetCurrent);
-    proto.config = Config::Object({
-        {"current", Config::Uint(0, 0, 32000)}
-    });
-
-    cron.register_action(proto, [this](const Config *config) {
-        backend->set_charging_slot(CHARGING_SLOT_CRON, config->get("current")->asUint(), true, false);
-    });
+    cron.register_action(
+        CronActionID::SetCurrent,
+        Config::Object({
+            {"current", Config::Uint(0, 0, 32000)}
+        }),
+        [this](const Config *config) {
+            backend->set_charging_slot(CHARGING_SLOT_CRON, config->get("current")->asUint(), true, false);
+        }
+    );
 #endif
 }
 
@@ -272,8 +271,8 @@ void EvseCommon::setup() {
 #if MODULE_CRON_AVAILABLE()
 bool EvseCommon::action_triggered(Config *config, void *data) {
     Config *cfg = (Config*)config->get();
-    switch (static_cast<CronTrigger>(config->getTag())) {
-        case CronTrigger::IECChange:
+    switch (config->getTag<CronTriggerID>()) {
+        case CronTriggerID::IECChange:
                 if (cfg->get("charger_state")->asUint() == state.get("charger_state")->asUint())
                     return true;
             break;
@@ -551,14 +550,14 @@ void EvseCommon::register_urls() {
     backend->post_register_urls();
 
 #if MODULE_CRON_AVAILABLE()
-    if (cron.is_trigger_active(CronTrigger::IECChange)) {
+    if (cron.is_trigger_active(CronTriggerID::IECChange)) {
         event.registerEvent("evse/state", {}, [this](Config *cfg) {
 
             // we need this since not only iec state changes trigger this api event.
             static uint32_t last_state = 0;
             uint32_t state_now = cfg->get("charger_state")->asUint();
             if (last_state != state_now) {
-                cron.trigger_action(CronTrigger::IECChange, nullptr, &trigger_action);
+                cron.trigger_action(CronTriggerID::IECChange, nullptr, &trigger_action);
                 last_state = state_now;
             }
         });
