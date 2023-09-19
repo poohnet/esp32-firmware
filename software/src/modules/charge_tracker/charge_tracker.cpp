@@ -732,21 +732,11 @@ void ChargeTracker::register_urls()
     api.addState("charge_tracker/last_charges", &last_charges, {}, 1000);
     api.addState("charge_tracker/current_charge", &current_charge, {}, 1000);
     api.addState("charge_tracker/state", &state, {}, 1000);
-    api.addRawCommand("charge_tracker/remove_all_charges", [this](char *c, size_t s) -> String {
-        StaticJsonDocument<16> doc;
 
-        DeserializationError error = deserializeJson(doc, c, s);
-
-        if (error) {
-            return "Failed to deserialize string: " + String(error.c_str());
-        }
-
-        if (!doc["do_i_know_what_i_am_doing"].is<bool>()) {
-            return "You don't seem to know what you are doing";
-        }
-
-        if (!doc["do_i_know_what_i_am_doing"].as<bool>()) {
-            return "Charges will NOT be removed";
+    api.addCommand("charge_tracker/remove_all_charges", Config::Confirm(), {Config::ConfirmKey()}, [this](String &result){
+        if (!Config::Confirm()->get(Config::ConfirmKey())->asBool()) {
+            result = "Tracked charges will NOT be removed";
+            return;
         }
 
         task_scheduler.scheduleOnce([](){
@@ -755,7 +745,6 @@ void ChargeTracker::register_urls()
             users.remove_username_file();
             ESP.restart();
         }, 3000);
-        return "";
     }, true);
 
     server.on("/charge_tracker/pdf", HTTP_PUT, [this](WebServerRequest request) {

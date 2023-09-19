@@ -113,7 +113,11 @@ void API::setup()
     }, 250, 250);
 }
 
-void API::addCommand(const String &path, ConfigRoot *config, std::initializer_list<String> keys_to_censor_in_debug_report, std::function<void(void)> callback, bool is_action)
+void API::addCommand(const String &path, ConfigRoot *config, std::initializer_list<String> keys_to_censor_in_debug_report, std::function<void(void)> callback, bool is_action) {
+    this->addCommand(path, config, keys_to_censor_in_debug_report, [callback](String &){callback();}, is_action);
+}
+
+void API::addCommand(const String &path, ConfigRoot *config, std::initializer_list<String> keys_to_censor_in_debug_report, std::function<void(String &)> callback, bool is_action)
 {
     if (already_registered(path, "command"))
         return;
@@ -126,12 +130,12 @@ void API::addCommand(const String &path, ConfigRoot *config, std::initializer_li
     }
 }
 
-void API::addState(const String &path, ConfigRoot *config, std::initializer_list<String> keys_to_censor, uint32_t interval_ms)
+void API::addState(const String &path, ConfigRoot *config, std::initializer_list<String> keys_to_censor, bool low_latency)
 {
     if (already_registered(path, "state"))
         return;
 
-    states.push_back({path, config, keys_to_censor, interval_ms < 1000});
+    states.push_back({path, config, keys_to_censor, low_latency});
     auto stateIdx = states.size() - 1;
 
     for (auto *backend : this->backends) {
@@ -139,7 +143,7 @@ void API::addState(const String &path, ConfigRoot *config, std::initializer_list
     }
 }
 
-bool API::addPersistentConfig(const String &path, ConfigRoot *config, std::initializer_list<String> keys_to_censor, uint32_t interval_ms)
+bool API::addPersistentConfig(const String &path, ConfigRoot *config, std::initializer_list<String> keys_to_censor)
 {
     if (path.length() > 63) {
         logger.printfln("The maximum allowed config path length is 63 bytes. Got %u bytes instead.", path.length());
@@ -174,9 +178,9 @@ bool API::addPersistentConfig(const String &path, ConfigRoot *config, std::initi
         }
 
         String conf_modified_path = path + "_modified";
-        addState(conf_modified_path, conf_modified, {}, interval_ms);
+        addState(conf_modified_path, conf_modified);
 
-        addState(path, config, keys_to_censor, interval_ms);
+        addState(path, config, keys_to_censor);
     }
 
     addCommand(path + "_update", config, keys_to_censor, [path, config, conf_modified]() {
@@ -203,6 +207,26 @@ void API::addRawCommand(const String &path, std::function<String(char *, size_t)
     for (auto *backend : this->backends) {
         backend->addRawCommand(rawCommandIdx, raw_commands[rawCommandIdx]);
     }
+}
+
+void API::callResponse(ResponseRegistration &reg, char *payload, size_t len, IChunkedResponse *response, Ownership *response_ownership, uint32_t response_owner_id) {
+    if (this->mainTaskHandle != xTaskGetCurrentTaskHandle()) {
+        logger.printfln("Don't use API::callResponse in non-main thread!");
+        return;
+    }
+
+    if (!(len == 0 && reg.config->is_null())) {
+        String message = reg.config->update_from_cstr(payload, len);
+        if (message != "") {
+            response->begin(false);
+            response->write(message.c_str(), message.length());
+            response->flush();
+            response->end("");
+            return;
+        }
+    }
+
+    reg.callback(response, response_ownership, response_owner_id);
 }
 
 void API::addResponse(const String &path, ConfigRoot *config, std::initializer_list<String> keys_to_censor_in_debug_report, std::function<void(IChunkedResponse *, Ownership *, uint32_t)> callback)
@@ -269,9 +293,9 @@ void API::removeAllConfig() {
 }
 
 /*
-void API::addTemporaryConfig(String path, Config *config, std::initializer_list<String> keys_to_censor, uint32_t interval_ms, std::function<void(void)> callback)
+void API::addTemporaryConfig(String path, Config *config, std::initializer_list<String> keys_to_censor, std::function<void(void)> callback)
 {
-    addState(path, config, keys_to_censor, interval_ms);
+    addState(path, config, keys_to_censor);
     addCommand(path + "_update", config, callback);
 }
 */
@@ -367,8 +391,8 @@ void API::registerDebugUrl(WebServer *server)
         return request.send(200, "application/json; charset=utf-8", result.c_str());
     });
 
-    this->addState("info/features", &features, {}, 1000);
-    this->addState("info/version", &version, {}, 1000);
+    this->addState("info/features", &features);
+    this->addState("info/version", &version);
 }
 
 size_t API::registerBackend(IAPIBackend *backend)
@@ -385,43 +409,65 @@ String API::callCommand(CommandRegistration &reg, char *payload, size_t len) {
         return "Use ConfUpdate overload of callCommand in main thread!";
     }
 
-    std::lock_guard<std::mutex> l{command_mutex};
+    String result = "";
 
-    if (payload == nullptr && !reg.config->is_null())
-        return "empty payload only allowed for null configs";
+    auto task_id = task_scheduler.scheduleOnce(
+        [&result, reg, payload, len]() mutable {
+            if (payload == nullptr && !reg.config->is_null()) {
+                result = "empty payload only allowed for null configs";
+                return;
+            }
 
-    for (auto *backend : backends)
-        backend->disableReceive();
+            if (payload != nullptr) {
+                result = reg.config->update_from_cstr(payload, len);
+                if (result != "")
+                    return;
+            }
 
-    if (task_scheduler.cancel(reg.task_id) == TaskScheduler::CancelResult::Cancelled) {
-        delete reg.config_in_flight;
-        reg.config_in_flight = nullptr;
+            reg.callback(result);
+        }, 0);
+
+    if (task_scheduler.await(task_id, 10000) == TaskScheduler::AwaitResult::Timeout) {
+        if (task_scheduler.cancel(task_id) == TaskScheduler::CancelResult::WillBeCancelled)
+            esp_system_abort("callCommand task timed out and can't be cancelled. Giving up.");
+        return "Failed to execute command: Timeout reached.";
     }
 
-    if (payload != nullptr) {
-        reg.config_in_flight = new Config();
-        String error = reg.config->get_updated_copy(payload, len, reg.config_in_flight);
-        if(error != "") {
-            delete reg.config_in_flight;
-            reg.config_in_flight = nullptr;
+    return result;
+}
 
-            for (auto *backend : backends)
-                backend->enableReceive();
-            return error;
-        }
+void API::callCommandNonBlocking(CommandRegistration &reg, char *payload, size_t len, std::function<void(String)> done_cb) {
+    if (this->mainTaskHandle == xTaskGetCurrentTaskHandle()) {
+        done_cb("callCommandNonBlocking: Use ConfUpdate overload of callCommand in main thread!");
+        return;
     }
 
-    reg.task_id = task_scheduler.scheduleOnce([this, reg]() mutable {
-        std::lock_guard<std::mutex> l2{command_mutex};
-        if (reg.config_in_flight != nullptr)
-            reg.config->update_from_copy(reg.config_in_flight);
-        reg.callback();
-        delete reg.config_in_flight;
-        reg.config_in_flight = nullptr;
-        for (auto *backend : backends)
-            backend->enableReceive();
-    }, 0);
-    return "";
+    char *cpy = (char *) malloc(len);
+    memcpy(cpy, payload, len);
+
+    task_scheduler.scheduleOnce(
+        [reg, cpy, len, done_cb]() mutable {
+            String result;
+
+            defer {
+                done_cb(result);
+                free(cpy);
+            };
+
+            if (cpy == nullptr && !reg.config->is_null()) {
+                result = "empty payload only allowed for null configs";
+                return;
+            }
+
+            if (cpy != nullptr) {
+                result = reg.config->update_from_cstr(cpy, len);
+                if (result != "") {
+                    return;
+                }
+            }
+
+            reg.callback(result);
+        }, 0);
 }
 
 String API::callCommand(const char *path, Config::ConfUpdate payload)
@@ -440,8 +486,8 @@ String API::callCommand(const char *path, Config::ConfUpdate payload)
         if (error != "") {
             return error;
         }
-        reg.callback();
-        return "";
+        reg.callback(error);
+        return error;
     }
 
     return String("Unknown command ") + path;

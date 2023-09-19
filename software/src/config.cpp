@@ -102,6 +102,7 @@ Config::ConfUnion::Slot *union_buf = nullptr;
 size_t union_buf_size = 0;
 
 static ConfigRoot nullconf = Config{Config::ConfVariant{}};
+static ConfigRoot *confirmconf;
 
 
 struct default_validator {
@@ -517,7 +518,8 @@ struct from_json {
         }
 
         for (size_t i = 0; i < arr_size; ++i) {
-            String inner_error = Config::apply_visitor(from_json{arr[i], force_same_keys, permit_null_updates, false}, (*val)[i].value);
+            // Must always call getVal() because a nested array might grow and trigger a slot array move that would invalidate any kept reference on the outer array.
+            String inner_error = Config::apply_visitor(from_json{arr[i], force_same_keys, permit_null_updates, false}, (*x.getVal())[i].value);
             if (inner_error != "")
                 return String("[") + i + "] " + inner_error;
         }
@@ -743,7 +745,8 @@ struct from_update {
         }
 
         for (size_t i = 0; i < arr_size; ++i) {
-            String inner_error = Config::apply_visitor(from_update{&arr->elements[i]}, (*val)[i].value);
+            // Must always call getVal() because a nested array might grow and trigger a slot array move that would invalidate any kept reference on the outer array.
+            String inner_error = Config::apply_visitor(from_update{&arr->elements[i]}, (*x.getVal())[i].value);
             if (inner_error != "")
                 return String("[") + i + "] " + inner_error;
         }
@@ -1485,6 +1488,23 @@ ConfigRoot *Config::Null()
     return &nullconf;
 }
 
+ConfigRoot *Config::Confirm() {
+    if (boot_stage < BootStage::PRE_SETUP)
+        esp_system_abort("constructing configs before the pre_setup is not allowed!");
+
+    if (confirmconf == nullptr) {
+        confirmconf = new ConfigRoot(Config::Object({
+            {Config::ConfirmKey(), Config::Bool(false)}
+        }));
+    }
+
+    return confirmconf;
+}
+
+String Config::ConfirmKey() {
+    return "do_i_know_what_i_am_doing";
+}
+
 Config Config::Uint8(uint8_t u)
 {
     return Config::Uint(u, std::numeric_limits<uint8_t>::lowest(), std::numeric_limits<uint8_t>::max());
@@ -1589,6 +1609,114 @@ const Config::ConstWrap Config::get(uint16_t i) const
     return wrap;
 }
 
+Config::Wrap Config::add() {
+    if (!this->is<Config::ConfArray>()) {
+        logger.printfln("Tried to add to a node that is not an array!");
+        delay(100);
+        return Wrap(nullptr);
+    }
+
+    std::vector<Config> &children = this->asArray();
+
+    const auto &arr = value.val.a;
+    const auto *slot = arr.getSlot();
+
+    const auto max_elements = slot->maxElements;
+    if (children.size() >= max_elements) {
+        logger.printfln("Tried to add to an ConfArray that already has the max allowed number of elements (%u).", max_elements);
+        delay(100);
+        return Wrap(nullptr);
+    }
+
+    auto copy = *slot->prototype;
+
+    // Copying the prototype might invalidate the children reference
+    // when ConfArray slots are moved, so asArray() must be called again.
+    children = this->asArray();
+
+    children.push_back(std::move(copy));
+
+    return Wrap(&children.back());
+}
+
+bool Config::removeLast()
+{
+    if (!this->is<Config::ConfArray>()) {
+        logger.printfln("Tried to remove the last element from a node that is not an array!");
+        delay(100);
+        return false;
+    }
+
+    std::vector<Config> &children = this->asArray();
+    if (children.size() == 0)
+        return false;
+
+    children.pop_back();
+    return true;
+}
+
+bool Config::removeAll()
+{
+    if (!this->is<Config::ConfArray>()) {
+        logger.printfln("Tried to remove all from a node that is not an array!");
+        delay(100);
+        return false;
+    }
+
+    std::vector<Config> &children = this->asArray();
+
+    children.clear();
+
+    return true;
+}
+
+bool Config::remove(size_t i)
+{
+    if (!this->is<Config::ConfArray>()) {
+        logger.printfln("Tried to remove from a node that is not an array!");
+        delay(100);
+        return false;
+    }
+    std::vector<Config> &children = this->asArray();
+
+    if (children.size() <= i)
+        return false;
+
+    children.erase(children.begin() + i);
+    return true;
+}
+
+ssize_t Config::count() const
+{
+    if (!this->is<Config::ConfArray>()) {
+        logger.printfln("Tried to get count of a node that is not an array!");
+        delay(100);
+        return -1;
+    }
+    const std::vector<Config> &children = this->asArray();
+    return children.size();
+}
+
+std::vector<Config>::iterator Config::begin()
+{
+    if (!this->is<Config::ConfArray>()) {
+        logger.printfln("Tried to get begin iterator of a node that is not an array!");
+        delay(100);
+        return std::vector<Config>::iterator();
+    }
+    return this->asArray().begin();
+}
+
+std::vector<Config>::iterator Config::end()
+{
+    if (!this->is<Config::ConfArray>()) {
+        logger.printfln("Tried to get end iterator of a node that is not an array!");
+        delay(100);
+        return std::vector<Config>::iterator();
+    }
+    return this->asArray().end();
+}
+
 const CoolString &Config::asString() const
 {
     return *this->get<ConfString>()->getVal();
@@ -1632,6 +1760,31 @@ std::vector<Config> &Config::asArray()
 const std::vector<Config> &Config::asArray() const
 {
     return *this->get<ConfArray>()->getVal();
+}
+
+bool Config::updateString(const String &value)
+{
+    return update_value<String, ConfString>(value);
+}
+
+bool Config::updateInt(int32_t value)
+{
+    return update_value<int32_t, ConfInt>(value);
+}
+
+bool Config::updateUint(uint32_t value)
+{
+    return update_value<uint32_t, ConfUint>(value);
+}
+
+bool Config::updateFloat(float value)
+{
+    return update_value<float, ConfFloat>(value);
+}
+
+bool Config::updateBool(bool value)
+{
+    return update_value<bool, ConfBool>(value);
 }
 
 size_t Config::fillFloatArray(float *arr, size_t elements)
@@ -1929,30 +2082,4 @@ void config_post_setup() {
 Config::ConstWrap::ConstWrap(const Config *_conf)
 {
     conf = _conf;
-}
-
-Config::Wrap Config::add() {
-    if (!this->is<Config::ConfArray>()) {
-        logger.printfln("Tried to add to a node that is not an array!");
-        delay(100);
-        return Wrap(nullptr);
-    }
-
-    std::vector<Config> &children = this->asArray();
-
-    const auto &arr = value.val.a;
-    const auto *slot = arr.getSlot();
-
-    const auto max_elements = slot->maxElements;
-    if (children.size() >= max_elements) {
-        logger.printfln("Tried to add to an ConfArray that already has the max allowed number of elements (%u).", max_elements);
-        delay(100);
-        return Wrap(nullptr);
-    }
-
-    children.push_back(*slot->prototype);
-
-    // The push_back() might invalidate the children reference
-    // when ConfArray slots are moved, so asArray() must be called again.
-    return Wrap(&this->asArray().back());
 }

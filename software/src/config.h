@@ -544,7 +544,16 @@ struct Config {
     template<typename T>
     static void check_enum_template_type() {
         static_assert(std::is_enum<T>::value, "ConfUnion tag type must be enum");
-        //static_assert(std::is_same<std::underlying_type<T>::type, uint8_t>::value, "Underlying type of ConfUnion tag type must be uint8_t");
+
+        // This is a complicated way to express
+        // static_assert(std::is_same<std::underlying_type<T>::type, uint8_t>::value, "Underlying type of ConfUnion tag type must be uint8_t");
+        // but I don't get the simpler assert to compile.
+        // So check for the alignment properties, because those are what we care about.
+        struct foobar{T foo; uint8_t bar;};
+        static_assert(offsetof(foobar, bar) == 1, "Underlying type of ConfUnion tag type must be uint8_t");
+
+        static_assert(offsetof(ConfUnionPrototype<T>, tag) == offsetof(ConfUnionPrototypeInternal, tag), "Tag offset mismatch between ConfUnionPrototype<T> and ConfUnionPrototypeInternal");
+        static_assert(offsetof(ConfUnionPrototype<T>, config) == offsetof(ConfUnionPrototypeInternal, config), "Config offset mismatch between ConfUnionPrototype<T> and ConfUnionPrototypeInternal");
     }
 
     template<typename T>
@@ -557,6 +566,9 @@ private:
 public:
 
     static ConfigRoot *Null();
+
+    static ConfigRoot *Confirm();
+    static String ConfirmKey();
 
     static Config Uint8(uint8_t u);
 
@@ -631,84 +643,13 @@ public:
 
     // for ConfArray
     const ConstWrap get(uint16_t i) const;
-
     Wrap add();
-
-    bool removeLast()
-    {
-        if (!this->is<Config::ConfArray>()) {
-            logger.printfln("Tried to remove the last element from a node that is not an array!");
-            delay(100);
-            return false;
-        }
-
-        std::vector<Config> &children = this->asArray();
-        if (children.size() == 0)
-            return false;
-
-        children.pop_back();
-        return true;
-    }
-
-    bool removeAll()
-    {
-        if (!this->is<Config::ConfArray>()) {
-            logger.printfln("Tried to remove all from a node that is not an array!");
-            delay(100);
-            return false;
-        }
-
-        std::vector<Config> &children = this->asArray();
-
-        children.clear();
-
-        return true;
-    }
-
-    bool remove(size_t i)
-    {
-        if (!this->is<Config::ConfArray>()) {
-            logger.printfln("Tried to remove from a node that is not an array!");
-            delay(100);
-            return false;
-        }
-        std::vector<Config> &children = this->asArray();
-
-        if (children.size() <= i)
-            return false;
-
-        children.erase(children.begin() + i);
-        return true;
-    }
-
-    ssize_t count() const
-    {
-        if (!this->is<Config::ConfArray>()) {
-            logger.printfln("Tried to get count of a node that is not an array!");
-            delay(100);
-            return -1;
-        }
-        const std::vector<Config> &children = this->asArray();
-        return children.size();
-    }
-
-    std::vector<Config>::iterator begin() {
-        if (!this->is<Config::ConfArray>()) {
-            logger.printfln("Tried to get count of a node that is not an array!");
-            delay(100);
-            return std::vector<Config>::iterator();
-        }
-        return this->asArray().begin();
-    }
-
-    std::vector<Config>::iterator end() {
-        if (!this->is<Config::ConfArray>()) {
-            logger.printfln("Tried to get count of a node that is not an array!");
-            delay(100);
-            return std::vector<Config>::iterator();
-        }
-        return this->asArray().end();
-    }
+    bool removeLast();
+    bool removeAll();
+    bool remove(size_t i);
+    ssize_t count() const;
+    std::vector<Config>::iterator begin();
+    std::vector<Config>::iterator end();
 
     void swapArray(Config *other) {
         this->asArray().swap(other->asArray());
@@ -725,6 +666,7 @@ public:
         return (T) this->get<ConfUnion>()->getTag();
     }
 
+private:
     template<typename ConfigT>
     ConfigT *get() {
         if (!this->is<ConfigT>()) {
@@ -747,6 +689,7 @@ public:
         return reinterpret_cast<const ConfigT *>(&value.val);
     }
 
+public:
     const CoolString &asString() const;
 
     const char *asEphemeralCStr() const;
@@ -779,7 +722,6 @@ private:
     std::vector<Config> &asArray();
     const std::vector<Config> &asArray() const;
 
-public:
     template<typename T, typename ConfigT>
     bool update_value(T value) {
         if (!this->is<ConfigT>()) {
@@ -797,31 +739,14 @@ public:
         return old_value != value;
     }
 
-    bool updateString(const String &value)
-    {
-        return update_value<String, ConfString>(value);
-    }
+public:
+    bool updateString(const String &value);
+    bool updateInt(int32_t value);
+    bool updateUint(uint32_t value);
+    bool updateFloat(float value);
+    bool updateBool(bool value);
 
-    bool updateInt(int32_t value)
-    {
-        return update_value<int32_t, ConfInt>(value);
-    }
-
-    bool updateUint(uint32_t value)
-    {
-        return update_value<uint32_t, ConfUint>(value);
-    }
-
-    bool updateFloat(float value)
-    {
-        return update_value<float, ConfFloat>(value);
-    }
-
-    bool updateBool(bool value)
-    {
-        return update_value<bool, ConfBool>(value);
-    }
-
+private:
     template<typename T, typename ConfigT>
     size_t fillArray(T *arr, size_t elements) {
         if (!this->is<ConfArray>()) {
@@ -846,6 +771,7 @@ public:
         return toWrite;
     }
 
+public:
     size_t fillFloatArray(float *arr, size_t elements);
 
     size_t fillUint8Array(uint8_t *arr, size_t elements);
