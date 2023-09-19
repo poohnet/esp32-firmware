@@ -97,7 +97,6 @@ void Mqtt::pre_setup()
 
 void Mqtt::subscribe_with_prefix(const String &path, std::function<void(const char *, size_t, char *, size_t)> callback, bool forbid_retained)
 {
-    const String &prefix = config_in_use.get("global_topic_prefix")->asString();
     String topic = prefix + "/" + path;
     subscribe(topic, callback, forbid_retained);
 }
@@ -106,7 +105,7 @@ void Mqtt::subscribe(const String &topic, std::function<void(const char *, size_
 {
     bool subscribed = esp_mqtt_client_subscribe(client, topic.c_str(), 0) >= 0;
 
-    this->commands.push_back({topic, callback, forbid_retained, topic.startsWith(config_in_use.get("global_topic_prefix")->asString()), subscribed});
+    this->commands.push_back({topic, callback, forbid_retained, topic.startsWith(prefix), subscribed});
 }
 
 void Mqtt::addCommand(size_t commandIdx, const CommandRegistration &reg)
@@ -136,7 +135,6 @@ void Mqtt::addResponse(size_t responseIdx, const ResponseRegistration &reg)
 
 bool Mqtt::publish_with_prefix(const String &path, const String &payload, bool retain)
 {
-    const String &prefix = config_in_use.get("global_topic_prefix")->asString();
     String topic = prefix + "/" + path;
     return publish(topic, payload, retain);
 }
@@ -178,7 +176,6 @@ void Mqtt::resubscribe() {
         return;
 
     if (!global_topic_prefix_subscribed) {
-        const String &prefix = config_in_use.get("global_topic_prefix")->asString();
         String topic = prefix + "/#";
         global_topic_prefix_subscribed = esp_mqtt_client_subscribe(client, topic.c_str(), 0) >= 0;
     }
@@ -259,14 +256,14 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
             continue;
 
         if (retain && c.forbid_retained) {
-            logger.printfln("MQTT: Topic %s is an action. Ignoring retained message (data_len=%u).", c.topic.c_str(), data_len);
+            logger.printfln("MQTT: Retained messages on topic %s are forbidden. Ignoring retained message (data_len=%u).", c.topic.c_str(), data_len);
             return;
         }
 
         c.callback(topic, topic_len, data, data_len);
         return;
     }
-    const String &prefix = this->config_in_use.get("global_topic_prefix")->asString();
+
     if (topic_len < prefix.length() + 1) // + 1 because we will check for the / between the prefix and the topic.
         return;
     if (memcmp(topic, prefix.c_str(), prefix.length()) != 0)
@@ -305,12 +302,15 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
             return;
         }
 
-        String error = reg.callback(data, data_len);
-        if(error == "") {
-            return;
-        }
+        esp_mqtt_client_disable_receive(client, 100);
+        task_scheduler.scheduleOnce([this, reg, data, data_len](){
+            String error = reg.callback(data, data_len);
+            if (error != "")
+                logger.printfln("MQTT: %s", error.c_str());
 
-        logger.printfln("MQTT: Failed to update %s from MQTT payload (data_len=%u): %s", reg.path.c_str(), data_len, error.c_str());
+            esp_mqtt_client_enable_receive(this->client);
+        }, 0);
+
         return;
     }
 
@@ -447,6 +447,7 @@ void Mqtt::setup()
     }
 
     config_in_use = config;
+    prefix = this->config_in_use.get("global_topic_prefix")->asString();
 
     if (!config.get("enable_mqtt")->asBool()) {
         initialized = true;
@@ -484,8 +485,8 @@ void Mqtt::setup()
 
 void Mqtt::register_urls()
 {
-    api.addPersistentConfig("mqtt/config", &config, {"broker_password"}, 1000);
-    api.addState("mqtt/state", &state, {}, 1000);
+    api.addPersistentConfig("mqtt/config", &config, {"broker_password"});
+    api.addState("mqtt/state", &state);
 
 #if MODULE_CRON_AVAILABLE()
     if (cron.is_trigger_active(CronTriggerID::MQTT)) {

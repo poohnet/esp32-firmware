@@ -143,8 +143,8 @@ struct Config {
 
     struct ConfBool {
         bool value;
-        bool *getVal() { return &value; };
-        const bool *getVal() const { return &value; };
+        bool *getVal();
+        const bool *getVal() const;
 
         static constexpr const char *variantName = "ConfBool";
     };
@@ -245,10 +245,7 @@ struct Config {
     // a get<std::nullptr_t>() that returned nullptr because the variant
     // had another type and the same call that returned nullptr because
     // the variant has the std::nullptr_type and thus contains a nullptr.
-    static bool containsNull(const ConfUpdate *update)
-    {
-        return update->which() == 0;
-    }
+    static bool containsNull(const ConfUpdate *update);
 
     struct ConfUpdateArray {
         std::vector<ConfUpdate> elements;
@@ -280,7 +277,7 @@ struct Config {
         Tag tag = Tag::EMPTY;
         uint8_t updated;
         union Val {
-            Val() : e(Empty{}) {}
+            Val();
             Empty e;
             ConfString s;
             ConfFloat f;
@@ -290,135 +287,29 @@ struct Config {
             ConfArray a;
             ConfObject o;
             ConfUnion un;
-            ~Val() {}
+            ~Val();
         } val;
 
-        ConfVariant(ConfString s) : tag(Tag::STRING), updated(0xFF), val() {new(&val.s)  ConfString{s};}
-        ConfVariant(ConfFloat f)  : tag(Tag::FLOAT),  updated(0xFF), val() {new(&val.f)  ConfFloat{f};}
-        ConfVariant(ConfInt i)    : tag(Tag::INT),    updated(0xFF), val() {new(&val.i)  ConfInt{i};}
-        ConfVariant(ConfUint u)   : tag(Tag::UINT),   updated(0xFF), val() {new(&val.u)  ConfUint{u};}
-        ConfVariant(ConfBool b)   : tag(Tag::BOOL),   updated(0xFF), val() {new(&val.b)  ConfBool{b};}
-        ConfVariant(ConfArray a)  : tag(Tag::ARRAY),  updated(0xFF), val() {new(&val.a)  ConfArray{a};}
-        ConfVariant(ConfObject o) : tag(Tag::OBJECT), updated(0xFF), val() {new(&val.o)  ConfObject{o};}
-        ConfVariant(ConfUnion un) : tag(Tag::UNION),  updated(0xFF), val() {new(&val.un) ConfUnion{un};}
+        ConfVariant(ConfString s);
+        ConfVariant(ConfFloat f);
+        ConfVariant(ConfInt i);
+        ConfVariant(ConfUint u);
+        ConfVariant(ConfBool b);
+        ConfVariant(ConfArray a);
+        ConfVariant(ConfObject o);
+        ConfVariant(ConfUnion un);
 
-        ConfVariant() : tag(Tag::EMPTY), updated(0xFF), val() {}
+        ConfVariant();
 
-        ConfVariant(const ConfVariant &cpy) {
-            if (tag != Tag::EMPTY)
-                destroyUnionMember();
+        ConfVariant(const ConfVariant &cpy);
 
-            switch (cpy.tag) {
-                case ConfVariant::Tag::EMPTY:
-                    new(&val.e) Empty(cpy.val.e);
-                    break;
-                case ConfVariant::Tag::STRING:
-                    new(&val.s) ConfString(cpy.val.s);
-                    break;
-                case ConfVariant::Tag::FLOAT:
-                    new(&val.f) ConfFloat(cpy.val.f);
-                    break;
-                case ConfVariant::Tag::INT:
-                    new(&val.i) ConfInt(cpy.val.i);
-                    break;
-                case ConfVariant::Tag::UINT:
-                    new(&val.u) ConfUint(cpy.val.u);
-                    break;
-                case ConfVariant::Tag::BOOL:
-                    new(&val.b) ConfBool(cpy.val.b);
-                    break;
-                case ConfVariant::Tag::ARRAY:
-                    new(&val.a) ConfArray(cpy.val.a);
-                    break;
-                case ConfVariant::Tag::OBJECT:
-                    new(&val.o) ConfObject(cpy.val.o);
-                    break;
-                case ConfVariant::Tag::UNION:
-                    new(&val.un) ConfUnion(cpy.val.un);
-                    break;
-            }
-            this->tag = cpy.tag;
-            this->updated = cpy.updated;
-        }
+        ConfVariant &operator=(const ConfVariant &cpy);
 
-        ConfVariant &operator=(const ConfVariant &cpy) {
-            if (this == &cpy) {
-                return *this;
-            }
+        void destroyUnionMember();
 
-            if (tag != Tag::EMPTY)
-                destroyUnionMember();
+        ~ConfVariant();
 
-            switch (cpy.tag) {
-                case ConfVariant::Tag::EMPTY:
-                    new(&val.e) Empty(cpy.val.e);
-                    break;
-                case ConfVariant::Tag::STRING:
-                    new(&val.s) ConfString(cpy.val.s);
-                    break;
-                case ConfVariant::Tag::FLOAT:
-                    new(&val.f) ConfFloat(cpy.val.f);
-                    break;
-                case ConfVariant::Tag::INT:
-                    new(&val.i) ConfInt(cpy.val.i);
-                    break;
-                case ConfVariant::Tag::UINT:
-                    new(&val.u) ConfUint(cpy.val.u);
-                    break;
-                case ConfVariant::Tag::BOOL:
-                    new(&val.b) ConfBool(cpy.val.b);
-                    break;
-                case ConfVariant::Tag::ARRAY:
-                    new(&val.a) ConfArray(cpy.val.a);
-                    break;
-                case ConfVariant::Tag::OBJECT:
-                    new(&val.o) ConfObject(cpy.val.o);
-                    break;
-                case ConfVariant::Tag::UNION:
-                    new(&val.un) ConfUnion(cpy.val.un);
-                    break;
-            }
-            this->tag = cpy.tag;
-            this->updated = cpy.updated;
-
-            return *this;
-        }
-
-        void destroyUnionMember() {
-            switch (tag) {
-                case ConfVariant::Tag::EMPTY:
-                    val.e.~Empty();
-                    break;
-                case ConfVariant::Tag::STRING:
-                    val.s.~ConfString();
-                    break;
-                case ConfVariant::Tag::FLOAT:
-                    val.f.~ConfFloat();
-                    break;
-                case ConfVariant::Tag::INT:
-                    val.i.~ConfInt();
-                    break;
-                case ConfVariant::Tag::UINT:
-                    val.u.~ConfUint();
-                    break;
-                case ConfVariant::Tag::BOOL:
-                    val.b.~ConfBool();
-                    break;
-                case ConfVariant::Tag::ARRAY:
-                    val.a.~ConfArray();
-                    break;
-                case ConfVariant::Tag::OBJECT:
-                    val.o.~ConfObject();
-                    break;
-                case ConfVariant::Tag::UNION:
-                    val.un.~ConfUnion();
-                    break;
-            }
-        }
-
-        ~ConfVariant() {
-            destroyUnionMember();
-        }
+        const char *getVariantName() const;
     };
 
     template<typename T>
@@ -511,9 +402,7 @@ struct Config {
         return (int)value.tag == Config::type_id<T>();
     }
 
-    bool is_null() const {
-        return value.tag == ConfVariant::Tag::EMPTY;
-    }
+    bool is_null() const;
 
     static Config Str(const String &s,
                       uint16_t minChars,
@@ -587,23 +476,15 @@ public:
         public:
             Wrap(Config *_conf);
 
-            Config *operator->()
-            {
-                return conf;
-            }
+            Config *operator->();
 
-            explicit operator Config*(){return conf;}
+            explicit operator Config*();
 
             // Allowing to call begin and end directly on
             // the wrapper makes it easier to use
             // range-based for loops.
-            std::vector<Config>::iterator begin() {
-                return conf->begin();
-            }
-
-            std::vector<Config>::iterator end() {
-                return conf->end();
-            }
+            std::vector<Config>::iterator begin();
+            std::vector<Config>::iterator end();
 
         private:
             Config *conf;
@@ -615,12 +496,9 @@ public:
         public:
             ConstWrap(const Config *_conf);
 
-            const Config *operator->() const
-            {
-                return conf;
-            }
+            const Config *operator->() const;
 
-            explicit operator const Config*() const {return conf;}
+            explicit operator const Config*() const;
 
         private:
             const Config *conf;
@@ -651,10 +529,6 @@ public:
     std::vector<Config>::iterator begin();
     std::vector<Config>::iterator end();
 
-    void swapArray(Config *other) {
-        this->asArray().swap(other->asArray());
-    }
-
     template<typename T>
     T getTag() const {
         Config::check_enum_template_type<T>();
@@ -670,7 +544,10 @@ private:
     template<typename ConfigT>
     ConfigT *get() {
         if (!this->is<ConfigT>()) {
-            logger.printfln("get: Config has wrong type. This is %s, requested is %s", this->to_string().c_str(), ConfigT::variantName);
+            logger.printfln("get: Config has wrong type. This is %s, requested is %s", this->value.getVariantName(), ConfigT::variantName);
+#ifdef DEBUG_FS_ENABLE
+            logger.printfln("Content is %s", this->to_string().c_str());
+#endif
             delay(100);
             return nullptr;
         }
@@ -681,7 +558,10 @@ private:
     template<typename ConfigT>
     const ConfigT *get() const {
         if (!this->is<ConfigT>()) {
-            logger.printfln("get: Config has wrong type. This is %s, requested is %s", this->to_string().c_str(), ConfigT::variantName);
+            logger.printfln("get: Config has wrong type. This is %s, requested is %s", this->value.getVariantName(), ConfigT::variantName);
+#ifdef DEBUG_FS_ENABLE
+            logger.printfln("Content is %s", this->to_string().c_str());
+#endif
             delay(100);
             return nullptr;
         }
@@ -708,7 +588,10 @@ public:
         } else if (this->is<ConfInt>()) {
             return (T) this->asInt();
         } else {
-            logger.printfln("asEnum: Config has wrong type. This is %s, (not a ConfInt or ConfUint)", this->to_string().c_str());
+            logger.printfln("asEnum: Config has wrong type. This is %s, (not a ConfInt or ConfUint)", this->value.getVariantName());
+#ifdef DEBUG_FS_ENABLE
+            logger.printfln("Content is %s", this->to_string().c_str());
+#endif
             delay(100);
             return (T) this->asUint();
         }
@@ -723,9 +606,13 @@ private:
     const std::vector<Config> &asArray() const;
 
     template<typename T, typename ConfigT>
-    bool update_value(T value) {
+    bool update_value(T value, const char *value_type) {
         if (!this->is<ConfigT>()) {
-            logger.printfln("update_value: Config has wrong type. This is %s. new value is %s", this->to_string().c_str(), String(value).c_str());
+            logger.printfln("update_value: Config has wrong type. This is a %s. new value is a %s", this->value.getVariantName(), value_type);
+#ifdef DEBUG_FS_ENABLE
+            logger.printfln("Content is %s", this->to_string().c_str());
+            logger.printfln("value is is %s", String(value).c_str());
+#endif
             delay(100);
             return false;
         }
@@ -781,38 +668,7 @@ public:
     size_t fillInt8Array(int8_t *arr, size_t elements);
     size_t fillInt16Array(int16_t *arr, size_t elements);
     size_t fillInt32Array(int32_t *arr, size_t elements);
-/*
-    template<typename T, typename ConfigT>
-    void fromArray(T *arr, size_t elements) {
-        if (!this->is<ConfArray>()) {
-            Serial.println("Can't from array, config is not an array");
-            delay(100);
-            return;
-        }
 
-        ConfArray *confArr = strict_variant::get<ConfArray>(&this->value);
-
-        confArr->value.clear();
-        for(size_t i = 0; i < elements; ++i) {
-            confArr->value.push_back(confArr->prototype[0]);
-            *confArr->value[i].as<T, ConfigT>() = arr[i];
-            ConfigT *inner = strict_variant::get<ConfigT>(confArr->value[i]);
-            String inner_error = inner->validator(*inner);
-            if(inner_error != "") {
-                //return String("[") + i + "]" + inner_error;
-                Serial.println( String("[") + i + "]" + inner_error);
-                delay(100);
-                return;
-            }
-        }
-
-        String error = confArr->validator(*confArr);
-        if(error != "") {
-            Serial.println(error);
-            delay(100);
-        }
-    }
-*/
     size_t json_size(bool zero_copy) const;
     size_t max_string_length() const;
 
@@ -831,13 +687,9 @@ struct ConfigRoot : public Config {
 public:
     ConfigRoot() = default;
 
-    ConfigRoot(Config cfg) : Config(cfg), validator(nullptr)
-    {
-    }
+    ConfigRoot(Config cfg);
 
-    ConfigRoot(Config cfg, std::function<String(Config &)> validator) : Config(cfg), validator(validator)
-    {
-    }
+    ConfigRoot(Config cfg, std::function<String(Config &)> validator);
 
     std::function<String(Config &)> validator;
     bool permit_null_updates = true;
