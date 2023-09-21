@@ -123,7 +123,7 @@ public:
 
     static bool restorePersistentConfig(const String &path, ConfigRoot *config);
 
-    void registerDebugUrl(WebServer *server);
+    void registerDebugUrl();
 
     size_t registerBackend(IAPIBackend *backend);
 
@@ -136,8 +136,6 @@ public:
 
     ConfigRoot features;
     ConfigRoot version;
-
-    TaskHandle_t mainTaskHandle;
 
     uint8_t state_update_counter = 0;
 
