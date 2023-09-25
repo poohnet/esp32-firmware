@@ -122,5 +122,9 @@ String ConfigRoot::validate()
 void ConfigRoot::update_from_copy(Config *copy) {
     ASSERT_MAIN_THREAD();
     this->value = copy->value;
-    this->value.updated = true;
+    this->value.updated = 0xFF;
+}
+
+OwnedConfig ConfigRoot::get_owned_copy() {
+    return Config::apply_visitor(to_owned{}, this->value);
 }
