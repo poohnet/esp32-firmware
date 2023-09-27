@@ -19,18 +19,28 @@
 
 #include "event_log.h"
 
-#include "web_server.h"
+#include <time.h>
 
-#include "time.h"
-
+#include "config.h"
 #include "tools.h"
+#include "modules.h"
+#include "web_server.h"
 
 // Global definition here to match the declaration in event_log.h.
 EventLog logger;
 
+// event_log.h can't include config.h because config.h includes event_log.h
+static ConfigRoot boot_id;
+
 void EventLog::pre_init()
 {
     event_buf.setup();
+}
+
+void EventLog::pre_setup() {
+    boot_id = Config::Object({
+        {"boot_id", Config::Uint32(esp_random())}
+    });
 }
 
 void EventLog::get_timestamp(char buf[TIMESTAMP_LEN + 1])
@@ -89,6 +99,16 @@ void EventLog::write(const char *buf, size_t len)
     if (buf[len - 1] != '\n') {
         event_buf.push('\n');
     }
+
+#if MODULE_WS_AVAILABLE()
+    String payload;
+    payload.reserve(to_write);
+    payload += '"';
+    payload.concat(timestamp_buf);
+    payload.concat(buf, len);
+    payload += '"';
+    ws.pushRawStateUpdate(payload, "event_log/message");
+#endif
 }
 
 void EventLog::printfln(const char *fmt, va_list args) {
@@ -146,4 +166,6 @@ void EventLog::register_urls()
 
         return request.endChunkedResponse();
     });
+
+    api.addState("event_log/boot_id", &boot_id);
 }
