@@ -78,17 +78,11 @@ let x = {
             "host_exists": "Host existiert bereits",
 
             "set_charge_manager": "Lastmanagement",
-            "cron_action_text": /*SFN*/(current: number) => {
-                return (
-                  <>
-                    setze den maximalen Gesamtstrom auf <b>{current / 1000} A</b>.
-                  </>
-                );
-            }/*NF*/
+            "cron_action_text": /*FFN*/(current: number) => <>setze den maximalen Gesamtstrom auf <b>{current / 1000} A</b>.</> /*NF*/
         },
         "script": {
             "charge_state_0": "Kein Fahrzeug angeschlossen",
-            "charge_state_1": "Warte auf Benutzerfreigabe",
+            "charge_state_1": "Warte auf Benutzer-/NFC-Freigabe",
             "charge_state_2": "Warte auf Manager-Freigabe",
             "charge_state_3": "Laden freigegeben",
             "charge_state_4": "Lädt",
