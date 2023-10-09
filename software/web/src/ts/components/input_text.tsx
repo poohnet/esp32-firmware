@@ -17,8 +17,8 @@
  * Boston, MA 02111-1307, USA.
  */
 
-import { h, Context, Fragment, ComponentChildren} from "preact";
-import {useContext} from "preact/hooks";
+import { h, Context, Fragment, ComponentChildren } from "preact";
+import { useContext, useId } from "preact/hooks";
 import { JSXInternal } from "preact/src/jsx";
 import { __ } from "../translation";
 
@@ -42,7 +42,7 @@ interface InputTextWithValidationProps extends Omit<JSXInternal.HTMLAttributes<H
 }
 
 export function InputText<T extends (InputTextProps | InputTextWithValidationProps)>(props: util.NoExtraProperties<InputTextProps, T> | InputTextWithValidationProps) {
-    let id = props.idContext === undefined ? "" : useContext(props.idContext);
+    const id = !props.idContext ? useId() : useContext(props.idContext);
 
     let invalidFeedback = undefined;
     if ("invalidFeedback" in props && props.invalidFeedback)
@@ -61,7 +61,7 @@ export function InputText<T extends (InputTextProps | InputTextWithValidationPro
                     id={id}
                     type="text"
                     onInput={props.onValue ? (e) => {
-                        if ((props.maxLength != undefined && new Blob([(e.target as HTMLInputElement).value]).size <= props.maxLength) ||
+                        if ((props.maxLength != undefined && new Blob([(e.target as HTMLInputElement).value]).size <= (props.maxLength as any)) ||
                                 props.maxLength == undefined)
                             props.onValue((e.target as HTMLInputElement).value);
                         else

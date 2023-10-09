@@ -31,12 +31,13 @@ import { InputText } from "../../ts/components/input_text";
 import { ConfigForm } from "../../ts/components/config_form";
 import { ConfigComponent } from "../../ts/components/config_component";
 import { Button } from "react-bootstrap";
-import { CollapsedSection } from "../../ts/components/collapsed_section";
-import { InputPassword } from "../../ts/components/input_password";
-import { IndicatorGroup } from "../../ts/components/indicator_group";
-import { SubPage } from "../../ts/components/sub_page";
+import { CollapsedSection } from "src/ts/components/collapsed_section";
+import { InputPassword } from "src/ts/components/input_password";
+import { IndicatorGroup } from "src/ts/components/indicator_group";
+import { SubPage } from "src/ts/components/sub_page";
+import { InputSelect } from "src/ts/components/input_select";
 
-type OcppConfig = API.getType['ocpp/config']
+type OcppConfig = API.getType["ocpp/config"];
 
 interface OcppState {
     state: API.getType['ocpp/state'];
@@ -59,17 +60,17 @@ export class Ocpp extends ConfigComponent<'ocpp/config', {}, OcppState> {
     }
 
     override async sendSave(t: "ocpp/config", cfg: OcppConfig) {
-        await API.save_maybe('evse/ocpp_enabled', {enabled: this.state.enable}, __("evse.script.save_failed"));
+        await API.save_unchecked('evse/ocpp_enabled', {enabled: this.state.enable}, __("evse.script.save_failed"));
         await super.sendSave(t, cfg);
     }
 
     override async sendReset(t: "ocpp/config") {
-        await API.save_maybe('evse/ocpp_enabled', {enabled: false}, __("evse.script.save_failed"));
+        await API.save_unchecked('evse/ocpp_enabled', {enabled: false}, __("evse.script.save_failed"));
         await super.sendReset(t);
     }
 
     override getIsModified(t: "ocpp/config"): boolean {
-        let evse = API.get_maybe("evse/ocpp_enabled");
+        let evse = API.get_unchecked("evse/ocpp_enabled");
         if (evse != null)
             if (evse.enabled)
                 return true;
@@ -84,7 +85,7 @@ export class Ocpp extends ConfigComponent<'ocpp/config', {}, OcppState> {
 
         return (
             <SubPage>
-                <ConfigForm id="ocpp_config_form" title={__("ocpp.content.ocpp")} isModified={this.isModified()} onSave={this.save} onReset={this.reset} onDirtyChange={(d) => this.ignore_updates = d}>
+                <ConfigForm id="ocpp_config_form" title={__("ocpp.content.ocpp")} isModified={this.isModified()} isDirty={this.isDirty()} onSave={this.save} onReset={this.reset} onDirtyChange={this.setDirty}>
                     <FormRow label={__("ocpp.content.enable_ocpp")}>
                         <Switch desc={__("ocpp.content.enable_ocpp_desc")}
                                 checked={state.enable}
@@ -97,6 +98,17 @@ export class Ocpp extends ConfigComponent<'ocpp/config', {}, OcppState> {
                                    onValue={this.set("url")}
                                    pattern="wss?:\/\/.*[^\/]"
                                    invalidFeedback={__("ocpp.content.endpoint_url_invalid")}/>
+                    </FormRow>
+                    <FormRow label={__("ocpp.content.tls_cert")}>
+                        <InputSelect items={[
+                                ["-1", __("ocpp.content.use_cert_bundle")],
+                            ].concat(API.get('certs/state').certs.map(c => [c.id.toString(), c.name])) as [string, string][]
+                            }
+                            value={state.cert_id}
+                            onValue={(v) => this.setState({cert_id: parseInt(v)})}
+                            disabled={!state.url.startsWith("wss://")}
+                            required={state.url.startsWith("wss://")}
+                        />
                     </FormRow>
                     <FormRow label={__("ocpp.content.identity")}>
                         <InputText required
@@ -324,12 +336,12 @@ export class OcppStatus extends Component<{}, OcppStatusState>
     }
 }
 
-render(<OcppStatus/>, $('#status-ocpp')[0]);
+render(<OcppStatus />, $("#status-ocpp")[0]);
 
 export function add_event_listeners(source: API.APIEventTarget) {}
 
 export function init() {}
 
 export function update_sidebar_state(module_init: any) {
-    $('#sidebar-ocpp').prop('hidden', !module_init.ocpp);
+    $("#sidebar-ocpp").prop("hidden", !module_init.ocpp);
 }

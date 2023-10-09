@@ -46,7 +46,18 @@ export class Nfc extends ConfigComponent<'nfc/config', {}, NfcState> {
     constructor() {
         super('nfc/config',
               __("nfc.script.save_failed"),
-              __("nfc.script.reboot_content_changed"));
+              __("nfc.script.reboot_content_changed"), {
+                addTag: {
+                    tag_id: "",
+                    user_id: 0,
+                    tag_type: "" as any
+                },
+                editTag: {
+                    tag_id: "",
+                    user_id: 0,
+                    tag_type: "" as any
+                }
+            });
 
         util.addApiEventListener('users/config', () => {
             this.setState({userCfg: API.get('users/config')});
@@ -65,23 +76,6 @@ export class Nfc extends ConfigComponent<'nfc/config', {}, NfcState> {
 
             this.setState({seen_tags: x});
         });*/
-
-        this.state = {
-            addTag: {
-                tag_id: "",
-                user_id: 0,
-                tag_type: "" as any
-            },
-            editTag: {
-                tag_id: "",
-                user_id: 0,
-                tag_type: "" as any
-            }
-        } as any;
-    }
-
-    hackToAllowSave() {
-        document.getElementById("nfc_config_form").dispatchEvent(new Event('input'));
     }
 
     render(props: {}, state: NfcConfig & NfcState) {
@@ -120,7 +114,7 @@ export class Nfc extends ConfigComponent<'nfc/config', {}, NfcState> {
 
         return (
             <SubPage>
-                <ConfigForm id="nfc_config_form" title={__("nfc.content.nfc")} isModified={this.isModified()} onSave={() => this.save()} onReset={this.reset} onDirtyChange={(d) => this.ignore_updates = d}>
+                <ConfigForm id="nfc_config_form" title={__("nfc.content.nfc")} isModified={this.isModified()} isDirty={this.isDirty()} onSave={this.save} onReset={this.reset} onDirtyChange={this.setDirty}>
                     <div class="mb-3">
                         <Table
                             tableTill="md"
@@ -174,12 +168,11 @@ export class Nfc extends ConfigComponent<'nfc/config', {}, NfcState> {
                                             editTag: {tag_id: "", user_id: 0, tag_type: "" as any}
                                         });
 
-                                        this.hackToAllowSave();
+                                        this.setDirty(true);
                                     },
-                                    onEditAbort: async () => this.setState({editTag: {tag_id: "", user_id: 0, tag_type: "" as any}}),
                                     onRemoveClick: async () => {
                                         this.setState({authorized_tags: state.authorized_tags.filter((v, idx) => idx != i)});
-                                        this.hackToAllowSave();
+                                        this.setDirty(true);
                                     }
                                 }})
                             }
@@ -244,22 +237,18 @@ export class Nfc extends ConfigComponent<'nfc/config', {}, NfcState> {
                                 },
                             ]}
                             onAddCommit={async () => {
-                                this.setState({
-                                    authorized_tags: state.authorized_tags.concat({tag_id: state.addTag.tag_id, user_id: state.addTag.user_id, tag_type: state.addTag.tag_type}),
-                                    addTag: {tag_id: "", user_id: 0, tag_type: "" as any}
-                                });
-
-                                this.hackToAllowSave();
+                                this.setState({authorized_tags: state.authorized_tags.concat({tag_id: state.addTag.tag_id, user_id: state.addTag.user_id, tag_type: state.addTag.tag_type})});
+                                this.setDirty(true);
                             }}
-                            onAddAbort={async () => this.setState({addTag: {tag_id: "", user_id: 0, tag_type: "" as any}})} />
+                            />
                     </div>
                 </ConfigForm>
             </SubPage>
-        )
+        );
     }
 }
 
-render(<Nfc/>, $('#nfc')[0]);
+render(<Nfc />, $("#nfc")[0]);
 
 export function init() {
 }
@@ -268,5 +257,5 @@ export function add_event_listeners(source: API.APIEventTarget) {
 }
 
 export function update_sidebar_state(module_init: any) {
-    $('#sidebar-nfc').prop('hidden', !module_init.nfc);
+    $("#sidebar-nfc").prop("hidden", !module_init.nfc);
 }

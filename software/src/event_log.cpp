@@ -22,9 +22,10 @@
 #include <time.h>
 
 #include "config.h"
+#include "event_log_dependencies.h"
 #include "tools.h"
-#include "modules.h"
 #include "web_server.h"
+#include "TFJson.h"
 
 // Global definition here to match the declaration in event_log.h.
 EventLog logger;
@@ -101,11 +102,25 @@ void EventLog::write(const char *buf, size_t len)
     }
 
 #if MODULE_WS_AVAILABLE()
-    String payload;
-    payload.reserve(to_write);
+    size_t req_len = 0;
+    {
+        TFJsonSerializer json{nullptr, 0};
+        json.add(buf, len, false);
+        req_len = json.end();
+    }
+
+    CoolString payload;
+    payload.reserve(2 + TIMESTAMP_LEN + req_len + 1); // 2 - \"\"; 1 - \0
     payload += '"';
+
     payload.concat(timestamp_buf);
-    payload.concat(buf, len);
+
+    {
+        TFJsonSerializer json{payload.begin() + payload.length(), req_len + 1};
+        json.add(buf, len, false);
+        payload.setLength(payload.length() + json.end());
+    }
+
     payload += '"';
     ws.pushRawStateUpdate(payload, "event_log/message");
 #endif

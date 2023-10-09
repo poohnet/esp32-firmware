@@ -19,6 +19,9 @@
 #include "module_dependencies.h"
 #include "ocpp.h"
 
+// A module can't have a dependency on itself. Manually declare it here.
+extern Ocpp ocpp;
+
 static bool feature_evse = false;
 static bool feature_meter = false;
 static bool feature_meter_all_values = false;
@@ -71,13 +74,33 @@ void* platform_init(const char *websocket_url, const char *basic_auth_user, cons
     tf_websocket_client_config_t websocket_cfg = {};
     websocket_cfg.uri = websocket_url;
     websocket_cfg.subprotocol = "ocpp1.6";
-    websocket_cfg.crt_bundle_attach = esp_crt_bundle_attach;
+    int8_t cert_id = ocpp.config.get("cert_id")->asInt();
+    if (cert_id == -1)
+        websocket_cfg.crt_bundle_attach = esp_crt_bundle_attach;
+    else {
+        size_t cert_len = 0;
+        auto cert = certs.get_cert(cert_id, &cert_len);
+        if (cert == nullptr) {
+            logger.printfln("OCPP platform: Configured TLS certificate does not exist!");
+            return nullptr;
+        }
+
+        // Release the cert buffer unique_ptr's ownership.
+        // This effectively leaks the buffer, but as per the
+        // esp_transport_ssl_set_cert_data documentation:
+        // "Note that, this function stores the pointer to data, rather than making a copy.
+        //  So this data must remain valid until after the connection is cleaned up"
+        // esp_transport_ssl_set_cert_data is called by esp_websocket_client_start.
+        websocket_cfg.cert_pem = (const char *)cert.release();
+    }
+
     websocket_cfg.disable_auto_reconnect = false;
 
     // We can't completely disable sending pings.
     websocket_cfg.ping_interval_sec = 0xFFFFFFFF;
     websocket_cfg.pingpong_timeout_sec = 0;
     websocket_cfg.disable_pingpong_discon = true;
+    websocket_cfg.task_stack = 8192;
 
     // Username and password are "Not supported for now".
     //websocket_cfg.username = basic_auth_user;

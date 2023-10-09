@@ -22,6 +22,8 @@ let x = {
             "enable_auth": "Authorization enabled",
             "enable_auth_desc": "Sends the configured password or 40 character long hex key be to authorized by the OCPP server",
             "pass": "Password or hex key",
+            "tls_cert": "TLS Certificate",
+            "use_cert_bundle": "Embedded certificate bundle",
 
             "reset": "Reset OCPP state",
             "reset_muted": "",
@@ -155,7 +157,7 @@ let x = {
             "configuration": "Configuration"
         },
         "script": {
-            "save_failed": "Failed to save the OCPP configuration.",
+            "save_failed": "Failed to save the OCPP settings.",
             "reboot_content_changed": "OCPP settings"
         }
     }

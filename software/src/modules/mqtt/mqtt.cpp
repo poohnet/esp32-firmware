@@ -30,7 +30,10 @@
 
 #include "matchTopicFilter.h"
 
+#if MODULE_CRON_AVAILABLE()
 extern Mqtt mqtt;
+#endif
+
 extern char local_uid_str[32];
 
 #if MODULE_ESP32_ETHERNET_BRICK_AVAILABLE()
@@ -341,9 +344,9 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
         }
 
         esp_mqtt_client_disable_receive(client, 100);
-        api.callCommandNonBlocking(reg, data, data_len, [this](String error){
+        api.callCommandNonBlocking(reg, data, data_len, [this, reg](String error){
             if (error != "")
-                logger.printfln("MQTT: %s", error.c_str());
+                logger.printfln("MQTT: On %s: %s", reg.path.c_str(), error.c_str());
             esp_mqtt_client_enable_receive(this->client);
         });
 
@@ -366,7 +369,7 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
         task_scheduler.scheduleOnce([this, reg, data_cpy, data_len](){
             String error = reg.callback(data_cpy, data_len);
             if (error != "")
-                logger.printfln("MQTT: %s", error.c_str());
+                logger.printfln("MQTT: On %s: %s", reg.path.c_str(), error.c_str());
 
             free(data_cpy);
             esp_mqtt_client_enable_receive(this->client);
@@ -587,12 +590,19 @@ void Mqtt::register_events() {
 #if MODULE_ETHERNET_AVAILABLE()
     start_immediately = ethernet.get_connection_state() == EthernetState::CONNECTED;
 #endif
-    if (start_immediately)
+    if (start_immediately) {
         esp_mqtt_client_start(client);
-    else
+#if MODULE_DEBUG_AVAILABLE()
+        debug.register_task("mqtt_task", 6144); // stack size from mqtt_config.h
+#endif
+    } else {
         task_scheduler.scheduleOnce([this]() {
             esp_mqtt_client_start(client);
+#if MODULE_DEBUG_AVAILABLE()
+            debug.register_task("mqtt_task", 6144); // stack size from mqtt_config.h
+#endif
         }, 20000);
+    }
 }
 
 #if MODULE_CRON_AVAILABLE()

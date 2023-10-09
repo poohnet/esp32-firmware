@@ -38,6 +38,8 @@ interface EventLogState {
 const TIMESTAMP_LEN = 25;
 const TIMESTAMP_REGEX = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}),(\d{3})  $/;
 const RELATIVE_TIME_REGEX = /^\s+(\d+),(\d{3})  $/;
+const LOG_MAX_LEN = 10 * 1024 * 1024;
+const LOG_CHUNK_LEN_DROPPED_WHEN_FULL = 1024 * 1024;
 
 export class EventLog extends Component<{}, EventLogState> {
     page_visible: boolean = false;
@@ -54,7 +56,11 @@ export class EventLog extends Component<{}, EventLogState> {
         });
 
         util.addApiEventListener("event_log/message", (ev) => {
-            this.setState({log: this.state.log + ev.data + "\n"});
+            // If we have not seen the complete log yet, don't add updates.
+            if (!this.state.log)
+                return;
+
+            this.set_log(this.state.log + ev.data + "\n");
         });
 
         // We have to use jquery here or else the events don't fire?
@@ -66,6 +72,13 @@ export class EventLog extends Component<{}, EventLogState> {
         $('#sidebar-event_log').on('hidden.bs.tab', () => {
             this.page_visible = false;
         });
+    }
+
+    set_log(log: string) {
+        if (log.length > LOG_MAX_LEN)
+            log = log.slice(log.indexOf("\n", LOG_CHUNK_LEN_DROPPED_WHEN_FULL) + 1)
+
+        this.setState({log: log});
     }
 
     get_line_date(line: string) {
@@ -93,7 +106,7 @@ export class EventLog extends Component<{}, EventLogState> {
                     return;
 
                 if (!this.state.log) {
-                    this.setState({log: text});
+                    this.set_log(text);
                     return;
                 }
 
@@ -102,7 +115,7 @@ export class EventLog extends Component<{}, EventLogState> {
                 let first_new_date = null;
 
                 if (new_lines.length == 0) {
-                    this.setState({log: text});
+                    this.set_log(text);
                     return;
                 } else {
                     first_new_line = new_lines[0]
@@ -110,7 +123,7 @@ export class EventLog extends Component<{}, EventLogState> {
                 }
 
                 if (first_new_date == null) {
-                    this.setState({log: text});
+                    this.set_log(text);
                     return;
                 }
 
@@ -145,7 +158,7 @@ export class EventLog extends Component<{}, EventLogState> {
                 }
 
                 if (i < 0) {
-                    this.setState({log: text});
+                    this.set_log(text);
                     return;
                 }
 
@@ -158,7 +171,7 @@ export class EventLog extends Component<{}, EventLogState> {
                     new_log += "-".repeat(TIMESTAMP_LEN - 2) + "  [WebSocket reconnect]\n";
                 new_log += text;
 
-                this.setState({log: new_log});
+                this.set_log(new_log);
             })
             .catch(e => util.add_alert("event_log_load_failed", "alert-danger", __("event_log.script.load_event_log_error"), e.message))
     }
@@ -251,7 +264,7 @@ export class EventLog extends Component<{}, EventLogState> {
     }
 }
 
-render(<EventLog/>, $('#event_log')[0])
+render(<EventLog />, $("#event_log")[0]);
 
 export function init() {
 }
@@ -261,5 +274,5 @@ export function add_event_listeners(source: API.APIEventTarget) {
 }
 
 export function update_sidebar_state(module_init: any) {
-    $('#sidebar-event_log').prop('hidden', !module_init.event_log);
+    $("#sidebar-event_log").prop("hidden", !module_init.event_log);
 }

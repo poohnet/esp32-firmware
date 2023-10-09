@@ -22,10 +22,9 @@ import $ from "../../ts/jq";
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
 
-import { h, render, Fragment, Component} from "preact";
+import { h, render, Fragment, Component } from "preact";
 import { __, translate_unchecked } from "../../ts/translation";
 import { PageHeader } from "../../ts/components/page_header";
-
 
 import { IndicatorGroup } from "../../ts/components/indicator_group";
 import { FormRow } from "../../ts/components/form_row";
@@ -206,7 +205,7 @@ export class EVSE extends Component<{}, EVSEState> {
                             variant = slot.max_current == min ? "warning" : "primary";
                         }
 
-                        let has_ocpp = API.get_maybe("ocpp/config") != null;
+                        let has_ocpp = API.get_unchecked("ocpp/config") != null;
 
                         if (i == EVSE_SLOT_GP_INPUT || i == EVSE_SLOT_SHUTDOWN_INPUT || (!has_ocpp && i == EVSE_SLOT_OCPP))
                             return <></>
@@ -526,7 +525,7 @@ class EVSESettings extends ConfigComponent<"charge_limits/default_limits", {}, E
 
         return <SubPage>
 
-                <ConfigForm id="evse_settings" title={__("evse.content.settings")} isModified={this.isModified()} onSave={this.save} onReset={this.reset} onDirtyChange={(d) => this.ignore_updates = d}>
+                <ConfigForm id="evse_settings" title={__("evse.content.settings")} isModified={this.isModified()} isDirty={this.isDirty()} onSave={this.save} onReset={this.reset} onDirtyChange={this.setDirty}>
                 <FormRow label={__("evse.content.auto_start_description")} label_muted={__("evse.content.auto_start_description_muted")}>
                     <Switch desc={__("evse.content.auto_start_enable")}
                             checked={!auto_start_charging.auto_start_charging}
@@ -584,14 +583,14 @@ class EVSESettings extends ConfigComponent<"charge_limits/default_limits", {}, E
     }
 }
 
-render(<EVSESettings/>, $('#evse-settings')[0])
+render(<EVSESettings />, $("#evse-settings")[0]);
 
 export function init(){}
 
 export function add_event_listeners(){}
 
 export function update_sidebar_state(module_init: any) {
-    $('#sidebar-evse').prop('hidden', !module_init.evse);
-    $('#sidebar-evse-settings').prop('hidden', !module_init.evse);
-    $('#status-evse').prop('hidden', !module_init.evse);
+    $("#sidebar-evse").prop("hidden", !module_init.evse);
+    $("#sidebar-evse-settings").prop("hidden", !module_init.evse);
+    $("#status-evse").prop("hidden", !module_init.evse);
 }
