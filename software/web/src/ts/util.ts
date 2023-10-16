@@ -26,6 +26,7 @@ import { __ } from "./translation";
 import { AsyncModal } from "./components/async_modal";
 import { api_cache } from "./api_defs";
 import { batch, signal, Signal } from "@preact/signals-core";
+import { useState } from "preact/hooks";
 
 export function reboot() {
     API.call("reboot", null, "").then(() => postReboot(__("util.reboot_title"), __("util.reboot_text")));
@@ -74,7 +75,13 @@ export function remove_alert(id: string) {
     $(`#alert_${id}`).remove();
 }
 
-export function format_timespan_ms(ms: number) {
+export function format_timespan_ms(ms: number, opts?: {replace_zero_with?: string, replace_u32max_with?: string}) {
+    if (opts !== undefined && opts.replace_zero_with !== undefined && ms == 0)
+        return opts.replace_zero_with;
+
+    if (opts !== undefined && opts.replace_u32max_with !== undefined && ms == 0xFFFFFFFF)
+        return opts.replace_u32max_with;
+
     return format_timespan(ms / 1000);
 }
 
@@ -468,15 +475,19 @@ function timestamp_to_date(timestamp: number, time_fmt: any) {
     return result;
 }
 
-export function timestamp_min_to_date(timestamp_minutes: number, unsynced_string: string) {
-    if (timestamp_minutes == 0) {
+export function timestamp_min_to_date(timestamp_minutes: number, unsynced_string?: string) {
+    if (unsynced_string !== undefined && timestamp_minutes == 0) {
         return unsynced_string;
     }
 
     return timestamp_to_date(timestamp_minutes * 60000, {hour: '2-digit', minute: '2-digit'});
 }
 
-export function timestamp_sec_to_date(timestamp_seconds: number) {
+export function timestamp_sec_to_date(timestamp_seconds: number, unsynced_string?: string) {
+    if (unsynced_string !== undefined && timestamp_seconds == 0) {
+        return unsynced_string;
+    }
+
     return timestamp_to_date(timestamp_seconds * 1000, {hour: '2-digit', minute: '2-digit', second: '2-digit'});
 }
 
@@ -631,4 +642,18 @@ export function hasValue(a: any): boolean
 export function compareArrays(a: Array<any>, b: Array<any>): boolean
 {
     return a.length === b.length && a.every((element, index) => element === b[index]);
+}
+
+// https://stackoverflow.com/a/1535650
+export let nextId = (function() {
+    var id = 0;
+    return function() {return "ID-" + (++id).toString();};
+})();
+
+// Preact's useId does not work with multiple roots:
+// https://github.com/preactjs/preact/issues/3781
+// Once the port to preact is complete,
+// we can switch back to Preact's useId.
+export function useId() {
+    return useState(nextId())[0];
 }

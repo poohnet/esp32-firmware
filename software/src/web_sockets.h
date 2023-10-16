@@ -31,7 +31,7 @@
 #include "config.h"
 
 #define MAX_WEB_SOCKET_CLIENTS 5
-#define MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE 20
+#define MAX_WEB_SOCKET_WORK_ITEMS_IN_QUEUE 32
 
 class WebSockets;
 
@@ -39,8 +39,8 @@ struct WebSocketsClient {
     int fd;
     WebSockets *ws;
 
-    bool send(const char *payload, size_t payload_len);
-    bool sendOwned(char *payload, size_t payload_len);
+    bool sendOwnedBlocking_HTTPThread(char *payload, size_t payload_len);
+    void close_HTTPThread();
 };
 
 struct ws_work_item {
@@ -80,7 +80,7 @@ public:
     void cleanUpQueue();
     bool queueFull();
 
-    void onConnect(std::function<void(WebSocketsClient)> fn);
+    void onConnect_HTTPThread(std::function<void(WebSocketsClient)> fn);
 
     void triggerHttpThread();
     bool haveWork(ws_work_item *item);
