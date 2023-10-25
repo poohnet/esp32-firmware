@@ -99,7 +99,7 @@ export class EVSESettings extends ConfigComponent<"charge_limits/default_limits"
         });
     }
 
-    override async sendSave(t: "charge_limits/default_limits", cfg: EVSESettingsState & ChargeLimitsConfig): Promise<void> {
+    override async sendSave(t: "charge_limits/default_limits", cfg: EVSESettingsState & ChargeLimitsConfig) {
         await API.save('evse/auto_start_charging', {"auto_start_charging": this.state.auto_start_charging.auto_start_charging}, __("evse.script.save_failed"));
         await API.save('evse/external_enabled', {"enabled": this.state.slots[EVSE_SLOT_EXTERNAL].active}, __("evse.script.save_failed"));
         await API.save('evse/boost_mode', {"enabled": this.state.boost_mode.enabled}, __("evse.script.save_failed"));
@@ -117,7 +117,7 @@ export class EVSESettings extends ConfigComponent<"charge_limits/default_limits"
 
     //TODO: Substitute hardcoded values after evse-reset-api is available.
 
-    override async sendReset(t: "charge_limits/default_limits"): Promise<void> {
+    override async sendReset(t: "charge_limits/default_limits") {
         await API.save('evse/auto_start_charging', {"auto_start_charging": true}, __("evse.script.save_failed"));
         await API.save('evse/external_enabled', {"enabled": false}, __("evse.script.save_failed"));
         await API.save('evse/boost_mode', {"enabled": false}, __("evse.script.save_failed"));
@@ -131,6 +131,25 @@ export class EVSESettings extends ConfigComponent<"charge_limits/default_limits"
         }
 
         super.sendReset(t);
+    }
+
+    override getIsModified(t: "charge_limits/default_limits"): boolean {
+        let result = false;
+
+        result ||= API.is_modified('evse/auto_start_charging');
+        result ||= API.is_modified('evse/external_enabled');
+        result ||= API.is_modified('evse/boost_mode');
+        result ||= API.is_modified('require_meter/config');
+        result ||= API.is_modified('evse/led_configuration');
+
+        if (this.state.is_evse_v2) {
+            result ||= API.is_modified('evse/button_configuration');
+            result ||= API.is_modified('evse/gpio_configuration');
+            result ||= API.is_modified('evse/ev_wakeup');
+        }
+
+        result ||= super.getIsModified(t);
+        return result;
     }
 
     render(props: {}, s: EVSESettingsState & ChargeLimitsConfig)

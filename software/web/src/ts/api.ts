@@ -81,6 +81,13 @@ export function is_modified<T extends keyof ConfigMap>(topic: T): boolean {
     return modified.modified > 1;
 }
 
+export function is_modified_unchecked(topic: string): boolean {
+    let modified = api_cache[(topic + "_modified") as ConfigModifiedKey] as ConfigModified;
+    if (modified === undefined || modified == null)
+        return false;
+    return modified.modified > 1;
+}
+
 export function is_dirty<T extends keyof ConfigMap>(topic: T): boolean {
     let modified = api_cache[(topic + "_modified") as ConfigModifiedKey] as ConfigModified;
     if (modified == null)
@@ -129,7 +136,8 @@ export function trigger_unchecked<T extends keyof ConfigMap>(topic: string, even
 }
 
 export function save<T extends keyof ConfigMap>(topic: T, payload: ConfigMap[T], error_string: string, reboot_string?: string) {
-    return call((topic + "_update") as any, payload, error_string, reboot_string);
+    let extracted = extract(topic, payload);
+    return call((topic + "_update") as any, extracted, error_string, reboot_string);
 }
 
 export function save_unchecked<T extends string>(topic: T, payload: (T extends keyof ConfigMap ? ConfigMap[T] : any), error_string: string, reboot_string?: string) {
@@ -140,6 +148,13 @@ export function save_unchecked<T extends string>(topic: T, payload: (T extends k
 
 export function reset<T extends keyof ConfigMap>(topic: T, error_string: string, reboot_string?: string) {
     return call((topic + "_reset") as any, null, error_string, reboot_string);
+}
+
+
+export function reset_unchecked<T extends string>(topic: T, error_string: string, reboot_string?: string) {
+    if (topic in api_cache)
+        return call((topic + "_reset") as any, null, error_string, reboot_string);
+    return Promise.resolve();
 }
 
 export async function call<T extends keyof ConfigMap>(topic: T, payload: ConfigMap[T], error_string: string, reboot_string?: string, timeout_ms: number = 5000) {
@@ -167,4 +182,14 @@ export function hasModule(module: string) {
     if (modules === null)
         return false;
     return module in modules && modules[module as keyof typeof modules];
+}
+
+//based on https://stackoverflow.com/a/50895613
+export function extract<T extends keyof ConfigMap, U extends ConfigMap[T]>(topic: T, value: Readonly<U>){
+    let stencil = get(topic)
+    let result = {} as ConfigMap[T];
+    for (const property of Object.keys(stencil) as Array<keyof ConfigMap[T]>) {
+        result[property] = value[property];
+    }
+    return result;
 }
