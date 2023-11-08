@@ -17,7 +17,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-import { VNode, h } from "preact";
+import { h, Fragment } from "preact";
 import { __, translate_unchecked } from "../../ts/translation";
 import { CronTriggerID } from "../cron/cron_defs";
 import { CronTrigger } from "../cron/types";
@@ -36,12 +36,12 @@ export type NfcCronTrigger = [
     }
 ];
 
-export function NFCCronTriggerComponent(trigger: CronTrigger): VNode {
+function get_nfc_table_children(trigger: CronTrigger) {
     const value = (trigger as NfcCronTrigger)[1];
     return __("nfc.content.cron_trigger_text")(value.tag_id, translate_unchecked("nfc.content.type_" + value.tag_type))
 }
 
-function NfcCronTriggerFactory(): CronTrigger {
+function new_nfc_config(): CronTrigger {
     return [
         CronTriggerID.NFC,
         {
@@ -51,7 +51,7 @@ function NfcCronTriggerFactory(): CronTrigger {
     ]
 }
 
-export function NFCCronTriggerConfig(cron: Cron, trigger: CronTrigger) {
+function get_nfc_edit_children(cron: Cron, trigger: CronTrigger) {
     const value = (trigger as NfcCronTrigger)[1];
     const tags = API.get("nfc/seen_tags");
     const known_tags = API.get("nfc/config").authorized_tags;
@@ -64,8 +64,8 @@ export function NFCCronTriggerConfig(cron: Cron, trigger: CronTrigger) {
         }}>
             <h5 class="mb-1 pr-2">{t.tag_id}</h5>
             <div class="d-flex w-100 justify-content-between">
-                <span>{translate_unchecked(`nfc.content.type_${t.tag_type}`)}</span>
-                <span>{__("nfc.content.last_seen") + util.format_timespan_ms(t.last_seen) + __("nfc.content.last_seen_suffix")}</span>
+                <span class="text-left">{translate_unchecked(`nfc.content.type_${t.tag_type}`)}</span>
+                <span class="text-right">{__("nfc.content.last_seen") + util.format_timespan_ms(t.last_seen) + __("nfc.content.last_seen_suffix")}</span>
             </div>
         </ListGroupItem>);
 
@@ -79,8 +79,8 @@ export function NFCCronTriggerConfig(cron: Cron, trigger: CronTrigger) {
         }}>
             <h5 class="mb-1 pr-2">{t.tag_id}</h5>
             <div class="d-flex w-100 justify-content-between">
-                <span>{translate_unchecked(`nfc.content.type_${t.tag_type}`)}</span>
-                <span>{__("nfc.content.table_user_id") + ": " + users.find(u => u.id == t.user_id).display_name}</span>
+                <span class="text-left">{translate_unchecked(`nfc.content.type_${t.tag_type}`)}</span>
+                <span class="text-right">{__("nfc.content.table_user_id") + ": " + users.find(u => u.id == t.user_id).display_name}</span>
             </div>
         </ListGroupItem>);
 
@@ -131,11 +131,11 @@ export function init() {
     return {
         trigger_components: {
             [CronTriggerID.NFC]: {
-                clone: (trigger: CronTrigger) => [trigger[0], {...trigger[1]}] as CronTrigger,
-                config_builder: NfcCronTriggerFactory,
-                config_component: NFCCronTriggerConfig,
-                table_row: NFCCronTriggerComponent,
                 name: __("nfc.content.cron_trigger_nfc"),
+                new_config: new_nfc_config,
+                clone_config: (trigger: CronTrigger) => [trigger[0], {...trigger[1]}] as CronTrigger,
+                get_edit_children: get_nfc_edit_children,
+                get_table_children: get_nfc_table_children,
             },
         },
     };

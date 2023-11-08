@@ -142,14 +142,28 @@ static bool seq_num_invalid(uint16_t received_sn, uint16_t last_seen_sn)
     return received_sn <= last_seen_sn && last_seen_sn - received_sn < 5;
 }
 
-void CMNetworking::register_manager(std::vector<String> &&hosts,
-                                    const std::vector<String> &names,
+static bool endswith(const char *haystack, const char *needle) {
+    size_t haystack_len = strlen(haystack);
+    size_t needle_len = strlen(needle);
+
+    if (haystack_len < needle_len)
+        return false;
+
+    return memcmp(haystack + haystack_len - needle_len, needle, needle_len) == 0;
+}
+
+void CMNetworking::register_manager(const char * const * const hosts,
+                                    int charger_count,
                                     std::function<void(uint8_t /* client_id */, cm_state_v1 *, cm_state_v2 *)> manager_callback,
                                     std::function<void(uint8_t, uint8_t)> manager_error_callback)
 {
-    hostnames = hosts;
+    this->hosts = hosts;
+    this->charger_count = charger_count;
 
-    for (int i = 0; i < names.size(); ++i) {
+    for (int i = 0; i < charger_count; ++i) {
+        if (endswith(hosts[i], ".local"))
+            needs_mdns |= 1 << i;
+
         dest_addrs[i].sin_addr.s_addr = 0;
         resolve_state[i] = RESOLVE_STATE_UNKNOWN;
         resolve_hostname(i);
@@ -161,7 +175,7 @@ void CMNetworking::register_manager(std::vector<String> &&hosts,
     if (manager_sock < 0)
         return;
 
-    task_scheduler.scheduleWithFixedDelay([this, names, manager_callback, manager_error_callback](){
+    task_scheduler.scheduleWithFixedDelay([this, manager_callback, manager_error_callback](){
         static uint16_t last_seen_seq_num[MAX_CLIENTS];
         static bool initialized = false;
         if (!initialized) {
@@ -188,7 +202,7 @@ void CMNetworking::register_manager(std::vector<String> &&hosts,
             }
 
             int charger_idx = -1;
-            for(int idx = 0; idx < names.size(); ++idx)
+            for(int idx = 0; idx < this->charger_count; ++idx)
                 if (source_addr.sin_family == dest_addrs[idx].sin_family &&
                     source_addr.sin_port == dest_addrs[idx].sin_port &&
                     source_addr.sin_addr.s_addr == dest_addrs[idx].sin_addr.s_addr) {
@@ -206,7 +220,7 @@ void CMNetworking::register_manager(std::vector<String> &&hosts,
             String validation_error = validate_state_packet_header(&state_pkt, len);
             if (validation_error != "") {
                 logger.printfln("Received state packet from %s (%s) (%i bytes) failed validation: %s",
-                                names[charger_idx].c_str(),
+                                charge_manager.get_charger_name(charger_idx),
                                 inet_ntoa(source_addr.sin_addr),
                                 len,
                                 validation_error.c_str());
@@ -216,7 +230,7 @@ void CMNetworking::register_manager(std::vector<String> &&hosts,
 
             if (seq_num_invalid(state_pkt.header.seq_num, last_seen_seq_num[charger_idx])) {
                 logger.printfln("Received stale (out of order?) state packet from %s (%s). Last seen seq_num is %u, Received seq_num is %u",
-                                names[charger_idx].c_str(),
+                                charge_manager.get_charger_name(charger_idx),
                                 inet_ntoa(source_addr.sin_addr),
                                 last_seen_seq_num[charger_idx],
                                 state_pkt.header.seq_num);
@@ -228,7 +242,7 @@ void CMNetworking::register_manager(std::vector<String> &&hosts,
             if (!CM_STATE_FLAGS_MANAGED_IS_SET(state_pkt.v1.state_flags)) {
                 manager_error_callback(charger_idx, CM_NETWORKING_ERROR_NOT_MANAGED);
                 logger.printfln("%s (%s) reports managed is not activated!",
-                    names[charger_idx].c_str(),
+                    charge_manager.get_charger_name(charger_idx),
                     inet_ntoa(source_addr.sin_addr));
                 return;
             }
