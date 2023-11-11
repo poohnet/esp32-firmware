@@ -29,14 +29,18 @@
 #include "module.h"
 #include "mdns.h"
 #include "TFJson.h"
+#include "module_dependencies.h"
 
 #include <functional>
 
 #define CHARGE_MANAGER_PORT 34127
 #define CHARGE_MANAGEMENT_PORT (CHARGE_MANAGER_PORT + 1)
 
-// Keep in sync with charge_manager.cpp
-#define MAX_CLIENTS 10
+#if MODULE_ESP32_ETHERNET_BRICK_AVAILABLE()
+#define MAX_CONTROLLED_CHARGERS 32
+#else
+#define MAX_CONTROLLED_CHARGERS 10
+#endif
 
 // Increment when changing packet structs
 #define CM_COMMAND_VERSION 1
@@ -208,7 +212,7 @@ public:
     void setup() override;
     void register_urls() override;
 
-    int create_socket(uint16_t port);
+    int create_socket(uint16_t port, bool blocking);
 
     void register_manager(const char * const * const hosts,
                           int charger_count,
@@ -254,13 +258,13 @@ private:
     #define RESOLVE_STATE_NOT_RESOLVED 1
     #define RESOLVE_STATE_RESOLVED 2
 
-    uint8_t resolve_state[MAX_CLIENTS] = {};
-    struct sockaddr_in dest_addrs[MAX_CLIENTS] = {};
+    uint8_t resolve_state[MAX_CONTROLLED_CHARGERS] = {};
+    struct sockaddr_in dest_addrs[MAX_CONTROLLED_CHARGERS] = {};
     const char * const * hosts = nullptr;
     int charger_count = 0;
     // one bit per charger
     uint32_t needs_mdns = 0;
-    static_assert(MAX_CLIENTS <= 32);
+    static_assert(MAX_CONTROLLED_CHARGERS <= 32);
 
     int client_sock;
     bool manager_addr_valid = false;

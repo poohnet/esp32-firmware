@@ -29,12 +29,18 @@
 
 extern NFC nfc;
 
-#define AUTHORIZED_TAG_LIST_LENGTH 16
+#if MODULE_ESP32_ETHERNET_BRICK_AVAILABLE()
+#define MAX_AUTHORIZED_TAGS 32
+#else
+#define MAX_AUTHORIZED_TAGS 16
+#endif
 
 #define DETECTION_THRESHOLD_MS 2000
 
 void NFC::pre_setup()
 {
+    this->DeviceModule::pre_setup();
+
     seen_tags = Config::Array(
         {},
         new Config{Config::Object({
@@ -54,7 +60,7 @@ void NFC::pre_setup()
                 {"tag_type", Config::Uint(0, 0, 4)},
                 {"tag_id", Config::Str("", 0, NFC_TAG_ID_STRING_LENGTH)}
             })},
-            0, AUTHORIZED_TAG_LIST_LENGTH,
+            0, MAX_AUTHORIZED_TAGS,
             Config::type_id<Config::ConfObject>())
         }
     }), [this](Config &cfg) -> String {
