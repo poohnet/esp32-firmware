@@ -263,6 +263,14 @@ void EVSEV2::post_register_urls() {
         }
     }, true);
 
+    api.addCommand("evse/debug_switch_to_one_phase", Config::Null(), {}, [this]() {
+        is_in_bootloader(tf_evse_v2_set_phase_control(&device, 1));
+    }, true);
+
+    api.addCommand("evse/debug_switch_to_three_phases", Config::Null(), {}, [this]() {
+        is_in_bootloader(tf_evse_v2_set_phase_control(&device, 3));
+    }, true);
+
     // Configurations. Note that those are _not_ configs in the api.addPersistentConfig sense:
     // The configs are stored on the EVSE itself, not the ESP's flash.
     // All _update APIs that write the EVSEs flash without checking first if this was a change
@@ -1015,6 +1023,11 @@ void EVSEV2::update_all_data()
     evse_common.require_meter_enabled.get("enabled")->updateBool(SLOT_ACTIVE(active_and_clear_on_disconnect[CHARGING_SLOT_REQUIRE_METER]));
 
     gp_output.get("gp_output")->updateUint(gpio[10] ? TF_EVSE_V2_OUTPUT_CONNECTED_TO_GROUND : TF_EVSE_V2_OUTPUT_HIGH_IMPEDANCE);
+
+    evse_common.low_level_state.get("temperature")->updateInt(temperature);
+    evse_common.low_level_state.get("phases_current")->updateUint(phases_current);
+    evse_common.low_level_state.get("phases_requested")->updateUint(phases_requested);
+    evse_common.low_level_state.get("phases_status")->updateUint(phases_status);
 
 #if MODULE_WATCHDOG_AVAILABLE()
     static size_t watchdog_handle = watchdog.add("evse_v2_all_data", "EVSE not reachable");

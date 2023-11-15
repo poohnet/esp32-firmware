@@ -42,9 +42,9 @@ let x = {
             "error_state": "Error state",
             "error_state_desc": <><a href="{{{manual_url}}}">see manual for details</a></>,
             "error_ok": "OK",
-            "error_switch": "Switch error",
-            "error_contactor": /*SFN*/(pe_error: boolean, contactor_error: boolean) => pe_error ? "PE" : (contactor_error ? "Contactor error" : "Contactor/PE error")/*NF*/,
-            "error_communication": "Communication error",
+            "error_switch": "Switch",
+            "error_contactor": /*SFN*/(pe_error: boolean, contactor_error: boolean) => (contactor_error == pe_error ? "Contactor/PE" : (pe_error ? "PE" : "Contactor"))/*NF*/,
+            "error_communication": "Communication",
             "error_pe": "PE",
             "lock_state": "Cable lock",
             "lock_init": "Init",
@@ -205,10 +205,10 @@ let x = {
             "dc_fault_current_6_ma": "DC fault",
             "dc_fault_current_system": "System error",
             "dc_fault_current_unknown": "Unknown error",
-            "dc_fault_current_calibration": /*SFN*/ (dc_fault_state: number, dc_fault_pins: number) => "Calibration error" + (dc_fault_state != 0 ? dc_fault_pins.toString() : "")/*NF*/,
+            "dc_fault_current_calibration": /*SFN*/ (dc_fault_state: number, dc_fault_pins: number) => "Calibration error" + (dc_fault_state != 0 ? (": " + dc_fault_pins.toString()) : "")/*NF*/,
             "dc_fault_current_reset": "Reset",
             "dc_fault_current_20_ma": "AC fault",
-            "dc_fault_current_6_ma_20_ma": "DC+AC fault",
+            "dc_fault_current_6_ma_20_ma": "AC and DC fault",
 
             "reset_dc_fault_title": "Reset the DC fault protector",
             "reset_dc_fault_content": <>Resetting the DC fault protector restores the ability to charge. <b>Ensure that the reason why the DC fault protector triggered is resolved!</b> <a href="{{{manual_url}}}">See manual for details.</a> Really reset the DC fault protector?</>,
@@ -226,7 +226,13 @@ let x = {
             "adc_names": /*FFN*/(is_evse_v2: boolean) => is_evse_v2 ? <>CP/PE before resistor (PWM high), CP/PE after resistor (PWM high)<br/>CP/PE before resistor (PWM low), CP/PE after resistor (PWM low)<br/>PP/PE, +12V rail<br/>-12V rail</> : <>CP/PE, PP/PE</>/*NF*/,
             "voltage_names": /*FFN*/(is_evse_v2: boolean) => is_evse_v2 ? <>CP/PE before resistor (PWM high), CP/PE after resistor (PWM high)<br/>CP/PE before resistor (PWM low), CP/PE after resistor (PWM low)<br/>PP/PE, +12V rail<br/>-12V rail</> : <>CP/PE, PP/PE,<br/> CP/PE (high)</>/*NF*/,
             "dc_fault_sensor_type": "DC fault protector version",
-            "dc_fault_pins": "DC fault protector pins"
+            "dc_fault_pins": "DC fault protector pins",
+            "temperature": "Temperature",
+            "phases_current": "Phases current",
+            "phases_requested": "Phases requested",
+            "phases_status": "Phases status",
+            "switch_to_one_phase": "Switch to one phase",
+            "switch_to_three_phases": "Switch to three phases"
         },
         "script": {
             "error_code": "Error code",
@@ -284,9 +290,11 @@ let x = {
             "gpio_configuration_failed": "Updating the GPIO configuration failed",
 
             "meter_type_0": "No energy meter found",
-            "meter_type_1": "SDM72",
-            "meter_type_2": "SDM630",
-            "meter_type_3": "SDM72V2",
+            "meter_type_1": "Eastron SDM72",
+            "meter_type_2": "Eastron SDM630",
+            "meter_type_3": "Eastron SDM72V2",
+            "meter_type_6": "Eltako DSZ15DZMOD",
+            "meter_type_7": "YTL DEM4A",
             "meter_type_254": "internal"
         }
     }
