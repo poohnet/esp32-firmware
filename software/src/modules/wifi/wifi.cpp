@@ -47,7 +47,7 @@ void Wifi::pre_setup()
         {"ip", Config::Str("10.0.0.1", 7, 15)},
         {"gateway", Config::Str("10.0.0.1", 7, 15)},
         {"subnet", Config::Str("255.255.255.0", 7, 15)}
-    }), [](Config &cfg) -> String {
+    }), [](Config &cfg, ConfigSource source) -> String {
         IPAddress ip_addr, subnet_mask, gateway_addr;
         if (!ip_addr.fromString(cfg.get("ip")->asEphemeralCStr()))
             return "Failed to parse \"ip\": Expected format is dotted decimal, i.e. 10.0.0.1";
@@ -94,7 +94,7 @@ void Wifi::pre_setup()
         {"subnet", Config::Str("0.0.0.0", 7, 15)},
         {"dns", Config::Str("0.0.0.0", 7, 15)},
         {"dns2", Config::Str("0.0.0.0", 7, 15)},
-    }), [](Config &cfg) -> String {
+    }), [](Config &cfg, ConfigSource source) -> String {
         const String &phrase = cfg.get("passphrase")->asString();
         if (phrase.length() > 0 && phrase.length() < 8)
             return "Passphrase too short. Must be at least 8 characters, or zero if open network.";
@@ -396,15 +396,9 @@ void Wifi::setup()
 
     WiFi.onEvent([this](arduino_event_id_t event, arduino_event_info_t info) {
             uint8_t reason_code = info.wifi_sta_disconnected.reason;
-            static bool first = true;
             const char *reason = reason2str(reason_code);
             if (!this->was_connected) {
                 logger.printfln("Wifi failed to connect to %s: %s (%u)", sta_config_in_use.get("ssid")->asEphemeralCStr(), reason, reason_code);
-                if (first)
-                {
-                    first = false;
-                    this->apply_sta_config_and_connect();
-                }
             } else {
                 uint32_t now = millis();
                 uint32_t connected_for = now - last_connected_ms;
@@ -553,31 +547,39 @@ void Wifi::setup()
             state.get("sta_rssi")->updateInt(WiFi.RSSI());
 
             static int tries = 0;
-            if (tries < 10 || (tries - 10) % 8 == 0)
+            if (tries < 3 || tries % 3 == 2)
                 if (!apply_sta_config_and_connect(connection_state))
                     tries = 0;
             tries++;
-        }, 0, 5000);
+        }, 0, 10000);
     }
 
     if (ap_fallback_only) {
         task_scheduler.scheduleWithFixedDelay([this]() {
-            bool connected = false;
+            bool connected = (WifiState)state.get("connection_state")->asInt() == WifiState::CONNECTED;
 
 #if MODULE_ETHERNET_AVAILABLE()
-            connected = ethernet.get_connection_state() == EthernetState::CONNECTED;
+            connected = connected || ethernet.get_connection_state() == EthernetState::CONNECTED;
 #endif
-            if (!connected)
-                connected = (WifiState)state.get("connection_state")->asInt() == WifiState::CONNECTED;
 
-            if (connected == soft_ap_running) {
-                if (connected) {
+            static int stop_soft_ap_runs = 0;
+
+            if (!connected)
+                stop_soft_ap_runs = 0;
+
+            // Start softAP immediately, but stop it only if
+            // we got a connection in the first 30 seconds after start-up
+            // or we had a connection for 5 minutes.
+
+            if (connected && soft_ap_running) {
+                ++stop_soft_ap_runs;
+                if (now_us() < 30_usec * 1000_usec * 1000_usec || stop_soft_ap_runs > 5 * 6) {
                     logger.printfln("Network connected. Stopping soft AP");
                     WiFi.softAPdisconnect(true);
                     soft_ap_running = false;
-                } else {
-                    apply_soft_ap_config_and_start();
                 }
+            } else if (!connected && !soft_ap_running) {
+                apply_soft_ap_config_and_start();
             }
         },
         enable_sta

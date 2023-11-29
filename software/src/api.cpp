@@ -248,7 +248,7 @@ bool API::hasFeature(const char *name)
     return false;
 }
 
-void API::writeConfig(const String &path, ConfigRoot *config)
+void API::writeConfig(const String &path, Config *config)
 {
     String path_copy = path;
     path_copy.replace('/', '_');
@@ -308,11 +308,7 @@ bool API::restorePersistentConfig(const String &path, ConfigRoot *config)
         return false;
     }
 
-    File file = LittleFS.open(filename);
-    String error = config->update_from_file(file);
-
-    error.trim();
-    file.close();
+    String error = config->update_from_file(LittleFS.open(filename));
 
     if (error != "") {
         logger.printfln("Failed to restore persistent config %s: %s", path_copy.c_str(), error.c_str());

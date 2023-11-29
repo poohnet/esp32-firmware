@@ -48,7 +48,7 @@ void Certs::pre_setup() {
         {"id", Config::Uint(0, 0, MAX_CERTS)},
         {"name", Config::Str("", 0, 32)},
         {"cert", Config::Str("", 0, MAX_CERT_SIZE)}
-    }), [](Config &cfg) -> String {
+    }), [](Config &cfg, ConfigSource source) -> String {
         const auto &cert = cfg.get("cert")->asString();
         if (cert.length() == 0)
             return "";
@@ -166,12 +166,6 @@ void Certs::register_urls()
 
         if (add.get("cert")->asString().length() != 0) {
             File f = LittleFS.open(String("/certs/") + cert_id, "w");
-
-            auto cert_name = add.get("name")->asString();
-            cert_name.replace('\n', ' ');
-            cert_name += '\n';
-            f.write((const uint8_t *) cert_name.c_str(), cert_name.length());
-
             // TODO: more robust writing
             auto &cert = add.get("cert")->asString();
             f.write((const uint8_t *) cert.c_str(), cert.length());
@@ -208,11 +202,14 @@ std::unique_ptr<unsigned char[]> Certs::get_cert(uint8_t id, size_t *out_cert_le
         return nullptr;
 
     File f = LittleFS.open(path, "r");
-    auto result = heap_alloc_array<unsigned char>(f.size());
+    // Allocate one byte more so that the cert is also null-terminated.
+    // Some ESP-IDF APIs need both a null-terminated string _and_ passing the strings length.
+    auto result = heap_alloc_array<unsigned char>(f.size() + 1);
     size_t buf_size = f.size();
     while (f.available())
         buf_size -= f.read(result.get(), buf_size);
 
     *out_cert_len = f.size();
+    result[*out_cert_len] = 0;
     return result;
 }

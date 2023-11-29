@@ -63,8 +63,10 @@ void NFC::pre_setup()
             0, MAX_AUTHORIZED_TAGS,
             Config::type_id<Config::ConfObject>())
         }
-    }), [this](Config &cfg) -> String {
+    }), [this](Config &cfg, ConfigSource source) -> String {
         Config *tags = (Config *)cfg.get("authorized_tags");
+
+        // Check tag_id format
         for(int tag = 0; tag < tags->count(); ++tag) {
             String id_copy = tags->get(tag)->get("tag_id")->asString();
             id_copy.toUpperCase();
@@ -80,13 +82,40 @@ void NFC::pre_setup()
             }
         }
 
+        // Add more validation above this block!
+        if (source == ConfigSource::File) {
+            // The validation below was missing in old firmwares.
+            // To make sure a config that is stored in the ESP's flash
+            // can be loaded on start-up, fix the mappings instead of
+            // returning an error.
+            bool update_file = false;
+            for(int tag = 0; tag < tags->count(); ++tag) {
+                uint8_t user_id = tags->get(tag)->get("user_id")->asUint();
+                if (!users.is_user_configured(user_id)) {
+                    logger.printfln("Fixing NFC tag %s referencing a deleted user.", tags->get(tag)->get("tag_id")->asEphemeralCStr());
+                    tags->get(tag)->get("user_id")->updateUint(0);
+                    update_file = true;
+                }
+            }
+            if (update_file)
+                API::writeConfig("nfc/config", &cfg);
+
+        } else {
+            // Check user_id_mappings
+            for(int tag = 0; tag < tags->count(); ++tag) {
+                uint8_t user_id = tags->get(tag)->get("user_id")->asUint();
+                if (!users.is_user_configured(user_id))
+                    return String("Unknown user with ID ") + (int)user_id + ".";
+            }
+        }
+
         return "";
     });
 
     inject_tag = ConfigRoot(Config::Object({
         {"tag_type", Config::Uint(0, 0, 4)},
         {"tag_id", Config::Str("", 0, NFC_TAG_ID_STRING_LENGTH)}
-    }), [this](Config &cfg) -> String {
+    }), [this](Config &cfg, ConfigSource source) -> String {
         String id_copy = cfg.get("tag_id")->asString();
         id_copy.toUpperCase();
         cfg.get("tag_id")->updateString(id_copy);
