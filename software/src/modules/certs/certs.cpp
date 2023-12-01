@@ -58,19 +58,52 @@ void Certs::pre_setup() {
         defer {mbedtls_pem_free(&ctx);};
 
         size_t ignored;
-        auto result = mbedtls_pem_read_buffer(
+        int result = mbedtls_pem_read_buffer(
                         &ctx,
                         "-----BEGIN CERTIFICATE-----",
                         "-----END CERTIFICATE-----",
                         (const unsigned char *)cert.c_str(),
                         nullptr, 0,
                         &ignored);
-        if (result != 0) {
-            char buf[256] = {0};
-            mbedtls_strerror(result, buf, sizeof(buf));
-            return String("Failed to parse certificate: ") + buf;
-        }
 
+        mbedtls_pem_context key_ctx;
+        mbedtls_pem_init(&key_ctx);
+
+        int key_res = mbedtls_pem_read_buffer(
+                        &key_ctx,
+                        "-----BEGIN PRIVATE KEY-----",
+                        "-----END PRIVATE KEY-----",
+                        (const unsigned char *)cert.c_str(),
+                        nullptr, 0,
+                        &ignored);
+        mbedtls_pem_free(&key_ctx);
+
+        int second_key_res = mbedtls_pem_read_buffer(
+                        &key_ctx,
+                        "-----BEGIN RSA PRIVATE KEY-----",
+                        "-----END RSA PRIVATE KEY-----",
+                        (const unsigned char *)cert.c_str(),
+                        nullptr, 0,
+                        &ignored);
+        mbedtls_pem_free(&key_ctx);
+
+        if (result != 0 && key_res != 0 && second_key_res != 0) {
+            if (result != 0) {
+                char buf[256] = {0};
+                mbedtls_strerror(result, buf, sizeof(buf));
+                return String("Failed to parse certificate: ") + buf;
+            }
+            if (key_res != 0) {
+                char buf[256] = {0};
+                mbedtls_strerror(key_res, buf, sizeof(buf));
+                return String("Failed to parse private key: ") + buf;
+            }
+            if (second_key_res != 0) {
+                char buf[256] = {0};
+                mbedtls_strerror(second_key_res, buf, sizeof(buf));
+                return String("Failed to parse RSA private key: ") + buf;
+            }
+        }
         return "";
     }};
 }
