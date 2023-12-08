@@ -21,10 +21,11 @@ import { h, Fragment } from "preact";
 import { __ } from "../../ts/translation";
 import { CronActionID } from "../cron/cron_defs";
 import { CronAction } from "../cron/types"
-import { Cron } from "../cron/main"
 import { InputSelect } from "../../ts/components/input_select"
 import { InputFloat } from "../../ts/components/input_float"
 import { InputNumber } from "../../ts/components/input_number"
+import { FormRow } from "../../ts/components/form_row"
+import * as util from "../../ts/util";
 
 export type EvseCronAction = [
     CronActionID.SetCurrent,
@@ -41,27 +42,23 @@ export type EvseLedCronAction = [
     },
 ];
 
-function get_set_current_table_children(action: CronAction) {
-    const value = (action as EvseCronAction)[1];
-    return __("evse.content.cron_action_text")(value.current / 1000);
+function get_set_current_table_children(action: EvseCronAction) {
+    return __("evse.cron.cron_action_text")(action[1].current / 1000);
 }
 
-function get_set_current_edit_children(cron: Cron, action: CronAction) {
-    const value = (action as EvseCronAction)[1];
+function get_set_current_edit_children(action: EvseCronAction, on_action: (action: CronAction) => void) {
     return [
-        {
-            name: __("evse.content.allowed_charging_current"),
-            value: <InputFloat
+        <FormRow label={__("evse.cron.allowed_charging_current")}>
+            <InputFloat
                 digits={3}
                 min={0}
                 max={32000}
                 unit="A"
-                value={value.current}
+                value={action[1].current}
                 onValue={(v) => {
-                    value.current = v;
-                    cron.setActionFromComponent(action);
-                }}/>
-        }
+                    on_action(util.get_updated_union(action, {current: v}));
+                }} />
+        </FormRow>
     ]
 }
 
@@ -74,72 +71,68 @@ function new_set_current_config(): CronAction {
     ];
 }
 
-function get_led_table_children(action: CronAction) {
-    const value = (action as EvseLedCronAction)[1];
+function get_led_table_children(action: EvseLedCronAction) {
     let state = "";
-    switch (value.state) {
+    switch (action[1].state) {
         case 0:
-            state = __("evse.content.led_state_off");
+            state = __("evse.cron.led_state_off");
             break;
 
         case 255:
-            state = __("evse.content.led_state_on");
+            state = __("evse.cron.led_state_on");
             break;
 
         case 1001:
-            state = __("evse.content.led_state_blinking");
+            state = __("evse.cron.led_state_blinking");
             break;
 
         case 1002:
-            state = __("evse.content.led_state_flickering");
+            state = __("evse.cron.led_state_flickering");
             break;
 
         case 1003:
-            state = __("evse.content.led_state_breathing");
+            state = __("evse.cron.led_state_breathing");
             break;
     }
-    if (value.state > 2000 && value.state < 2011) {
-        state = __("evse.content.led_state_error")(value.state - 2000);
+    if (action[1].state > 2000 && action[1].state < 2011) {
+        state = __("evse.cron.led_state_error")(action[1].state - 2000);
     }
 
-    return __("evse.content.cron_led_action_text")(state, value.duration)
+    return __("evse.cron.cron_led_action_text")(state, action[1].duration)
 }
 
-function get_led_edit_children(cron: Cron, action: CronAction) {
-    const value = (action as EvseLedCronAction)[1];
+function get_led_edit_children(action: EvseLedCronAction, on_action: (action: CronAction) => void) {
     const items: [string, string][] = [
-        ["0", __("evse.content.led_state_off")],
-        ["255", __("evse.content.led_state_on")],
-        ["1001", __("evse.content.led_state_blinking")],
-        ["1002", __("evse.content.led_state_flickering")],
-        ["1003", __("evse.content.led_state_breathing")]];
+        ["0", __("evse.cron.led_state_off")],
+        ["255", __("evse.cron.led_state_on")],
+        ["1001", __("evse.cron.led_state_blinking")],
+        ["1002", __("evse.cron.led_state_flickering")],
+        ["1003", __("evse.cron.led_state_breathing")]
+    ];
+
     for (let i = 1; i <= 10; i++) {
-        items.push([String(2000 + i), __("evse.content.led_state_error")(i)]);
+        items.push([String(2000 + i), __("evse.cron.led_state_error")(i)]);
     }
-    return [
-        {
-            name: __("evse.content.led_state"),
-            value: <InputSelect
+
+    return [<>
+        <FormRow label={__("evse.cron.led_state")}>
+            <InputSelect
                 items={items}
-                value={value.state.toString()}
+                value={action[1].state.toString()}
                 onValue={(v) => {
-                    value.state = parseInt(v);
-                    cron.setActionFromComponent(action);
-                }}/>
-        },
-        {
-            name: __("evse.content.led_duration"),
-            value: <> <InputNumber
-                value={value.duration / 1000}
+                    on_action(util.get_updated_union(action, {state: parseInt(v)}));
+                }} />
+        </FormRow>
+        <FormRow label={ __("evse.cron.led_duration")}>
+            <InputNumber
+                value={action[1].duration / 1000}
                 unit="s"
                 onValue={(v) => {
-                    value.duration = v * 1000;
-                    cron.setActionFromComponent(action);
+                    on_action(util.get_updated_union(action, {duration: v * 1000}));
                 }} />
-                <span class="text-muted mt-1">{__("evse.content.api_must_be_enabled")}</span>
-            </>
-        }
-    ]
+            <span class="text-muted mt-1">{__("evse.cron.api_must_be_enabled")}</span>
+        </FormRow>
+    </>];
 }
 
 function new_led_config(): CronAction {
@@ -156,14 +149,14 @@ export function init() {
     return {
         action_components: {
             [CronActionID.SetCurrent]: {
-                name: __("evse.content.allowed_charging_current"),
+                name: __("evse.cron.allowed_charging_current"),
                 new_config: new_set_current_config,
                 clone_config: (action: CronAction) => [action[0], {...action[1]}] as CronAction,
                 get_edit_children: get_set_current_edit_children,
                 get_table_children: get_set_current_table_children,
             },
             [CronActionID.LED]: {
-                name: __("evse.content.led_state"),
+                name: __("evse.cron.led_state"),
                 new_config: new_led_config,
                 clone_config: (action: CronAction) => [action[0], {...action[1]}] as CronAction,
                 get_edit_children: get_led_edit_children,

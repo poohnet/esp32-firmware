@@ -39,16 +39,12 @@
 // are registered.
 void set_data_storage(uint8_t *buf)
 {
-#if MODULE_EVSE_COMMON_AVAILABLE()
     evse_common.set_data_storage(DATA_STORE_PAGE_CHARGE_TRACKER, buf);
-#endif
 }
 
 void get_data_storage(uint8_t *buf)
 {
-#if MODULE_EVSE_COMMON_AVAILABLE()
     evse_common.get_data_storage(DATA_STORE_PAGE_CHARGE_TRACKER, buf);
-#endif
 }
 
 void zero_user_slot_info()
@@ -60,25 +56,19 @@ void zero_user_slot_info()
 
 uint8_t get_charger_state()
 {
-#if MODULE_EVSE_COMMON_AVAILABLE()
     return evse_common.get_state().get("charger_state")->asUint();
-#endif
-    return 0;
 }
 
 Config *get_user_slot()
 {
-#if MODULE_EVSE_COMMON_AVAILABLE()
     return (Config *)evse_common.get_slots().get(CHARGING_SLOT_USER);
-#endif
-    return nullptr;
 }
 
 float get_energy()
 {
-    bool meter_avail = meter.state.get("state")->asUint() == 2;
-    // If for some reason we decide to use energy_rel here, also update the energy_this_charge calculation in modbus_tcp.cpp
-    return !meter_avail ? NAN : meter.values.get("energy_abs")->asFloat();
+    float energy = NAN;
+    evse_common.get_charger_meter_energy(&energy);
+    return energy;
 }
 
 #define USER_SLOT_INFO_VERSION 1
@@ -276,31 +266,8 @@ void Users::setup()
 
     if (charge_start_tracked && !charging) {
         float override_value = get_energy();
-
-        // This can be 0 if the EVSE 2.0 already reports the meter as available,
-        // but has not read any value from it.
-        if (std::isnan(override_value) || override_value == 0.0f)
-        {
-            auto start = millis();
-#if MODULE_EVSE_AVAILABLE() && MODULE_MODBUS_METER_AVAILABLE()
-            while(!deadline_elapsed(start + 10000) && meter.values.get("energy_abs")->asFloat() == 0)
-            {
-                modbus_meter.checkRS485State();
-                modbus_meter.loop();
-                delay(50);
-            }
-            override_value = meter.values.get("energy_abs")->asFloat();
-#elif MODULE_EVSE_V2_AVAILABLE()
-            while(!deadline_elapsed(start + 10000) && evse_v2.energy_meter_values.get("energy_abs")->asFloat() == 0)
-            {
-                evse_v2.update_all_data();
-                delay(250);
-            }
-            override_value = evse_v2.energy_meter_values.get("energy_abs")->asFloat();
-#endif
-        }
-
-        // ChargeTracker::endCharge replaces 0 with NAN.
+        // The energy value can be NaN if the meter is not readable yet.
+        // This will be repaired when starting the next charge.
         this->stop_charging(0, true, override_value);
     }
 

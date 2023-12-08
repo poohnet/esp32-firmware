@@ -144,8 +144,14 @@ void EvseCommon::pre_setup() {
     cron.register_trigger(
         CronTriggerID::IECChange,
         Config::Object({
-            {"charger_state", Config::Uint(0, 0, 4)}
+            {"old_charger_state", Config::Int(0, -1, 4)},
+            {"new_charger_state", Config::Int(0, -1, 4)}
         }));
+
+    cron.register_trigger(
+        CronTriggerID::EVSEExternalCurrentWd,
+        *Config::Null()
+    );
 
     cron.register_action(
         CronActionID::SetCurrent,
@@ -254,6 +260,12 @@ void EvseCommon::apply_defaults()
     }
 }
 
+#if MODULE_CRON_AVAILABLE()
+    bool trigger_action(Config *cfg, void *data) {
+        return evse_common.action_triggered(cfg, data);
+    }
+#endif
+
 void EvseCommon::setup() {
     setup_evse();
 
@@ -263,6 +275,13 @@ void EvseCommon::setup() {
     // Get all data once before announcing the EVSE feature.
     backend->update_all_data();
     api.addFeature("evse");
+
+#if MODULE_CRON_AVAILABLE()
+    task_scheduler.scheduleOnce([this]() {
+        cron.trigger_action(CronTriggerID::IECChange, nullptr, trigger_action);
+    }, 0);
+#endif
+
     task_scheduler.scheduleWithFixedDelay([this](){
         backend->update_all_data();
     }, 0, 250);
@@ -274,11 +293,17 @@ void EvseCommon::setup() {
 #if MODULE_CRON_AVAILABLE()
 bool EvseCommon::action_triggered(Config *config, void *data) {
     Config *cfg = (Config*)config->get();
+    uint32_t *states = (uint32_t*)data;
     switch (config->getTag<CronTriggerID>()) {
         case CronTriggerID::IECChange:
-                if (cfg->get("charger_state")->asUint() == state.get("charger_state")->asUint())
+                if ((cfg->get("new_charger_state")->asInt() == states[1]
+                    || cfg->get("new_charger_state")->asInt() == -1)
+                    && (cfg->get("old_charger_state")->asInt() == states[0] || cfg->get("old_charger_state")->asInt() == -1) )
                     return true;
             break;
+
+        case CronTriggerID::EVSEExternalCurrentWd:
+        return true;
 
         default:
             return false;
@@ -295,12 +320,6 @@ void EvseCommon::setup_evse()
     this->apply_defaults();
     backend->initialized = true;
 }
-
-#if MODULE_CRON_AVAILABLE()
-    bool trigger_action(Config *cfg, void *data) {
-        return evse_common.action_triggered(cfg, data);
-    }
-#endif
 
 void EvseCommon::register_urls() {
 #if MODULE_CM_NETWORKING_AVAILABLE()
@@ -344,8 +363,12 @@ void EvseCommon::register_urls() {
             last_current_update = millis();
             return;
         }
-        if(!shutdown_logged)
+        if(!shutdown_logged) {
             logger.printfln("Got no managed current update for more than 30 seconds. Setting managed current to 0");
+#if MODULE_CRON_AVAILABLE() && MODULE_CHARGE_MANAGER_AVAILABLE()
+            charge_manager.trigger_wd();
+#endif
+        }
         shutdown_logged = true;
         backend->set_charging_slot_max_current(CHARGING_SLOT_CHARGE_MANAGER, 0);
     }, 1000, 1000);
@@ -392,6 +415,7 @@ void EvseCommon::register_urls() {
 
     api.addState("evse/external_current", &external_current, {}, 1000);
     api.addCommand("evse/external_current_update", &external_current_update, {}, [this](){
+        this->last_current_update = millis();
         backend->set_charging_slot_max_current(CHARGING_SLOT_EXTERNAL, external_current_update.get("current")->asUint());
     }, false);
 
@@ -555,11 +579,26 @@ void EvseCommon::register_urls() {
             // we need this since not only iec state changes trigger this api event.
             static uint32_t last_state = 0;
             uint32_t state_now = cfg->get("charger_state")->asUint();
+            uint32_t states[2] = {last_state, state_now};
             if (last_state != state_now) {
-                cron.trigger_action(CronTriggerID::IECChange, nullptr, &trigger_action);
+                cron.trigger_action(CronTriggerID::IECChange, (void *)states, &trigger_action);
                 last_state = state_now;
             }
+            return EventResult::OK;
         });
+    }
+
+    if (cron.is_trigger_active(CronTriggerID::EVSEExternalCurrentWd)) {
+        task_scheduler.scheduleWithFixedDelay([this](){
+            static bool was_triggered = false;
+            const bool elapsed = deadline_elapsed(last_external_update + 30000);
+            if (external_enabled.get("enabled")->asBool() && elapsed && !was_triggered) {
+                cron.trigger_action(CronTriggerID::EVSEExternalCurrentWd, nullptr, &trigger_action);
+                was_triggered = true;
+            } else if (!elapsed) {
+                was_triggered = false;
+            }
+        }, 1000, 1000);
     }
 #endif
 
@@ -591,6 +630,22 @@ void EvseCommon::set_modbus_current(uint16_t current) {
 
 void EvseCommon::set_modbus_enabled(bool enabled) {
     backend->set_charging_slot_max_current(CHARGING_SLOT_MODBUS_TCP_ENABLE, enabled ? 32000 : 0);
+}
+
+uint32_t EvseCommon::get_charger_meter()
+{
+    return 0; // TODO: Make a config option for this.
+}
+
+MeterValueAvailability EvseCommon::get_charger_meter_power(float *power, micros_t max_age)
+{
+    return meters.get_power(this->get_charger_meter(), power, max_age);
+}
+
+MeterValueAvailability EvseCommon::get_charger_meter_energy(float *energy, micros_t max_age)
+{
+    // TODO: This function must handle the change from EnergyImExSum to EnergyImport.
+    return meters.get_energy_import(this->get_charger_meter(), energy, max_age);
 }
 
 void EvseCommon::set_require_meter_blocking(bool blocking) {

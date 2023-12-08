@@ -53,7 +53,7 @@ let x = {
 
             "wpa_personal": "WPA2/3 Personal",
             "wpa_auth_type": "Authentifizierung",
-            "eap_tls": "TWPA2 Enterprise - EAP-TLS",
+            "eap_tls": "WPA2 Enterprise - EAP-TLS",
             "eap_peap_ttls": "WPA2 Enterprise - EAP-PEAP/TTLS",
             "eap_identity": "Identität",
             "eap_username": "Benutzername",
@@ -62,7 +62,15 @@ let x = {
             "eap_client_cert": "Client-Zertifikat",
             "eap_client_key": "Client-Schlüssel",
             "eap_client_key_password": "Client-Schlüssel-Passwort",
-            "eap_ca_cert_placeholder": "Kein Zertifikat"
+            "eap_cert_placeholder": "Kein Zertifikat",
+            "eap_key_placeholder": "Kein Schlüssel",
+            "optional_eap_cert_muted": /*FFN*/ () => {
+                return <>optional <a href="#certs">Zertifikatsverwaltung</a></>
+            } /*NF*/,
+            "eap_cert_muted": /*FFN*/ () => {
+                return <a href="#certs">Zertifikatsverwaltung</a>
+            } /*NF*/,
+            "optional": "optional"
         },
         "script": {
             "scan_wifi_init_failed": "Suche nach Netzwerken fehlgeschlagen. Konnte Scan nicht starten.",

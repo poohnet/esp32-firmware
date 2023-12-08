@@ -38,13 +38,26 @@ let x = {
             "type_2": "NFC Forum Type 2",
             "type_3": "NFC Forum Type 3",
             "type_4": "NFC Forum Type 4",
-            "tag_id_invalid_feedback": "The BSSID must have three to ten groups separated by a colon, each with a two-digit hexadecimal number. For example 01:23:45:67:89:AB",
-
+            "tag_id_invalid_feedback": "The BSSID must have three to ten groups separated by a colon, each with a two-digit hexadecimal number. For example 01:23:45:67:89:AB"
+        },
+        "cron": {
+            "nfc": "NFC-Tags",
+            "add_tag_description": "Hold the new tag to the right side of the charger. Tag ID and type can also be typed in manually.",
             "trigger_charge_any": "Charge start/stop",
             "trigger_charge_start": "Charge start",
             "trigger_charge_stop": "Charge stop",
             "tag_action": "Tag action",
-
+            "tag_id_invalid_feedback": "The BSSID must have three to ten groups separated by a colon, each with a two-digit hexadecimal number. For example 01:23:45:67:89:AB",
+            "table_tag_id": "Tag ID",
+            "table_user_id": "Assigned user",
+            "table_tag_type": "Tag type",
+            "type_0": "Mifare Classic",
+            "type_1": "NFC Forum Type 1",
+            "type_2": "NFC Forum Type 2",
+            "type_3": "NFC Forum Type 3",
+            "type_4": "NFC Forum Type 4",
+            "last_seen": "",
+            "last_seen_suffix": " ago",
             "last_seen_and_known_tags": "Last seen tags and known tags",
 
             "cron_action_text": /*FFN*/(tag_id: string, tag_type: string, tag_action: number) => {

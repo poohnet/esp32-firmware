@@ -62,6 +62,10 @@ void Wifi::pre_setup()
         if (!is_valid_subnet_mask(subnet_mask))
             return "Invalid subnet mask passed: Expected format is 255.255.255.0";
 
+        uint8_t cidr = WiFiGenericClass::calculateSubnetCIDR(subnet_mask);
+        if (cidr < 24 || cidr > 30)
+            return "Invalid subnet mask passed: Subnet mask must be at least /30 and not bigger than /24.";
+
         if (ip_addr != IPAddress(0,0,0,0) && is_in_subnet(ip_addr, subnet_mask, IPAddress(127,0,0,1)))
             return "Invalid IP or subnet mask passed: This configuration would route localhost (127.0.0.1) to the WiFi AP.";
 
@@ -84,19 +88,21 @@ void Wifi::pre_setup()
 
     eap_config_prototypes.push_back({EapConfigID::None, *Config::Null()});
 
-    // Currently not used.
+    // Max len of identity is currently limited by arduino.
     eap_config_prototypes.push_back({EapConfigID::TLS, Config::Object({
         {"ca_cert_id", Config::Int(-1, -1, MAX_CERTS)},
-        {"identity", Config::Str("", 0, 32)},
+        {"identity", Config::Str("", 0, 64)},
         {"client_cert_id", Config::Int(0, 0, MAX_CERTS)},
         {"client_key_id", Config::Int(0, 0, MAX_CERTS)}
     })});
 
     eap_config_prototypes.push_back({EapConfigID::PEAP_TTLS, Config::Object({
         {"ca_cert_id", Config::Int(-1, -1, MAX_CERTS)},
-        {"identity", Config::Str("", 0, 32)},
-        {"username", Config::Str("", 0, 32)},
-        {"password", Config::Str("", 0, 32)}
+        {"identity", Config::Str("", 0, 64)},
+        {"username", Config::Str("", 0, 64)},
+        {"password", Config::Str("", 0, 64)},
+        {"client_cert_id", Config::Int(-1, -1, MAX_CERTS)},
+        {"client_key_id", Config::Int(-1, -1, MAX_CERTS)}
     })});
 
     Config eap_proto = Config::Union<EapConfigID>(
@@ -319,11 +325,11 @@ bool Wifi::apply_sta_config_and_connect(WifiState current_state)
         WiFi.config((uint32_t)0, (uint32_t)0, (uint32_t)0);
     }
 
-    logger.printfln("wifi connecting to %s", ssid);
+    logger.printfln("Wifi connecting to %s", ssid);
     EapConfigID eap_config_id = static_cast<EapConfigID>(sta_config_in_use.get("wpa_eap_config")->as<OwnedConfig::OwnedConfigUnion>()->tag);
     switch (eap_config_id) {
         case EapConfigID::None:
-            WiFi.begin(ssid, passphrase, 0, bssid_lock ? bssid : nullptr, true);
+            WiFi.begin(ssid, passphrase, 0, bssid_lock ? bssid : nullptr, true, (uint8_t)3);
             break;
 
             case EapConfigID::TLS:
@@ -342,7 +348,8 @@ bool Wifi::apply_sta_config_and_connect(WifiState current_state)
                             "",
                             0,
                             bssid_lock ? bssid : nullptr,
-                            true);
+                            true,
+                            3);
                 }
                 break;
         /**
@@ -365,7 +372,8 @@ bool Wifi::apply_sta_config_and_connect(WifiState current_state)
                     nullptr,
                     0,
                     bssid_lock ? bssid : nullptr,
-                    true);
+                    true,
+                    3);
             break;
 
         default:
@@ -585,16 +593,15 @@ void Wifi::setup()
     esp_wifi_set_ps(WIFI_PS_NONE);
 
     // We don't need the additional speed of HT40 and it only causes more errors.
-    if (enable_sta) {
-        esp_err_t err = esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20);
-        if (err != ESP_OK)
-            logger.printfln("WiFi: Setting HT20 for station failed: %i", err);
-    }
-    if (enable_ap) {
-        esp_err_t err = esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20);
-        if (err != ESP_OK)
-            logger.printfln("WiFi: Setting HT20 for AP failed: %i", err);
-    }
+    // Always disable on both interfaces but only print warnings for interfaces we care about.
+    esp_err_t err;
+    err = esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20);
+    if (enable_sta && err != ESP_OK)
+        logger.printfln("WiFi: Setting HT20 for station failed: %i", err);
+
+    err = esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20);
+    if (enable_ap && err != ESP_OK)
+        logger.printfln("WiFi: Setting HT20 for AP failed: %i", err);
 
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
@@ -688,6 +695,10 @@ void Wifi::setup()
             case EapConfigID::PEAP_TTLS:
                 eap_username = eap_config->get("username")->asString();
                 eap_password = eap_config->get("password")->asString();
+
+                client_cert = certs.get_cert(eap_config->get("client_cert_id")->asInt(), &client_cert_len);
+                client_key = certs.get_cert(eap_config->get("client_key_id")->asInt(), &client_key_len);
+
                 break;
 
             default:
@@ -819,7 +830,7 @@ void Wifi::register_urls()
         return request.send(200, "application/json; charset=utf-8", result.c_str());
     });
 
-    api.addPersistentConfig("wifi/sta_config", &sta_config, {"passphrase"});
+    api.addPersistentConfig("wifi/sta_config", &sta_config, {"passphrase", "password"});
     api.addPersistentConfig("wifi/ap_config", &ap_config, {"passphrase"});
 }
 

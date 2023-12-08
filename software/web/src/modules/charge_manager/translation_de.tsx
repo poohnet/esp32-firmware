@@ -75,10 +75,14 @@ let x = {
 
             "managed_boxes": "Kontrollierte Wallboxen",
 
-            "host_exists": "Host existiert bereits",
-
+            "host_exists": "Host existiert bereits"
+        },
+        "cron": {
+            "charge_manager_wd": "Lastmanagement Watchdog",
+            "cron_trigger_text": "Wenn der Watchdog des Lastmanagements auslöst, ",
             "set_charge_manager": "Lastmanagement",
-            "cron_action_text": /*FFN*/(current: number) => <>setze den maximalen Gesamtstrom auf <b>{current / 1000} A</b>.</> /*NF*/
+            "cron_action_text": /*FFN*/(current: number) => <>setze den maximal durch den Lastmanager verteilbaren Gesamtstrom auf <b>{current / 1000} A</b>.</> /*NF*/,
+            "max_current": "Maximaler Strom"
         },
         "script": {
             "charge_state_0": "Kein Fahrzeug angeschlossen",

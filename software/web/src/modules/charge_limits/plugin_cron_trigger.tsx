@@ -18,21 +18,20 @@
  */
 
 import { __ } from "../../ts/translation";
-import { Cron } from "../cron/main";
 import { CronTrigger } from "../cron/types";
 import { CronTriggerID } from "../cron/cron_defs";
-import { VNode, ComponentChildren } from "preact";
+import { ComponentChildren } from "preact";
 
 export type ChargeLimitsCronTrigger = [
     CronTriggerID.ChargeLimits,
     {}
 ];
 
-function get_charge_limits_table_children(_: CronTrigger) {
-    return __("charge_limits.content.cron_trigger_text");
+function get_charge_limits_table_children(_: ChargeLimitsCronTrigger) {
+    return __("charge_limits.cron.cron_trigger_text");
 }
 
-function get_charge_limits_edit_children(_: Cron, __: CronTrigger): ComponentChildren {
+function get_charge_limits_edit_children(_: ChargeLimitsCronTrigger, __: (trigger: CronTrigger) => void): ComponentChildren {
     return []
 }
 
@@ -47,7 +46,7 @@ export function init() {
     return {
         trigger_components: {
             [CronTriggerID.ChargeLimits]: {
-                name: __("charge_limits.content.charge_limits_expiration"),
+                name: __("charge_limits.cron.charge_limits_expiration"),
                 new_config: new_charge_limits_config,
                 clone_config: (trigger: CronTrigger) => [trigger[0], {...trigger[1]}] as CronTrigger,
                 get_edit_children: get_charge_limits_edit_children,

@@ -26,6 +26,7 @@
 #include "event_log.h"
 #include "task_scheduler.h"
 #include "tools.h"
+#include "modules/meters/meter_defs.h"
 
 #include <ESPmDNS.h>
 #include "lwip/ip_addr.h"

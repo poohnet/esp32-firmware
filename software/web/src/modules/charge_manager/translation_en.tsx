@@ -75,16 +75,20 @@ let x = {
 
             "managed_boxes": "Managed chargers",
 
-            "host_exists": "Host already exists",
-
-            "set_charge_manager": "Charge Manager",
-            "cron_action_text": /*FFN*/(current: number) => {
-              return (
-                <>
-                  set the maximum total current to <b>{current / 1000} A</b>.
-                </>
-              );
-            }/*NF*/
+            "host_exists": "Host already exists"
+        },
+        "cron": {
+          "charge_manager_wd": "Charge manager watchdog",
+          "cron_trigger_text": "When the charge managers watchdog gets triggered, ",
+          "set_charge_manager": "Charge Manager",
+          "cron_action_text": /*FFN*/(current: number) => {
+            return (
+              <>
+                set the maximum total current that can be distributed by the charge manager to <b>{current / 1000} A</b>.
+              </>
+            );
+          }/*NF*/,
+          "max_current": "Maximum current"
         },
         "script": {
             "charge_state_0": "No vehicle connected",

@@ -3,8 +3,6 @@ import { h } from "preact";
 let x = {
     "charge_limits": {
         "content": {
-            "charge_limits": "Charge limits",
-            "charge_limits_expiration": "Charge limit expired",
             "overridden": "(active)",
             "configured": "(configured)",
             "left": " left",
@@ -24,12 +22,34 @@ let x = {
             "h4": "4 Hours",
             "h6": "6 Hours",
             "h8": "8 Hours",
+            "h12": "12 Hours"
+        },
+        "cron": {
+            "reset": "Reset charge limit",
+            "charge_limits_expiration": "Charge limit expired",
+            "energy": "Charging energy limit",
+            "duration": "Charging duration limit",
+            "charge_limits": "Charge limits",
+            "unlimited": "Unlimited",
+            "min15": "15 Minutes",
+            "min30": "30 Minutes",
+            "min45": "45 Minutes",
+            "h1": "1 Hour",
+            "h2": "2 Hours",
+            "h3": "3 Hours",
+            "h4": "4 Hours",
+            "h6": "6 Hours",
+            "h8": "8 Hours",
             "h12": "12 Hours",
             "cron_trigger_text": "If the charge limit is reached, ",
-            "cron_action_text": /*FFN*/(duration: string, energy: number) => {
+            "cron_action_text": /*FFN*/(duration: string, energy: number, reset: boolean) => {
+                let reset_text = <>set</>;
+                if (reset) {
+                    reset_text = <>reset</>
+                }
                 return (
                   <>
-                    set the charge limit to{" "}
+                    {reset_text} the charge limit to{" "}
                     {duration !== "Unlimited" && <b>{duration}</b>}
                     {duration !== "Unlimited" && energy !== 0 && " and "}
                     {energy !== 0 && <b>{energy / 1000} kWh</b>}

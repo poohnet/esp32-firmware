@@ -54,6 +54,7 @@ static uint32_t max_avail_current = 0;
 #define REQUESTED_CURRENT_MARGIN_DEFAULT 3000
 
 extern bool firmware_update_allowed;
+extern ChargeManager charge_manager;
 
 #if MODULE_ENERGY_MANAGER_AVAILABLE()
 #define REQUESTED_CURRENT_MARGIN_ENERGY_MANAGER_1_CHARGER_DEFAULT (2 * REQUESTED_CURRENT_MARGIN_DEFAULT)
@@ -73,6 +74,28 @@ static void apply_energy_manager_config(Config &conf)
         conf.get("requested_current_margin")->updateUint(REQUESTED_CURRENT_MARGIN_DEFAULT);
     }
 }
+#endif
+
+#if MODULE_CRON_AVAILABLE()
+bool ChargeManager::action_triggered(Config *config, void *data) {
+    switch(config->getTag<CronTriggerID>()) {
+        case CronTriggerID::ChargeManagerWd:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+
+ #if !MODULE_ENERGY_MANAGER_AVAILABLE()
+static bool trigger_action(Config *config, void *data) {
+    return charge_manager.action_triggered(config, data);
+}
+void ChargeManager::trigger_wd() {
+    cron.trigger_action(CronTriggerID::ChargeManagerWd, nullptr, trigger_action);
+}
+ #endif
 #endif
 
 void ChargeManager::pre_setup()
@@ -186,7 +209,12 @@ void ChargeManager::pre_setup()
         {"disconnect", Config::Bool(false)},
     });
 
-#if MODULE_CRON_AVAILABLE()
+#if MODULE_CRON_AVAILABLE() && !MODULE_ENERGY_MANAGER_AVAILABLE()
+    cron.register_trigger(
+        CronTriggerID::ChargeManagerWd,
+        *Config::Null()
+    );
+
     cron.register_action(
         CronActionID::SetManagerCurrent,
         Config::Object({
@@ -526,7 +554,13 @@ const char* ChargeManager::get_charger_name(uint8_t idx) {
 
 void ChargeManager::distribute_current()
 {
-    uint32_t available_current_init = available_current.get("current")->asUint();
+    bool seen_all_chargers_local = seen_all_chargers();
+    if (seen_all_chargers_local && !printed_all_chargers_seen) {
+        logger.printfln("Charge manager: Seen all chargers.");
+        printed_all_chargers_seen = true;
+    }
+
+    uint32_t available_current_init = seen_all_chargers_local ? available_current.get("current")->asUint() : 0;
     uint32_t available_current = available_current_init;
 
     bool use_3phase_minimum_current = available_phases.get("phases")->asUint() >= 3;

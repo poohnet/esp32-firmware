@@ -32,7 +32,7 @@ import { InputText } from "../../ts/components/input_text";
 import { InputPassword } from "../../ts/components/input_password";
 import { Lock, Unlock } from "react-feather";
 import { SubPage } from "../../ts/components/sub_page";
-import { EapConfigCertificate, EapConfigID, EapConfigLogin } from "./api";
+import { EapConfigID, EapConfigPEAPTTLS, EapConfigTLS } from "./api";
 import { InputSelect } from "src/ts/components/input_select";
 
 type STAConfig = API.getType["wifi/sta_config"];
@@ -193,96 +193,162 @@ export class WifiSTA extends ConfigComponent<'wifi/sta_config', {}, WifiSTAState
         </>;
     }
 
-    eap_login(state: Readonly<WifiSTAState & STAConfig>) {
+    last_peap_ttls_state: EapConfigPEAPTTLS[1] = {
+        identity: "",
+        ca_cert_id: -1,
+        username: "",
+        password: "",
+        client_cert_id: -1,
+        client_key_id: -1
+    }
+
+    eap_peap_ttls(state: Readonly<WifiSTAState & STAConfig>) {
+        const certs_config = API.get("certs/state");
+        const cert_items: [string, string][] = [
+            ["-1", __("wifi.content.eap_cert_placeholder")]
+        ];
+        const key_items: [string, string][] = [
+            ["-1", __("wifi.content.eap_key_placeholder")]
+        ]
+        for (const cert of certs_config.certs) {
+            cert_items.push([cert.id.toString(), cert.name]);
+            key_items.push([cert.id.toString(), cert.name])
+        }
+
+        if (state.wpa_eap_config[0] === EapConfigID.PEAP_TTLS) {
+            this.last_peap_ttls_state = state.wpa_eap_config[1];
+        }
+
         return <>
             <FormRow label={__("wifi.content.eap_username")}>
                 <InputText required={state.wpa_eap_config[0] == EapConfigID.PEAP_TTLS}
-                    value={(state.wpa_eap_config as EapConfigLogin)[1].username}
+                    maxLength={64}
+                    value={this.last_peap_ttls_state.username}
                     onValue={(v) => {
-                        (state.wpa_eap_config as EapConfigLogin)[1].username = v;
+                        (state.wpa_eap_config as EapConfigPEAPTTLS)[1].username = v;
                         this.setState({wpa_eap_config: state.wpa_eap_config});
                 }}/>
             </FormRow>
+
             <FormRow label={__("wifi.content.eap_password")}>
                 <InputPassword
-                    value={(state.wpa_eap_config as EapConfigLogin)[1].password}
+                    maxLength={64}
+                    required={state.wpa_eap_config[0] == EapConfigID.PEAP_TTLS && this.last_peap_ttls_state.password === ""}
+                    value={this.last_peap_ttls_state.password}
                     onValue={(v) => {
-                        (state.wpa_eap_config as EapConfigLogin)[1].password = v;
+                        (state.wpa_eap_config as EapConfigPEAPTTLS)[1].password = v;
+                        this.setState({wpa_eap_config: state.wpa_eap_config});
+                    }}/>
+            </FormRow>
+
+            <FormRow label={__("wifi.content.eap_identity")} label_muted={__("wifi.content.optional")}>
+                <InputText
+                    maxLength={64}
+                    value={this.last_peap_ttls_state.identity}
+                    onValue={(v) => {
+                        (state.wpa_eap_config as EapConfigTLS | EapConfigPEAPTTLS)[1].identity = v;
+                        this.setState({wpa_eap_config: state.wpa_eap_config})
+                    }}
+                    />
+            </FormRow>
+
+            <FormRow label={__("wifi.content.eap_ca_cert")} label_muted={__("wifi.content.optional_eap_cert_muted")()}>
+                <InputSelect
+                    items={cert_items}
+                    value={this.last_peap_ttls_state.ca_cert_id.toString()}
+                    onValue={(v) => {
+                        (state.wpa_eap_config as EapConfigTLS | EapConfigPEAPTTLS)[1].ca_cert_id = parseInt(v);
+                        this.setState({wpa_eap_config: state.wpa_eap_config});
+                    }}/>
+            </FormRow>
+
+            <FormRow label={__("wifi.content.eap_client_cert")} label_muted={__("wifi.content.optional_eap_cert_muted")()}>
+                <InputSelect
+                    items={cert_items}
+                    value={this.last_peap_ttls_state.client_cert_id.toString()}
+                    onValue={(v) => {
+                        (state.wpa_eap_config as EapConfigPEAPTTLS)[1].client_cert_id = parseInt(v);
+                        this.setState({wpa_eap_config: state.wpa_eap_config});
+                    }}/>
+            </FormRow>
+
+            <FormRow label={__("wifi.content.eap_client_key")} label_muted={__("wifi.content.optional_eap_cert_muted")()}>
+                <InputSelect
+                    items={key_items}
+                    value={this.last_peap_ttls_state.client_key_id.toString()}
+                    onValue={(v) => {
+                        (state.wpa_eap_config as EapConfigPEAPTTLS)[1].client_key_id = parseInt(v);
                         this.setState({wpa_eap_config: state.wpa_eap_config});
                     }}/>
             </FormRow>
         </>
     }
 
-    eap_cert(state: Readonly<WifiSTAState & STAConfig>, cert_items: [string, string][]) {
-        return <>
-            <FormRow label={__("wifi.content.eap_client_cert")}>
-                <InputSelect
-                    required={state.wpa_eap_config[0] == EapConfigID.TLS}
-                    items={cert_items}
-                    placeholder={__("wifi.content.eap_ca_cert_placeholder")}
-                    value={(state.wpa_eap_config as EapConfigCertificate)[1].client_cert_id.toString()}
-                    onValue={(v) => {
-                        (state.wpa_eap_config as EapConfigCertificate)[1].client_cert_id = parseInt(v);
-                        this.setState({wpa_eap_config: state.wpa_eap_config});
-                    }}/>
-            </FormRow>
+    last_state: EapConfigTLS[1] = {
+        identity: "",
+        ca_cert_id: -1,
+        client_cert_id: -1,
+        client_key_id: -1,
+    };
 
-            <FormRow label={__("wifi.content.eap_client_key")}>
-                <InputSelect
-                    required={state.wpa_eap_config[0] == EapConfigID.TLS}
-                    items={cert_items}
-                    placeholder={__("wifi.content.eap_ca_cert_placeholder")}
-                    value={(state.wpa_eap_config as EapConfigCertificate)[1].client_key_id.toString()}
-                    onValue={(v) => {
-                        (state.wpa_eap_config as EapConfigCertificate)[1].client_key_id = parseInt(v);
-                        this.setState({wpa_eap_config: state.wpa_eap_config});
-                    }}/>
-            </FormRow>
-        </>
-    }
-
-    eap_config(state: Readonly<WifiSTAState & STAConfig>) {
+    eap_tls(state: Readonly<WifiSTAState & STAConfig>) {
         const certs_config = API.get("certs/state");
         const cert_items: [string, string][] = [
-            ["-1", __("wifi.content.eap_ca_cert_placeholder")]
+            ["-1", __("wifi.content.eap_cert_placeholder")]
         ];
         for (const cert of certs_config.certs) {
             cert_items.push([cert.id.toString(), cert.name]);
         }
 
+
+        if (state.wpa_eap_config[0] == EapConfigID.TLS) {
+            this.last_state = state.wpa_eap_config[1];
+        }
+
         return <>
-                <FormRow label={__("wifi.content.eap_identity")}>
-                    <InputText
-                        value={(state.wpa_eap_config as EapConfigCertificate | EapConfigLogin)[1].identity}
-                        onValue={(v) => {
-                            (state.wpa_eap_config as EapConfigCertificate | EapConfigLogin)[1].identity = v;
-                            this.setState({wpa_eap_config: state.wpa_eap_config})
-                        }}
-                        />
-                </FormRow>
+            <FormRow label={__("wifi.content.eap_client_cert")} label_muted={__("wifi.content.eap_cert_muted")()}>
+                <InputSelect
+                    required={state.wpa_eap_config[0] == EapConfigID.TLS}
+                    items={cert_items.filter((v) => v[0] != "-1")}
+                    placeholder={__("wifi.content.eap_cert_placeholder")}
+                    value={this.last_state.client_cert_id.toString()}
+                    onValue={(v) => {
+                        (state.wpa_eap_config as EapConfigTLS)[1].client_cert_id = parseInt(v);
+                        this.setState({wpa_eap_config: state.wpa_eap_config});
+                    }}/>
+            </FormRow>
 
-                <FormRow label={__("wifi.content.eap_ca_cert")}>
-                    <InputSelect
-                        items={cert_items}
-                        value={(state.wpa_eap_config as EapConfigCertificate | EapConfigLogin)[1].ca_cert_id.toString()}
-                        onValue={(v) => {
-                            (state.wpa_eap_config as EapConfigCertificate | EapConfigLogin)[1].ca_cert_id = parseInt(v);
-                            this.setState({wpa_eap_config: state.wpa_eap_config});
-                        }}/>
-                </FormRow>
+            <FormRow label={__("wifi.content.eap_client_key")} label_muted={__("wifi.content.eap_cert_muted")()}>
+                <InputSelect
+                    required={state.wpa_eap_config[0] == EapConfigID.TLS}
+                    items={cert_items.filter((v) => v[0] != "-1")}
+                    placeholder={__("wifi.content.eap_key_placeholder")}
+                    value={this.last_state.client_key_id.toString()}
+                    onValue={(v) => {
+                        (state.wpa_eap_config as EapConfigTLS)[1].client_key_id = parseInt(v);
+                        this.setState({wpa_eap_config: state.wpa_eap_config});
+                    }}/>
+            </FormRow>
 
-                <Collapse in={state.wpa_eap_config[0] === EapConfigID.PEAP_TTLS}>
-                    <div>
-                        {state.wpa_eap_config[0] === EapConfigID.PEAP_TTLS ? this.eap_login(state) : <></>}
-                    </div>
-                </Collapse>
-                <Collapse in={state.wpa_eap_config[0] === EapConfigID.TLS}>
-                    <div>
-                        {state.wpa_eap_config[0] === EapConfigID.TLS ? this.eap_cert(state, cert_items) : <></>}
-                    </div>
-                </Collapse>
+            <FormRow label={__("wifi.content.eap_identity")} label_muted={__("wifi.content.optional")}>
+                <InputText
+                    value={this.last_state.identity}
+                    onValue={(v) => {
+                        (state.wpa_eap_config as EapConfigTLS | EapConfigPEAPTTLS)[1].identity = v;
+                        this.setState({wpa_eap_config: state.wpa_eap_config})
+                    }}
+                    />
+            </FormRow>
 
+            <FormRow label={__("wifi.content.eap_ca_cert")} label_muted={__("wifi.content.optional_eap_cert_muted")()}>
+                <InputSelect
+                    items={cert_items}
+                    value={this.last_state.ca_cert_id.toString()}
+                    onValue={(v) => {
+                        (state.wpa_eap_config as EapConfigTLS | EapConfigPEAPTTLS)[1].ca_cert_id = parseInt(v);
+                        this.setState({wpa_eap_config: state.wpa_eap_config});
+                    }}/>
+            </FormRow>
         </>
     }
 
@@ -358,7 +424,6 @@ export class WifiSTA extends ConfigComponent<'wifi/sta_config', {}, WifiSTAState
                                             ca_cert_id: -1,
                                             client_cert_id: -1,
                                             client_key_id: -1,
-                                            key_password: ""
                                         }
                                         this.setState({wpa_eap_config: [EapConfigID.TLS, eap_config]});
                                         break;
@@ -368,7 +433,9 @@ export class WifiSTA extends ConfigComponent<'wifi/sta_config', {}, WifiSTAState
                                             identity: "",
                                             ca_cert_id: -1,
                                             username: "",
-                                            password: ""
+                                            password: "",
+                                            client_cert_id: -1,
+                                            client_key_id: -1
                                         }
                                         this.setState({wpa_eap_config: [EapConfigID.PEAP_TTLS, eap_config2]});
                                         break;
@@ -376,13 +443,19 @@ export class WifiSTA extends ConfigComponent<'wifi/sta_config', {}, WifiSTAState
                         }}/>
                     </FormRow>
 
-                    <Collapse in={state.wpa_eap_config[0] != EapConfigID.None}>
+                    <Collapse in={state.wpa_eap_config[0] === EapConfigID.PEAP_TTLS}>
                         <div>
-                            {state.wpa_eap_config[0] !== EapConfigID.None ? this.eap_config(state) : <></>}
+                            {this.eap_peap_ttls(state)}
                         </div>
                     </Collapse>
 
-                    <Collapse in={state.wpa_eap_config[0] == EapConfigID.None}>
+                    <Collapse in={state.wpa_eap_config[0] === EapConfigID.TLS}>
+                        <div>
+                            {this.eap_tls(state)}
+                        </div>
+                    </Collapse>
+
+                    <Collapse in={state.wpa_eap_config[0] === EapConfigID.None}>
                         <div>
                             <FormRow label={__("wifi.content.sta_passphrase")}>
                                 <InputPassword minLength={8} maxLength={63}

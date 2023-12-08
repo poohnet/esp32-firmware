@@ -29,13 +29,6 @@ export interface low_level_state {
     contactor_check_state: number,
 }
 
-export interface meter_state {
-    energy_meter_type: number,
-    energy_meter_power: number,
-    energy_meter_energy_import: number,
-    energy_meter_energy_export: number,
-}
-
 export interface state {
     phases_switched: number,
     error_flags: number,
@@ -48,27 +41,13 @@ export interface state {
 
 export interface config {
     default_mode: number,
-    auto_reset_mode: boolean,
-    auto_reset_time: number,
     excess_charging_enable: boolean,
+    meter_slot_grid_power: number,
     target_power_from_grid: number,
     guaranteed_power: number,
     cloud_filter_mode: number,
     contactor_installed: boolean,
     phase_switching_mode: number,
-    relay_config: number,
-    relay_rule_when: number,
-    relay_rule_is: number,
-    input3_rule_then: number,
-    input3_rule_then_limit: number,
-    input3_rule_is: number,
-    input3_rule_then_on_high: number,
-    input3_rule_then_on_low: number,
-    input4_rule_then: number,
-    input4_rule_then_limit: number,
-    input4_rule_is: number,
-    input4_rule_then_on_high: number,
-    input4_rule_then_on_low: number
 }
 
 export interface debug_config {
@@ -109,18 +88,15 @@ export interface history_energy_manager_5min_changed {
     hour: number,
     minute: number,
     flags: number,
-    power_grid: number,
-    power_general: number[]
+    power: number[]
 }
 
 export interface history_energy_manager_daily_changed {
     year: number,
     month: number,
     day: number,
-    energy_grid_in: number,
-    energy_grid_out: number,
-    energy_general_in: number[],
-    energy_general_out: number[]
+    energy_import: number[],
+    energy_export: number[]
 }
 
 export type debug_header = string;

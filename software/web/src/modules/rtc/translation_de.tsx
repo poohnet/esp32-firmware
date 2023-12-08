@@ -7,12 +7,15 @@ let x = {
         },
         "content": {
             "rtc": "Echtzeituhr",
+            "live_date": "Aktuelle Zeit der Echtzeituhr",
+            "set_time": "Zeit setzen",
+            "enable_auto_sync": "Automatische Synchronisierung",
+            "auto_sync_desc": "Setzt die Zeit der Echtzeituhr automatisch, wenn das Webinterface geladen wird und keine NTP-Synchronisierung besteht."
+        },
+        "cron": {
             "clock": "Zeitpunkt",
             "time": "Uhrzeit",
             "mday": "Tag",
-            "wday": "Wochentag",
-            "hour": "Stunde",
-            "minute": "Minute",
             "monday": "Montag",
             "tuesday": "Dienstag",
             "wednesday": "Mittwoch",
@@ -21,6 +24,9 @@ let x = {
             "saturday": "Samstag",
             "sunday": "Sonntag",
             "every": "Täglich",
+            "weekdays": "Wochentags",
+            "weekends": "Am Wochenende",
+            "month_end": "Monatsende",
             "cron_translation_function": /*SFN*/(mday: number, wday: number, hour: number, minute: number) => {
                 const wdays = [
                     "Sonntags",
@@ -35,10 +41,22 @@ let x = {
 
                 let ret = "";
                 if (mday != -1) {
-                    ret += "Jeden " + mday + ". des Monats";
+                    if (mday == 32) {
+                        ret += "Am letzten Tag des Monats";
+                    } else {
+                        ret += "Jeden " + mday + ". des Monats";
+                        if (mday >= 29) {
+                            ret += " (wird nur in Monaten mit " + mday + " Tagen ausgeführt)";
+                        }
+                    }
+                } else if (wday == 8) {
+                    ret += "Wochentags";
+                } else if (wday == 9) {
+                    ret += "Am Wochenende";
                 } else if (wday != -1) {
                     ret += wdays[wday];
-                } else {
+                }
+                else {
                     ret += "Täglich";
                 }
 
@@ -63,11 +81,7 @@ let x = {
                 }
 
                 return ret + ", ";
-            }/*NF*/,
-            "live_date": "Aktuelle Zeit der Echtzeituhr",
-            "set_time": "Zeit setzen",
-            "enable_auto_sync": "Automatische Synchronisierung",
-            "auto_sync_desc": "Setzt die Zeit der Echtzeituhr automatisch, wenn das Webinterface geladen wird und keine NTP-Synchronisierung besteht."
+            }/*NF*/
         },
         "script": {
             "save_failed": "Speichern der Echtzeituhr-Einstellungen fehlgeschlagen.",

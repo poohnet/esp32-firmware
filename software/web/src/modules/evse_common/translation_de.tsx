@@ -54,7 +54,6 @@ let x = {
             "lock_opening": "Öffnend",
             "lock_error": "Fehler",
             "time_since_state_change": "Zeit seit Zustandswechsel",
-            "state_change": "Fahrzeugstatus gewechselt auf",
             "uptime": "Laufzeit",
             "configuration": "Hardware-Konfiguration",
             "has_lock_switch": "Kabelverriegelung vorhanden",
@@ -77,7 +76,6 @@ let x = {
             "led_state_flickering": "Flackernd",
             "led_state_breathing": "Atmend",
             "led_state_api": "API",
-            "led_duration": "Dauer",
             "cp_pwm_dc": "CP-PWM-Tastverhältnis",
             "adc_values": "ADC-Werte",
             "voltages": "Spannungen",
@@ -91,16 +89,11 @@ let x = {
             "debug_stop": "Stop+Download",
             "debug_description": "Ladeprotokoll erstellen",
             "debug_description_muted": "zur Diagnose bei Ladeproblemen",
-            "active_high": "Wenn geöffnet",
-            "active_low": "Wenn geschlossen",
-            "gpio_state": "Status",
             "gpio_out_high": "Hochohmig",
             "gpio_out_low": "Verbunden mit Masse",
             "gpio_out": "Konfigurierbarer Ausgang",
             "gpio_in": "Konfigurierbarer Eingang",
             "gpio_shutdown": "Abschalteingang",
-            "button_pressed": "Drücken des Tasters",
-            "button_released": "Loslassen des Tasters",
             "button_configuration": "Tastereinstellung",
 
             "auto_start_description": "Manuelle Ladefreigabe",
@@ -126,10 +119,6 @@ let x = {
 
             "enable_led_api": "Status-LED Steuerung",
             "enable_led_api_desc": "Erlaubt die externe Steuerung der Status-LED.",
-            "api_must_be_enabled": "Die API muss aktiviert sein, um die Status-LED steuern zu können.",
-            "cron_state_change_trigger": /*FFN*/(state: string) => <>Wenn der Ladecontroller in den Zustand "<b>{state}</b>" wechselt,{" "}</>/*NF*/,
-            "cron_action_text": /*FFN*/(current: number) => <>setze den erlaubten Ladestrom auf <b>{current} A</b>.</>/*NF*/,
-            "cron_led_action_text": /*FFN*/(state: string, duration: number) => (state == "An" || state == "Aus") ? <>schalte die Status-LED für <b>{duration / 1000} Sekunden</b> <b>{state}</b>.</> : <>zeige <b>{state}</b> für <b>{duration / 1000} Sekunden</b> auf der Status-LED.</>/*NF*/,
 
             "slot": /*SFN*/(i: number) => { return {
                 0: "Zuleitung",
@@ -217,11 +206,6 @@ let x = {
             "trigger_dc_fault_test": "DC-Fehlerschutz testen",
             "time_since_dc_fault_check": "Zeit seit dem letzten DC-Fehlerschutztest",
 
-            "cron_sd_trigger_text": /*FFN*/(state: boolean) => <>Wenn der Abschalteingang <b>{state ? "geöffnet" : "geschlossen"}</b> wird,{" "}</>/*NF*/,
-            "cron_gpin_trigger_text": /*FFN*/(state: boolean) => <>Wenn der Konfigurierbare Eingang <b>{state ? "geöffnet" : "geschlossen"}</b> wird,{" "}</>/*NF*/,
-            "cron_button_trigger_text": /*FFN*/(state: boolean) => <>Wenn der Fronttaster <b>{state ? "gedrückt" : "losgelassen"}</b> wird,{" "}</>/*NF*/,
-            "cron_gpout_action_text": /*FFN*/(state: number) => state ? <><b>schalte</b> den Konfigurierbaren Ausgang <b>hochohmig</b>.</> : <><b>verbinde</b> den Konfigurierbaren Ausgang <b>mit Masse</b>.</>/*NF*/,
-
             // EVSE version specific value for common placeholder
             "error_2": /*SFN*/(is_evse_v2: boolean) => is_evse_v2 ? "DC-Fehlerstromschutz" : "Kalibrierung"  /*NF*/,
             "adc_names": /*FFN*/(is_evse_v2: boolean) => is_evse_v2 ? <>CP/PE vor Widerstand (PWM High), CP/PE nach Widerstand (PWM High)<br/>CP/PE vor Widerstand (PWM Low), CP/PE nach Widerstand (PWM Low)<br/>PP/PE, +12V Rail<br/>-12V Rail</> : <>CP/PE, PP/PE</> /*NF*/,
@@ -234,6 +218,33 @@ let x = {
             "phases_status": "Status der Phasenumschaltung",
             "switch_to_one_phase": "Umschalten auf einphasig",
             "switch_to_three_phases": "Umschalten auf dreiphasig"
+        },
+        "cron" : {
+            "external_current_wd": "Externer Steuerungs Watchdog",
+            "external_current_wd_trigger": "Wenn der Watchdog der Externen steuerung auslöst, ",
+            "api_must_be_enabled": "Die API muss aktiviert sein, um die Status-LED steuern zu können.",
+            "state_change": "Fahrzeugstatus gewechselt",
+            "cron_sd_trigger_text": /*FFN*/(state: boolean) => <>Wenn der Abschalteingang <b>{state ? "geöffnet" : "geschlossen"}</b> wird,{" "}</>/*NF*/,
+            "cron_gpin_trigger_text": /*FFN*/(state: boolean) => <>Wenn der Konfigurierbare Eingang <b>{state ? "geöffnet" : "geschlossen"}</b> wird,{" "}</>/*NF*/,
+            "cron_button_trigger_text": /*FFN*/(state: boolean) => <>Wenn der Fronttaster <b>{state ? "gedrückt" : "losgelassen"}</b> wird,{" "}</>/*NF*/,
+            "cron_gpout_action_text": /*FFN*/(state: number) => state ? <><b>schalte</b> den Konfigurierbaren Ausgang <b>hochohmig</b>.</> : <><b>verbinde</b> den Konfigurierbaren Ausgang <b>mit Masse</b>.</>/*NF*/,
+            "led_duration": "Dauer",
+            "led_state": "LED-Zustand",
+            "led_state_off": "Aus",
+            "led_state_on": "An",
+            "led_state_blinking": "Bestätigendes Blinken",
+            "led_state_flickering": "Ablehnendes Blinken",
+            "led_state_breathing": "Auffordendes Blinken",
+            "led_state_error": /*SFN*/(count: number) => {
+                return "Blinken (" + count + "x)";
+            }/*NF*/,
+            "from": "Von",
+            "to": "Zu",
+            "any": "Beliebiger status",
+            "allowed_charging_current": "Erlaubter Ladestrom",
+            "cron_state_change_trigger": /*FFN*/(old_state: string, new_state: string) => <>Wenn der Ladecontroller vom Zustand "<b>{old_state}</b>" auf Zustand "<b>{new_state}</b>" wechselt,{" "}</>/*NF*/,
+            "cron_action_text": /*FFN*/(current: number) => <>setze den erlaubten Ladestrom auf <b>{current} A</b>.</>/*NF*/,
+            "cron_led_action_text": /*FFN*/(state: string, duration: number) => (state == "An" || state == "Aus") ? <>schalte die Status-LED für <b>{duration / 1000} Sekunden</b> <b>{state}</b>.</> : <>zeige <b>{state}</b> für <b>{duration / 1000} Sekunden</b> auf der Status-LED.</>/*NF*/
         },
         "script": {
             "error_code": "Fehlercode",

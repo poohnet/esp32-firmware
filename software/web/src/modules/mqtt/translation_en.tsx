@@ -23,13 +23,6 @@ let x = {
             "username_muted": "optional",
             "password": "Broker password",
             "password_muted": "optional",
-            "topic": "Topic",
-            "payload": "Message",
-            "retain": "Retain message",
-            "accept_retain": "Accept retained messages",
-            "use_topic_prefix": "Use topic prefix",
-            "use_topic_prefix_muted": "The topic prefix is ",
-            "use_topic_prefix_invalid": "The topic prefix must not be a part of the topic",
             "topic_prefix": "Topic prefix",
             "topic_prefix_muted": "optional",
             "topic_prefix_invalid": "The topic prefix can not start with $ or contain a # or +.",
@@ -42,18 +35,35 @@ let x = {
             "auto_discovery_mode_generic": "Generic",
             "auto_discovery_mode_homeassistant": "Home Assistant",
             "auto_discovery_prefix": "Discovery topic prefix",
-            "auto_discovery_prefix_invalid": "The topic prefix can not start with $, contain a # or +, or be empty.",
-            "yes": "Yes",
-            "no": "No",
-
+            "auto_discovery_prefix_invalid": "The topic prefix can not start with $, contain a # or +, or be empty."
+        },
+        "cron": {
+            "mqtt": "MQTT",
+            "match_all": "Accept all messages",
+            "full_topic": "Full Topic",
+            "send_topic": "To topic",
+            "send_payload": "Message",
+            "topic": "Topic",
+            "payload": "Message",
+            "retain": "Retain message",
+            "accept_retain": "Accept retained messages",
+            "use_topic_prefix": "Use topic prefix",
+            "use_topic_prefix_muted": "The topic prefix is ",
+            "use_topic_prefix_invalid": "The topic prefix must not be a part of the topic",
             "cron_action_text": /*FFN*/(topic: string, payload: string, retain: boolean) => {
                 return <>
                     send MQTT message '<b>{payload}</b>' to topic '<b>{topic}</b>'{retain ? " and retain it." : "."}
                 </>
             }/*NF*/,
             "cron_trigger_text": /*FFN*/(topic: string, payload: string, retained: boolean) => {
+                let ret = <></>;
+                if (payload.length == 0) {
+                    ret = <>If any MQTT message</>;
+                } else {
+                    ret = <>If  MQTT message '<b>{payload}</b>'</>;
+                }
                 return <>
-                    If MQTT message '<b>{payload}</b>' is received on topic '<b>{topic}</b>' {retained ? "(Retained messages are accepted)" : ""} {", "}
+                    {ret} is received on topic '<b>{topic}</b>'{retained ? " (Retained messages are accepted)" : ""}{", "}
                 </>
             }/*NF*/,
             "cron_trigger_mqtt": "MQTT message received"

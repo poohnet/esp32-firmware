@@ -24,12 +24,13 @@ import * as API from "../../ts/api";
 
 import { Fragment, render, h, ComponentChild, toChildArray } from "preact";
 import { ConfigComponent } from "../../ts/components/config_component";
+import { Table, TableRow } from "../../ts/components/table";
 import { ConfigForm } from "../../ts/components/config_form";
-import { Table, TableModalRow, TableRow } from "../../ts/components/table";
 import { InputSelect } from "../../ts/components/input_select";
+import { FormRow } from "../../ts/components/form_row";
 import { __ } from "../../ts/translation";
 import { CronTriggerID, CronActionID } from "./cron_defs";
-import { CronAction, CronTrigger, Task, CronTriggerComponents, CronActionComponents } from "./types";
+import { Task, CronTriggerComponents, CronActionComponents } from "./types";
 import { plugins_init } from "./plugins";
 import { SubPage } from "src/ts/components/sub_page";
 
@@ -59,18 +60,6 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
              });
     }
 
-    setTriggerFromComponent(update: CronTrigger) {
-        let edit_task = this.state.edit_task;
-        edit_task.trigger = update;
-        this.setState({edit_task: edit_task});
-    }
-
-    setActionFromComponent(update: CronAction) {
-        let edit_task = this.state.edit_task;
-        edit_task.action = update;
-        this.setState({edit_task: edit_task});
-    }
-
     createSelectors() {
         let trigger: [string, string][] = [];
         for (let i in cron_trigger_components) {
@@ -88,54 +77,70 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
             action.push(entry);
         }
 
-        let triggerSelector: TableModalRow[] = [{
-            name: __("cron.content.condition"),
-            value: <InputSelect
-                        required
-                        placeholder={__("cron.content.select")}
-                        items={trigger}
-                        onValue={(v) => {
-                            this.setState({
-                                displayed_trigger: parseInt(v),
-                                edit_task: {
-                                    trigger: cron_trigger_components[parseInt(v)].new_config(),
-                                    action: this.state.edit_task.action
-                                }
-                            })
-                        }}
-                        value={this.state.displayed_trigger.toString()}/>
-        }];
+        let triggerSelector: ComponentChild[] = [
+            <FormRow label={__("cron.content.condition")}>
+                <InputSelect
+                    required
+                    placeholder={__("cron.content.select")}
+                    items={trigger}
+                    onValue={(v) => {
+                        this.setState({
+                            displayed_trigger: parseInt(v),
+                            edit_task: {
+                                trigger: cron_trigger_components[parseInt(v)].new_config(),
+                                action: this.state.edit_task.action
+                            }
+                        })
+                    }}
+                    value={this.state.displayed_trigger.toString()} />
+            </FormRow>
+        ];
+
         if (this.state.displayed_trigger != CronTriggerID.None) {
-            const trigger_config = cron_trigger_components[this.state.displayed_trigger].get_edit_children(this, this.state.edit_task.trigger);
+            const trigger_config = cron_trigger_components[this.state.displayed_trigger].get_edit_children(this.state.edit_task.trigger, (trigger) => {
+                this.setState({edit_task: {...this.state.edit_task, trigger: trigger}});
+            });
             triggerSelector = triggerSelector.concat(toChildArray(trigger_config));
         }
-        triggerSelector = triggerSelector.concat({name: null, value: <hr/>});
 
-        let actionSelector: TableModalRow[] = [{
-            name: __("cron.content.action"),
-            value: <>
-            <InputSelect
-                        required
-                        placeholder={__("cron.content.select")}
-                        items={action}
-                        onValue={(v) => {
-                            this.setState({
-                                displayed_action: parseInt(v),
-                                edit_task: {
-                                    trigger: this.state.edit_task.trigger,
-                                    action: cron_action_components[parseInt(v)].new_config()
-                                }
-                            });
-                        }}
-                        value={this.state.displayed_action.toString()}/></>
-        }]
+        triggerSelector = triggerSelector.concat(<hr/>);
+
+        let actionSelector: ComponentChild[] = [
+            <FormRow label={__("cron.content.action")}>
+                <InputSelect
+                    required
+                    placeholder={__("cron.content.select")}
+                    items={action}
+                    onValue={(v) => {
+                        this.setState({
+                            displayed_action: parseInt(v),
+                            edit_task: {
+                                trigger: this.state.edit_task.trigger,
+                                action: cron_action_components[parseInt(v)].new_config()
+                            }
+                        });
+                    }}
+                    value={this.state.displayed_action.toString()} />
+            </FormRow>
+        ];
 
         if (this.state.displayed_action != CronActionID.None) {
-            const action_config = cron_action_components[this.state.displayed_action].get_edit_children(this, this.state.edit_task.action);
+            const action_config = cron_action_components[this.state.displayed_action].get_edit_children(this.state.edit_task.action, (action) => {
+                this.setState({edit_task: {...this.state.edit_task, action: action}});
+            });
             actionSelector = actionSelector.concat(toChildArray(action_config));
         }
 
-        return triggerSelector.concat(actionSelector);
+        const preview = [];
+        const trigger_children = cron_trigger_components[this.state.displayed_trigger];
+        if (trigger_children) {
+            preview.push(trigger_children.get_table_children(this.state.edit_task.trigger));
+        }
+        const action_children = cron_action_components[this.state.displayed_action];
+        if (action_children) {
+            preview.push(action_children.get_table_children(this.state.edit_task.action));
+        }
+        return triggerSelector.concat(actionSelector).concat(<hr/>).concat(<div class="pb-3">{preview}</div>);
     }
 
     assembleTable() {
@@ -172,9 +177,7 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
                         }
                     });
                 },
-                onEditGetRows: () => {
-                    return this.createSelectors();
-                },
+                onEditGetChildren: () => this.createSelectors(),
                 onEditSubmit: async () => {
                     this.setState({tasks: this.state.tasks.map((task, k) => k === idx ? this.state.edit_task : task)});
                     this.setDirty(true);
@@ -223,9 +226,7 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
                             }
                         });
                     }}
-                    onAddGetRows={() => {
-                        return this.createSelectors()
-                    }}
+                    onAddGetChildren={() => this.createSelectors()}
                     onAddSubmit={async () => {
                         this.setState({tasks: this.state.tasks.concat([this.state.edit_task])});
                         this.setDirty(true);

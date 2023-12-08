@@ -30,6 +30,15 @@ triggers = [
     ('Charge Limits', 6),
     ('EVSE Shutdown Input', 7),
     ('EVSE GP Input', 8),
+    ('EVSE External Current Wd', 9),
+    ('Require Meter', 10),
+    ('Charge Manager Wd', 11),
+    ('EM Input Three', 12),
+    ('EM Input Four', 13),
+    ('EM Phase Switch', 14),
+    ('EM Contactor Monitoring', 15),
+    ('EM Power Available', 16),
+    ('EM Grid Power Draw', 17),
 ]
 
 # NEVER EVER EDIT OR REMOVE IDS. Only append new ones. Changing or removing IDs is a breaking API and config change!
@@ -44,6 +53,12 @@ actions = [
     ('NFC Inject Tag', 7),
     ('Charge Limits', 8),
     ('EVSE GP Output', 9),
+    ('Charge Tracker Reset', 10),
+    ('EM Phase Switch', 11),
+    ('EM Charge Mode Switch', 12),
+    ('EM Relay Switch', 13),
+    ('EM Limit Max Current', 14),
+    ('EM Block Charge', 15),
 ]
 
 trigger_values = []

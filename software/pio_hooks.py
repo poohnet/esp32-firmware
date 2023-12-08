@@ -454,6 +454,7 @@ def main():
     build_flags = env.GetProjectOption("build_flags")
     frontend_debug = env.GetProjectOption("custom_frontend_debug") == "true"
     web_only = env.GetProjectOption("custom_web_only") == "true"
+    web_build_flags = env.GetProjectOption("custom_web_build_flags")
     monitor_speed = env.GetProjectOption("monitor_speed")
     nightly = "-DNIGHTLY" in build_flags
 
@@ -603,6 +604,12 @@ def main():
         'frontend_modules': [frontend_module.under for frontend_module in frontend_modules]
     }, separators=(',', ':'))
 
+    web_build_lines = []
+    for web_build_flag in web_build_flags.split('\n'):
+        web_build_lines.append(f'export const {web_build_flag};')
+
+    util.write_file_if_different(os.path.join('web', 'src', 'build.ts'), '\n'.join(web_build_lines))
+
     # Handle backend modules
     excluded_backend_modules = list(os.listdir('src/modules'))
     backend_modules = [util.FlavoredName(x).get() for x in env.GetProjectOption("custom_backend_modules").splitlines()]
@@ -717,24 +724,38 @@ def main():
 
         if os.path.exists(os.path.join(mod_path, 'api.ts')):
             with open(os.path.join(mod_path, 'api.ts'), 'r', encoding='utf-8') as f:
-                content = f.read()
+                content = f.readlines()
 
             api_path = frontend_module.under + "/"
 
-            api_match = api_path_pattern.match(content)
-            if api_match is not None:
-                api_path = api_match.group(1).strip()
+            found_api_exports = False
 
-            api_exports = exported_interface_pattern.findall(content) + exported_type_pattern.findall(content)
-            if len(api_exports) != 0:
+            for line in content:
+                match = api_path_pattern.match(line)
+                if match is not None:
+                    api_path = match.group(1).strip()
+                    continue
+
+                match = exported_interface_pattern.match(line)
+                if match is None:
+                    match = exported_type_pattern.match(line)
+                    if match is None:
+                        continue
+
+                found_api_exports = True
+
+                type_ = match.group(1)
+                api_suffix = type_.split("___")[0]
+
+                api_config_map_entries.append("'{}{}': module_{}.{},".format(api_path, api_suffix, module_counter, type_))
+                api_cache_entries.append("'{}{}': null as any,".format(api_path, api_suffix))
+                api_cache_entries.append("'{}{}_modified': null as any,".format(api_path, api_suffix))
+
+            if found_api_exports:
                 api_module = "module_{}".format(module_counter)
                 module_counter += 1
 
                 api_imports.append("import * as {} from '../modules/{}/api';".format(api_module, frontend_module.under))
-
-                api_config_map_entries += ["'{}{}': {}.{},".format(api_path, x, api_module, x) for x in api_exports]
-                api_cache_entries += ["'{}{}': null as any,".format(api_path, x) for x in api_exports]
-                api_cache_entries += ["'{}{}_modified': null as any,".format(api_path, x) for x in api_exports]
 
         for phase, scss_paths in [('pre', pre_scss_paths), ('post', post_scss_paths)]:
             scss_path = os.path.join(mod_path, phase + '.scss')

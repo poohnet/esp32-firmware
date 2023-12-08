@@ -62,7 +62,12 @@ let x = {
     },
     "meter": {
         "status": {
-            "charge_history": "Ladeverlauf"
+            "power_history": "Ladeverlauf"
+        }
+    },
+    "meters": {
+        "status": {
+            "power_history": "Ladeverlauf"
         }
     }
 }
