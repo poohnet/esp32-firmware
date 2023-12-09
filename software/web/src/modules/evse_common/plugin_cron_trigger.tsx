@@ -17,7 +17,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-import { h } from "preact";
+import { h, ComponentChildren } from "preact";
 import { __ } from "../../ts/translation";
 import { CronTriggerID } from "../cron/cron_defs";
 import { CronTrigger } from "../cron/types";
@@ -35,7 +35,7 @@ export type IECChangeCronTrigger = [
 
 export type EVSEEexternalCurrentWdCronTrigger = [
     CronTriggerID.EVSEExternalCurrentWd,
-    {}
+    {},
 ];
 
 function new_iec_change_config(): CronTrigger {
@@ -55,8 +55,8 @@ function get_iec_change_table_children(trigger: IECChangeCronTrigger) {
         [__("evse.status.waiting_for_charge_release")],
         [__("evse.status.ready_to_charge")],
         [__("evse.status.charging")],
-        [__("evse.status.error")]
-    ]
+        [__("evse.status.error")],
+    ];
 
     return __("evse.cron.cron_state_change_trigger")(names[trigger[1].old_charger_state + 1][0], names[trigger[1].new_charger_state + 1][0]);
 }
@@ -71,12 +71,13 @@ function get_iec_change_edit_children(trigger: IECChangeCronTrigger, on_trigger:
                     ["1", __("evse.status.waiting_for_charge_release")],
                     ["2", __("evse.status.ready_to_charge")],
                     ["3", __("evse.status.charging")],
-                    ["4", __("evse.status.error")]
+                    ["4", __("evse.status.error")],
                 ]}
                 value={trigger[1].old_charger_state.toString()}
                 onValue={(v) => {
                     on_trigger(util.get_updated_union(trigger, {old_charger_state: parseInt(v)}));
-                }} />
+                }}
+            />
         </FormRow>,
         <FormRow label={__("evse.cron.to")}>
             <InputSelect
@@ -86,14 +87,15 @@ function get_iec_change_edit_children(trigger: IECChangeCronTrigger, on_trigger:
                     ["1", __("evse.status.waiting_for_charge_release")],
                     ["2", __("evse.status.ready_to_charge")],
                     ["3", __("evse.status.charging")],
-                    ["4", __("evse.status.error")]
+                    ["4", __("evse.status.error")],
                 ]}
                 value={trigger[1].new_charger_state.toString()}
                 onValue={(v) => {
                     on_trigger(util.get_updated_union(trigger, {new_charger_state: parseInt(v)}));
-                }} />
-        </FormRow>
-    ]
+                }}
+            />
+        </FormRow>,
+    ];
 }
 
 function new_external_current_wd_config(): CronTrigger {
@@ -107,7 +109,7 @@ function get_external_current_wd_table_children(_: EVSEEexternalCurrentWdCronTri
     return __("evse.cron.external_current_wd_trigger");
 }
 
-function get_external_current_wd_edit_children(_: EVSEEexternalCurrentWdCronTrigger, __: (trigger: CronTrigger) => void): h.JSX.Element[] {
+function get_external_current_wd_edit_children(_: EVSEEexternalCurrentWdCronTrigger, __: (trigger: CronTrigger) => void): ComponentChildren {
     return []
 }
 

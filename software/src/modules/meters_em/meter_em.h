@@ -45,6 +45,8 @@ public:
     bool supports_energy_import() override {return true;}
     bool supports_energy_export() override {return true;}
     bool supports_currents()      override {return true;}
+    bool supports_reset()         override {return true;}
+    bool reset()                  override;
 
     void update_from_em_all_data(EnergyManagerAllData &all_data);
 private:
@@ -56,8 +58,7 @@ private:
 
     uint32_t meter_type = METER_TYPE_NONE;
     uint32_t value_index_power  = UINT32_MAX;
-    uint32_t value_index_import = UINT32_MAX;
-    uint32_t value_index_export = UINT32_MAX;
+    uint32_t value_index_current[3] = {UINT32_MAX, UINT32_MAX, UINT32_MAX};
 
     bool meter_change_warning_printed = false;
 };

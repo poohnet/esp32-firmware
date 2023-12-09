@@ -18,7 +18,7 @@
  */
 
 import { h, Context, Fragment, ComponentChildren } from "preact";
-import { useContext, useRef, useState } from "preact/hooks";
+import { useContext, useRef } from "preact/hooks";
 import { JSXInternal } from "preact/src/jsx";
 import { Button } from "react-bootstrap";
 import { ArrowLeft, ArrowRight } from "react-feather";
@@ -44,7 +44,7 @@ export function InputDate(props: InputDateProps) {
         let [y, mIdx, d] = value.split(/-/g).map(x => parseInt(x));
 
         return new Date(y, mIdx - 1, d);
-    }
+    };
 
     let inner =
         <>

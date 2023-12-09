@@ -82,7 +82,8 @@ function get_em_input_three_edit_children(trigger: EMInputThreeCronTrigger, on_t
                 ]}
                 onValue={(v) => {
                     on_trigger(util.get_updated_union(trigger, {state: v === '1'}));
-                }} />
+                }}
+            />
         </FormRow>,
     ];
 }
@@ -91,8 +92,8 @@ function new_em_input_three_config(): CronTrigger {
     return [
         CronTriggerID.EMInputThree,
         {
-            state: false
-        }
+            state: false,
+        },
     ];
 }
 
@@ -120,8 +121,8 @@ function new_em_input_four_config(): CronTrigger {
     return [
         CronTriggerID.EMInputFour,
         {
-            state: false
-        }
+            state: false,
+        },
     ];
 }
 
@@ -149,8 +150,8 @@ function new_em_phase_switch_config(): CronTrigger {
     return [
         CronTriggerID.EMPhaseSwitch,
         {
-            phase: 1
-        }
+            phase: 1,
+        },
     ];
 }
 
@@ -178,8 +179,8 @@ function new_em_contactor_monitoring_config(): CronTrigger {
     return [
         CronTriggerID.EMContactorMonitoring,
         {
-            contactor_okay: false
-        }
+            contactor_okay: false,
+        },
     ];
 }
 
@@ -207,8 +208,8 @@ function new_em_power_available_config(): CronTrigger {
     return [
         CronTriggerID.EMPowerAvailable,
         {
-            power_available: false
-        }
+            power_available: false,
+        },
     ];
 }
 
@@ -236,8 +237,8 @@ function new_em_grid_power_draw_config(): CronTrigger {
     return [
         CronTriggerID.EMGridPowerDraw,
         {
-            drawing_power: false
-        }
+            drawing_power: false,
+        },
     ];
 }
 
@@ -286,6 +287,6 @@ export function init() {
                 get_table_children: get_em_grid_power_draw_table_children,
                 get_edit_children: get_em_grid_power_draw_edit_children,
             },
-        }
-    }
+        },
+    };
 }

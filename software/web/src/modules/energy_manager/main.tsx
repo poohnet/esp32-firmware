@@ -35,8 +35,6 @@ import { IndicatorGroup  } from "../../ts/components/indicator_group";
 import { InputFloat      } from "../../ts/components/input_float";
 import { InputNumber     } from "../../ts/components/input_number";
 import { InputSelect     } from "../../ts/components/input_select";
-import { InputTime       } from "../../ts/components/input_time";
-import { InputText       } from "../../ts/components/input_text";
 import { Switch          } from "../../ts/components/switch";
 import { SubPage         } from "../../ts/components/sub_page";
 import { MeterConfig     } from "../meters/types";
@@ -209,14 +207,13 @@ export class EnergyManagerStatus extends Component {
     }
 }
 
-render(<EnergyManagerStatus/>, $('#status-energy_manager')[0])
+render(<EnergyManagerStatus />, $("#status-energy_manager")[0]);
 
 export class EnergyManager extends ConfigComponent<'energy_manager/config', {}, API.getType['energy_manager/debug_config'] & {meter_configs: {[meter_slot: number]: MeterConfig}}> {
     old_input4_rule_then = -1;
 
     // Need to use any here in case the cron module is not available.
     cron_config: any;
-
 
     constructor() {
         super('energy_manager/config',

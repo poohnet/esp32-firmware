@@ -148,7 +148,7 @@ export function toLocaleFixed(i: number, fractionDigits?: number) {
 
     return i.toLocaleString(undefined, {
         minimumFractionDigits: fractionDigits,
-        maximumFractionDigits: fractionDigits
+        maximumFractionDigits: fractionDigits,
     });
 }
 
@@ -208,8 +208,7 @@ export function addApiEventListener<T extends keyof API.EventMap>(type: T, liste
 export function addApiEventListener_unchecked(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
     eventTarget.addEventListener_unchecked(type, callback, options);
     let api_cache_any = api_cache as any;
-    if (api_cache_any[type])
-    {
+    if (api_cache_any[type]) {
         API.trigger_unchecked(type, eventTarget);
     }
 }
@@ -287,7 +286,7 @@ export function setupEventSource(first: boolean, keep_as_first: boolean, continu
 
             allow_render.value = true;
         });
-    }
+    };
 
     continuation(ws, eventTarget);
 }
@@ -467,7 +466,7 @@ export function getShowRebootModalFn(changed_value_name: string) {
     return () => {
         $('#reboot_content_changed').html(changed_value_name);
         $('#reboot').modal('show');
-    }
+    };
 }
 
 function timestamp_to_date(timestamp: number, time_fmt: any) {
@@ -665,7 +664,7 @@ export function compareArrays(a: Array<any>, b: Array<any>): boolean
 
 // https://stackoverflow.com/a/1535650
 export let nextId = (function() {
-    var id = 0;
+    let id = 0;
     return function() {return "ID-" + (++id).toString();};
 })();
 

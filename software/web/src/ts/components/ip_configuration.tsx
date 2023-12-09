@@ -29,11 +29,11 @@ import { InputSelect } from "./input_select";
 import { InputSubnet } from "./input_subnet";
 
 export interface IPConfig {
-    ip: string,
-    gateway: string,
-    subnet: string,
-    dns?: string,
-    dns2?: string,
+    ip: string;
+    gateway: string;
+    subnet: string;
+    dns?: string;
+    dns2?: string;
 }
 
 interface IPConfigurationProps extends Omit<JSXInternal.HTMLAttributes<HTMLInputElement>,  "class" | "id" | "type" | "onInput" | "value" | "disabled"> {
@@ -55,10 +55,6 @@ interface IPConfigurationProps extends Omit<JSXInternal.HTMLAttributes<HTMLInput
 }
 
 export class IPConfiguration extends Component<IPConfigurationProps, {}> {
-    constructor() {
-        super();
-    }
-
     onUpdate<T extends keyof IPConfig>(k: T, v: IPConfig[T]) {
         this.props.value[k] = v;
         this.props.onValue(this.props.value);
@@ -89,9 +85,10 @@ export class IPConfiguration extends Component<IPConfigurationProps, {}> {
                 if (props.forbidNetwork) {
                     for (let net of props.forbidNetwork) {
                         let common_subnet = subnet & net.subnet;
-                        if ((ip & common_subnet) == (net.ip & common_subnet))
+                        if ((ip & common_subnet) == (net.ip & common_subnet)) {
                             captured_subnet_name = net.name;
                             captured_subnet_ip = unparseIP(net.ip);
+                        }
                     }
                 }
             }
@@ -184,13 +181,11 @@ export class IPConfiguration extends Component<IPConfigurationProps, {}> {
                             ["hide", __("component.ip_configuration.dhcp")],
                             ["show", __("component.ip_configuration.static")]
                         ]}
-                        />
+                    />
                 </FormRow>
 
                 <Collapse in={!dhcp}>
-                    <div>
-                        {inner}
-                    </div>
+                    <div>{inner}</div>
                 </Collapse>
             </>
         );

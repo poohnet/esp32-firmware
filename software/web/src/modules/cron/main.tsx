@@ -37,9 +37,9 @@ import { SubPage } from "src/ts/components/sub_page";
 const MAX_RULES = 20;
 
 type CronState = {
-    displayed_trigger: number,
-    displayed_action: number,
-    edit_task: Task,
+    displayed_trigger: number;
+    displayed_action: number;
+    edit_task: Task;
 };
 
 let cron_trigger_components: CronTriggerComponents = {};
@@ -89,11 +89,12 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
                             edit_task: {
                                 trigger: cron_trigger_components[parseInt(v)].new_config(),
                                 action: this.state.edit_task.action
-                            }
-                        })
+                            },
+                        });
                     }}
-                    value={this.state.displayed_trigger.toString()} />
-            </FormRow>
+                    value={this.state.displayed_trigger.toString()}
+                />
+            </FormRow>,
         ];
 
         if (this.state.displayed_trigger != CronTriggerID.None) {
@@ -103,7 +104,7 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
             triggerSelector = triggerSelector.concat(toChildArray(trigger_config));
         }
 
-        triggerSelector = triggerSelector.concat(<hr/>);
+        triggerSelector = triggerSelector.concat(<hr />);
 
         let actionSelector: ComponentChild[] = [
             <FormRow label={__("cron.content.action")}>
@@ -120,8 +121,9 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
                             }
                         });
                     }}
-                    value={this.state.displayed_action.toString()} />
-            </FormRow>
+                    value={this.state.displayed_action.toString()}
+                />
+            </FormRow>,
         ];
 
         if (this.state.displayed_action != CronActionID.None) {
@@ -154,7 +156,7 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
 
             const task_copy: Task = {
                 trigger: trigger_component.clone_config(task.trigger),
-                action: action_component.clone_config(task.action)
+                action: action_component.clone_config(task.action),
             };
             const trigger_children = trigger_component.get_table_children(task.trigger);
             const action_children = action_component.get_table_children(task.action);
@@ -163,7 +165,7 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
                 columnValues: [
                     [idx + 1],
                     [trigger_children],
-                    [action_children]
+                    [action_children],
                 ],
                 fieldNames: ["", ""],
                 fieldValues: [__("cron.content.rule") + " #" + (idx + 1) as ComponentChild, <div class="pb-3">{trigger_children}{action_children}</div>],
@@ -173,8 +175,8 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
                         displayed_action: task.action[0] as number,
                         edit_task: {
                             trigger: task_copy.trigger,
-                            action: task_copy.action
-                        }
+                            action: task_copy.action,
+                        },
                     });
                 },
                 onEditGetChildren: () => this.createSelectors(),
@@ -186,11 +188,11 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
                     this.setState({tasks: this.state.tasks.filter((_, k) => idx != k)})
                     this.setDirty(true);
                 },
-                editTitle: __("cron.content.edit_rule_title")
+                editTitle: __("cron.content.edit_rule_title"),
             };
             rows.push(row);
-        })
-        return rows
+        });
+        return rows;
     }
 
     render(props: {}, state: CronState) {

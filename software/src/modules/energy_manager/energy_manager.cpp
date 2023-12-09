@@ -414,10 +414,13 @@ void EnergyManager::setup()
     int32_t min_phases;
     if (phase_switching_mode == PHASE_SWITCHING_ALWAYS_1PHASE) {
         min_phases = 1;
+        max_phases = 1;
     } else if (phase_switching_mode == PHASE_SWITCHING_ALWAYS_3PHASE) {
         min_phases = 3;
+        max_phases = 3;
     } else { // automatic, external or PV1P/FAST3P
         min_phases = 1;
+        max_phases = 3;
     }
     if (min_phases < 3) {
         overall_min_power_w = static_cast<int32_t>(230 * 1 * min_current_1p_ma / 1000);
@@ -756,8 +759,7 @@ void EnergyManager::update_all_data_struct()
         &all_data.rgb_value_g,
         &all_data.rgb_value_b,
         &all_data.power,
-        &all_data.energy_import,
-        &all_data.energy_export,
+        all_data.current,
         &all_data.energy_meter_type,
         all_data.error_count,
         all_data.input,
@@ -1009,7 +1011,7 @@ void EnergyManager::update_energy()
 
         switch (mode) {
             case MODE_FAST:
-                power_available_w          = static_cast<int32_t>(230 * 3 * max_current_limited_ma / 1000);
+                power_available_w          = static_cast<int32_t>(230 * max_phases * max_current_limited_ma / 1000);
                 power_available_filtered_w = power_available_w;
                 break;
             case MODE_OFF:
@@ -1345,6 +1347,15 @@ uint16_t EnergyManager::get_energy_meter_detailed_values(float *ret_values)
     check_bricklet_reachable(rc, "get_energy_meter_detailed_values");
 
     return rc == TF_E_OK ? len : 0;
+}
+
+bool EnergyManager::reset_energy_meter_relative_energy()
+{
+    int rc = tf_warp_energy_manager_reset_energy_meter_relative_energy(&device);
+
+    check_bricklet_reachable(rc, "reset_energy_meter_relative_energy");
+
+    return rc == TF_E_OK;
 }
 
 void EnergyManager::set_output(bool output_value)

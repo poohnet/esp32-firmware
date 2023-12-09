@@ -18,10 +18,10 @@
  */
 
 import { h, Context, Fragment, ComponentChildren } from "preact";
-import { useContext, useRef, useState } from "preact/hooks";
+import { useContext, useRef } from "preact/hooks";
 import { JSXInternal } from "preact/src/jsx";
-import { Button } from "react-bootstrap";
-import { ArrowLeft, ArrowRight } from "react-feather";
+//import { Button } from "react-bootstrap";
+//import { ArrowLeft, ArrowRight } from "react-feather";
 
 import * as util from "../../ts/util";
 
@@ -43,7 +43,7 @@ export function InputTime(props: InputTimeProps) {
         let [h, m, s] = value.split(/:/g).map(x => parseInt(x));
 
         return new Date(0, 0, 1, h, m, s, 0);
-    }
+    };
 
     let inner =
         <>

@@ -18,7 +18,7 @@
  */
 
 import { __ } from "../translation";
-import { h, Component, Fragment, VNode, ComponentChild, ComponentChildren } from "preact";
+import { h, Component, Fragment, ComponentChild, ComponentChildren } from "preact";
 import { Card, Button, Collapse } from "react-bootstrap";
 import { Plus, Edit3, Trash2 } from "react-feather";
 import { FormRow } from "./form_row";
@@ -26,42 +26,42 @@ import { ItemModal } from "./item_modal";
 import * as util from "../../ts/util";
 
 export interface TableRow {
-    key?: string
-    columnValues: ComponentChild[]
-    extraShow?: boolean
-    extraFieldName?: string
-    extraValue?: ComponentChild
-    extraKey?: string
-    fieldNames?: string[]
-    fieldValues?: ComponentChild[]
-    fieldWithBox?: boolean[]
-    editTitle?: string
-    onEditShow?: () => Promise<void>
-    onEditGetChildren?: () => ComponentChildren
-    onEditCheck?: () => Promise<boolean>
-    onEditSubmit?: () => Promise<void>
-    onEditHide?: () => Promise<void>
-    onRemoveClick?: () => Promise<void>
+    key?: string;
+    columnValues: ComponentChild[];
+    extraShow?: boolean;
+    extraFieldName?: string;
+    extraValue?: ComponentChild;
+    extraKey?: string;
+    fieldNames?: string[];
+    fieldValues?: ComponentChild[];
+    fieldWithBox?: boolean[];
+    editTitle?: string;
+    onEditShow?: () => Promise<void>;
+    onEditGetChildren?: () => ComponentChildren;
+    onEditCheck?: () => Promise<boolean>;
+    onEditSubmit?: () => Promise<void>;
+    onEditHide?: () => Promise<void>;
+    onRemoveClick?: () => Promise<void>;
 }
 
 export interface TableProps {
-    columnNames: string[]
-    rows: TableRow[]
-    addEnabled?: boolean
-    addMessage?: string
-    addTitle?: string
-    onAddShow?: () => Promise<void>
-    onAddGetChildren?: () => ComponentChildren
-    onAddCheck?: () => Promise<boolean>
-    onAddSubmit?: () => Promise<void>
-    onAddHide?: () => Promise<void>
-    tableTill?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-    nestingDepth?: number
+    columnNames: string[];
+    rows: TableRow[];
+    addEnabled?: boolean;
+    addMessage?: string;
+    addTitle?: string;
+    onAddShow?: () => Promise<void>;
+    onAddGetChildren?: () => ComponentChildren;
+    onAddCheck?: () => Promise<boolean>;
+    onAddSubmit?: () => Promise<void>;
+    onAddHide?: () => Promise<void>;
+    tableTill?: "xs" | "sm" | "md" | "lg" | "xl";
+    nestingDepth?: number;
 }
 
 interface TableState {
-    showAddModal: boolean
-    showEditModal: number
+    showAddModal: boolean;
+    showEditModal: number;
 }
 
 const value_or_else = (value: ComponentChild, replacement: ComponentChild): ComponentChild => {
@@ -178,7 +178,7 @@ export class Table extends Component<TableProps, TableState> {
                 </table>
                 </Card.Body></Card>
 
-                <div class={`d-block d-${props.tableTill ? props.tableTill : 'sm'}-none` + " table-card-mode"}>
+                <div class={`d-block d-${props.tableTill ? props.tableTill : 'sm'}-none table-card-mode`}>
                     {props.rows.map((row, i) => {
                         let card_fields = this.get_card_fields(row);
                         let needs_body = card_fields.length > 0 || (row.extraValue && row.extraShow);

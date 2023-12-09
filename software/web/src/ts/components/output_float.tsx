@@ -20,17 +20,17 @@
 import * as util from "../util";
 
 import { h, Context } from "preact";
-import { useContext, useState } from "preact/hooks";
+import { useContext } from "preact/hooks";
 
 interface OutputFloatProps {
-    idContext?: Context<string>
-    value: number
-    digits: 0|1|2|3
-    scale: number
-    unit: string
-    maxFractionalDigitsOnPage?: number
-    maxUnitLengthOnPage?: number
-    small?: boolean
+    idContext?: Context<string>;
+    value: number;
+    digits: 0 | 1 | 2 | 3;
+    scale: number;
+    unit: string;
+    maxFractionalDigitsOnPage?: number;
+    maxUnitLengthOnPage?: number;
+    small?: boolean;
 }
 
 export function OutputFloat(props: OutputFloatProps) {
