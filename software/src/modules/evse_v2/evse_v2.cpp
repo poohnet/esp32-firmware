@@ -112,26 +112,6 @@ void EVSEV2::pre_setup()
         {"dc_fault_sensor_type", Config::Uint8(0)}
     });
 
-    energy_meter_values = Config::Object({
-        {"power", Config::Float(0)},
-        {"energy_rel", Config::Float(0)},
-        {"energy_abs", Config::Float(0)},
-        {"phases_active", Config::Array({Config::Bool(false),Config::Bool(false),Config::Bool(false)},
-            new Config{Config::Bool(false)},
-            3, 3, Config::type_id<Config::ConfBool>())},
-        {"phases_connected", Config::Array({Config::Bool(false),Config::Bool(false),Config::Bool(false)},
-            new Config{Config::Bool(false)},
-            3, 3, Config::type_id<Config::ConfBool>())}
-    });
-
-    energy_meter_errors = Config::Object({
-        {"local_timeout", Config::Uint32(0)},
-        {"global_timeout", Config::Uint32(0)},
-        {"illegal_function", Config::Uint32(0)},
-        {"illegal_data_access", Config::Uint32(0)},
-        {"illegal_data_value", Config::Uint32(0)},
-        {"slave_device_failure", Config::Uint32(0)},
-    });
 
     // Actions
 
@@ -401,8 +381,9 @@ String EVSEV2::get_evse_debug_header()
            "energy_meter_type,"
            "ENERGY METER,"
            "power,"
-           "energy_relative,"
-           "energy_absolute,"
+           "current_0,"
+           "current_1,"
+           "current_2,"
            "phase_0_active,"
            "phase_1_active,"
            "phase_2_active,"
@@ -505,8 +486,7 @@ String EVSEV2::get_evse_debug_line()
     uint8_t evse_version;
     uint8_t energy_meter_type;
     float power;
-    float energy_relative;
-    float energy_absolute;
+    float currents[3];
     bool phases_active[3];
     bool phases_connected[3];
     uint32_t error_count[6];
@@ -541,8 +521,7 @@ String EVSEV2::get_evse_debug_line()
                                        &evse_version,
                                        &energy_meter_type,
                                        &power,
-                                       &energy_relative,
-                                       &energy_absolute,
+                                       currents,
                                        phases_active,
                                        phases_connected,
                                        error_count);
@@ -586,7 +565,7 @@ String EVSEV2::get_evse_debug_line()
              "\"%lu,,"
              "%u,%u,%u,%u,%u,%u,%u,%u,,"
              "%u,%c,%u,%u,,"
-             "%.3f,%.3f,%.3f,%c,%c,%c,%c,%c,%c,,"
+             "%.3f,%.3f,%.3f,%.3f,%c,%c,%c,%c,%c,%c,,"
              "%u,%u,%u,%u,%u,%u,,"
              "%u,%u,%u,%u,%u,,"
              "%u,%u,%u,%u,%u,%u,%u,,"
@@ -610,8 +589,9 @@ String EVSEV2::get_evse_debug_line()
              energy_meter_type,
 
              power,
-             energy_relative,
-             energy_absolute,
+             currents[0],
+             currents[1],
+             currents[2],
              phases_active[0] ? '1' : '0',
              phases_active[1] ? '1' : '0',
              phases_active[2] ? '1' : '0',
@@ -769,8 +749,7 @@ void EVSEV2::update_all_data()
                                        &evse_version,
                                        &meter_data.meter_type,
                                        &meter_data.power,
-                                       &meter_data.energy_relative,
-                                       &meter_data.energy_absolute,
+                                       meter_data.currents,
                                        meter_data.phases_active,
                                        meter_data.phases_connected,
                                        meter_data.error_count);
@@ -950,29 +929,6 @@ void EVSEV2::update_all_data()
     evse_common.auto_start_charging.get("auto_start_charging")->updateBool(
         !evse_common.slots.get(CHARGING_SLOT_AUTOSTART_BUTTON)->get("clear_on_disconnect")->asBool());
 
-
-    // TODO: Remove meter values and errors? Also remove meter type?
-    if (meter_data.meter_type != 0) {
-        // get_energy_meter_values
-        energy_meter_values.get("power")->updateFloat(meter_data.power);
-        energy_meter_values.get("energy_rel")->updateFloat(meter_data.energy_relative);
-        energy_meter_values.get("energy_abs")->updateFloat(meter_data.energy_absolute);
-
-        for (int i = 0; i < 3; ++i)
-            energy_meter_values.get("phases_active")->get(i)->updateBool(meter_data.phases_active[i]);
-
-        for (int i = 0; i < 3; ++i)
-            energy_meter_values.get("phases_connected")->get(i)->updateBool(meter_data.phases_connected[i]);
-    }
-
-    // get_energy_meter_errors
-    energy_meter_errors.get("local_timeout")->updateUint(meter_data.error_count[0]);
-    energy_meter_errors.get("global_timeout")->updateUint(meter_data.error_count[1]);
-    energy_meter_errors.get("illegal_function")->updateUint(meter_data.error_count[2]);
-    energy_meter_errors.get("illegal_data_access")->updateUint(meter_data.error_count[3]);
-    energy_meter_errors.get("illegal_data_value")->updateUint(meter_data.error_count[4]);
-    energy_meter_errors.get("slave_device_failure")->updateUint(meter_data.error_count[5]);
-
     // get_gpio_configuration
     gpio_configuration.get("shutdown_input")->updateUint(shutdown_input_configuration);
     gpio_configuration.get("input")->updateUint(input_configuration);
@@ -1049,9 +1005,10 @@ uint16_t EVSEV2::get_all_energy_meter_values(float *ret_values)
     return len;
 }
 
-void EVSEV2::reset_energy_meter_relative_energy()
+bool EVSEV2::reset_energy_meter_relative_energy()
 {
     tf_evse_v2_reset_energy_meter_relative_energy(&device);
+    return true;
 }
 
 uint8_t EVSEV2::get_energy_meter_type()

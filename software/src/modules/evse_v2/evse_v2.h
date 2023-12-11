@@ -83,7 +83,7 @@ public:
     // End IEvseBackend implementation
 
     uint16_t get_all_energy_meter_values(float *ret_values);
-    void reset_energy_meter_relative_energy();
+    bool reset_energy_meter_relative_energy();
     uint8_t get_energy_meter_type();
 
     struct meter_data {
@@ -91,13 +91,10 @@ public:
         bool phases_connected[3];
         uint8_t meter_type;
         float power;
-        float energy_relative;
-        float energy_absolute;
+        float currents[3];
         uint32_t error_count[6];
     };
 
-    ConfigRoot energy_meter_values;
-    ConfigRoot energy_meter_errors;
 private:
     ConfigRoot reset_dc_fault_current_state;
     ConfigRoot gpio_configuration;

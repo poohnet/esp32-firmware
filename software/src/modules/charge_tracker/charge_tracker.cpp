@@ -57,7 +57,6 @@ static_assert(sizeof(ChargeEnd) == 16, "Unexpected size of ChargeEnd");
 
 static_assert(CHARGE_RECORD_SIZE == 32, "Unexpected size of ChargeStart + ChargeEnd");
 
-#define CHARGE_RECORD_FOLDER "/charge-records-2"
 // 30 files with 256 records each: 7680 records @ ~ max. 10 records per day = ~ 2 years and one month of records.
 #define CHARGE_RECORD_FILE_COUNT 30
 #define CHARGE_RECORD_MAX_FILE_SIZE 4096
