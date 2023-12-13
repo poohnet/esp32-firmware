@@ -36,6 +36,13 @@ static const MeterValueID legacy_values_ids[3] = {
     MeterValueID::EnergyActiveLSumImExSum,
 };
 
+static const MeterValueID value_ids_import_imex[4] = {
+    MeterValueID::EnergyActiveLSumImportResettable,
+    MeterValueID::EnergyActiveLSumImport,
+    MeterValueID::EnergyActiveLSumImExSumResettable,
+    MeterValueID::EnergyActiveLSumImExSum,
+};
+
 static const char *values_names[] = {
     "power",
     "energy_rel",
@@ -101,8 +108,6 @@ void MetersLegacyAPI::setup()
     });
     // END from old meter.cpp pre_setup()
 
-    api.restorePersistentConfig("meter/last_reset", &legacy_last_reset);
-
     // BEGIN from old api_meter.cpp pre_setup()
     legacy_state_update = Config::Object({
         {"state", Config::Uint8(0)}, // 0 - no energy meter, 1 - initialization error, 2 - meter available
@@ -146,7 +151,7 @@ void MetersLegacyAPI::register_urls()
     api.addState("meter/values", &legacy_values, {}, 1000);
     api.addState("meter/phases", &legacy_phases, {}, 1000);
     api.addState("meter/all_values", &legacy_all_values, {}, 1000);
-    // meter/last_reset registered in on_value_ids_change handler
+    api.addState("meter/last_reset", &legacy_last_reset, {}, 1000);
     // meter/error_counters registered in meters module
 
     api.addCommand("meter/reset", Config::Null(), {}, [this](){
@@ -287,6 +292,24 @@ static bool is_values_value(MeterValueID value_id)
     return false;
 }
 
+static bool indices_match_meter_indices(const bool all_values_present[], const uint32_t all_value_indices[], uint32_t all_value_indices_length)
+{
+    bool values_present[METER_ALL_VALUES_LEGACY_COUNT] = {false};
+    for (uint32_t i = 0; i < all_value_indices_length; i++) {
+        uint32_t index = all_value_indices[i];
+        if (index < ARRAY_SIZE(values_present))
+            values_present[index] = true;
+    }
+
+    for (uint32_t i = 0; i < METER_ALL_VALUES_LEGACY_COUNT; i++) {
+        if (values_present[i] != all_values_present[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 EventResult MetersLegacyAPI::on_value_ids_change(const Config *value_ids)
 {
     // ==== Fill index arrays ====
@@ -307,16 +330,43 @@ EventResult MetersLegacyAPI::on_value_ids_change(const Config *value_ids)
         meter_value_ids[i] = static_cast<MeterValueID>(value_ids->get(i)->asUint());
     }
 
-    fill_index_array(value_indices_legacy_values_to_linked_meter, legacy_values_ids, METER_VALUES_LEGACY_COUNT, meter_value_ids, linked_meter_value_count);
     fill_index_array(value_indices_legacy_all_values_to_linked_meter, sdm_helper_all_ids, METER_ALL_VALUES_LEGACY_COUNT, meter_value_ids, linked_meter_value_count);
+
+    // Get power index
+    fill_index_array(value_indices_legacy_values_to_linked_meter, legacy_values_ids, 1, meter_value_ids, linked_meter_value_count);
+
+    uint16_t value_indices_import_imex[ARRAY_SIZE(value_ids_import_imex)];
+    fill_index_array(value_indices_import_imex, value_ids_import_imex, ARRAY_SIZE(value_ids_import_imex), meter_value_ids, linked_meter_value_count);
+
+    bool use_imexsum = false;
+#if MODULE_EVSE_COMMON_AVAILABLE()
+    use_imexsum = evse_common.get_use_imexsum();
+#endif
+
+    if (use_imexsum) {
+        if (value_indices_import_imex[2] != UINT16_MAX) {
+            value_indices_legacy_values_to_linked_meter[1] = value_indices_import_imex[2];
+        } else {
+            value_indices_legacy_values_to_linked_meter[1] = value_indices_import_imex[0];
+        }
+
+        if (value_indices_import_imex[3] != UINT16_MAX) {
+            value_indices_legacy_values_to_linked_meter[2] = value_indices_import_imex[3];
+        } else {
+            value_indices_legacy_values_to_linked_meter[2] = value_indices_import_imex[1];
+        }
+    } else {
+            value_indices_legacy_values_to_linked_meter[1] = value_indices_import_imex[0];
+            value_indices_legacy_values_to_linked_meter[2] = value_indices_import_imex[1];
+    }
 
 
     // ==== Meter type detection ====
 
     bool all_values_present[METER_ALL_VALUES_LEGACY_COUNT];
     bool has_any_known_value = false;
-    uint32_t can_be_sdm72   = 1;
-    uint32_t can_be_sdm72v2 = 1;
+    uint32_t can_be_sdm72;
+    uint32_t can_be_sdm72v2;
     uint32_t can_be_sdm630  = 1;
 
     for (uint32_t i = 0; i < METER_ALL_VALUES_LEGACY_COUNT; i++) {
@@ -333,34 +383,12 @@ EventResult MetersLegacyAPI::on_value_ids_change(const Config *value_ids)
             MeterValueID value_id = meter_value_ids[value_index];
             if (!is_values_value(value_id)) {
                 has_all_values = true;
-                can_be_sdm72 = 0;
             }
         }
     }
 
-    if (can_be_sdm72) {
-        for (uint32_t i = 0; i < ARRAY_SIZE(value_indices_legacy_values_to_linked_meter); i++) {
-            if (value_indices_legacy_values_to_linked_meter[i] >= linked_meter_value_count) {
-                // Linked meter doesn't have this value.
-                can_be_sdm72 = 0;
-                break;
-            }
-        }
-    }
-
-    bool sdm72v2_values_present[METER_ALL_VALUES_LEGACY_COUNT] = {false};
-    for (uint32_t i = 0; i < ARRAY_SIZE(sdm_helper_72v2_all_value_indices); i++) {
-        uint32_t index = sdm_helper_72v2_all_value_indices[i];
-        if (index < ARRAY_SIZE(sdm72v2_values_present))
-            sdm72v2_values_present[index] = true;
-    }
-
-    for (uint32_t i = 0; i < METER_ALL_VALUES_LEGACY_COUNT; i++) {
-        if (sdm72v2_values_present[i] != all_values_present[i]) {
-            can_be_sdm72v2 = 0;
-            break;
-        }
-    }
+    can_be_sdm72   = indices_match_meter_indices(all_values_present, sdm_helper_72_all_value_indices,   ARRAY_SIZE(sdm_helper_72_all_value_indices));
+    can_be_sdm72v2 = indices_match_meter_indices(all_values_present, sdm_helper_72v2_all_value_indices, ARRAY_SIZE(sdm_helper_72v2_all_value_indices));
 
     uint32_t can_be_count = can_be_sdm72 + can_be_sdm72v2 + can_be_sdm630;
     uint32_t meter_type = METER_TYPE_NONE;
@@ -448,8 +476,6 @@ EventResult MetersLegacyAPI::on_value_ids_change(const Config *value_ids)
     String last_reset_path = meters.get_path(linked_meter_slot, Meters::PathType::LastReset);
     const Config *last_reset_config = api.getState(last_reset_path, false);
     if (last_reset_config) {
-        api.addState("meter/last_reset", &legacy_last_reset, {}, 1000);
-
         on_last_reset_change(last_reset_config);
 
         event.registerEvent(last_reset_path, {}, [this](Config *event_last_reset) {

@@ -40,8 +40,9 @@ import { MeterConfig, MeterConfigPlugin } from "./types";
 import { Table } from "../../ts/components/table";
 import { PageHeader } from "../../ts/components/page_header";
 import { plugins_init } from "./plugins";
-import { InputDate } from "src/ts/components/input_date";
-import { InputTime } from "src/ts/components/input_time";
+import { InputDate } from "../../ts/components/input_date";
+import { InputTime } from "../../ts/components/input_time";
+import { InputText } from "../../ts/components/input_text";
 
 const PHASE_CONNECTED_VOLTAGE_THRESHOLD = 180.0; // V
 const PHASE_ACTIVE_CURRENT_THRESHOLD = 0.3; // A
@@ -162,22 +163,8 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
             this.visible = false;
         });
 
-        let get_size = () => {
-            let div = this.div_ref.current;
-            let aspect_ratio = parseFloat(getComputedStyle(div).aspectRatio);
-
-            if (isNaN(aspect_ratio)) {
-                aspect_ratio = this.props.aspect_ratio;
-            }
-
-            return {
-                width: div.clientWidth,
-                height: Math.floor((div.clientWidth + (window.innerWidth - document.documentElement.clientWidth)) / aspect_ratio),
-            };
-        };
-
         let options = {
-            ...get_size(),
+            ...this.get_size(),
             pxAlign: 0,
             cursor: {
                 drag: {
@@ -345,29 +332,19 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
         let div = this.div_ref.current;
         this.uplot = new uPlot(options, [], div);
 
-        let resize = () => {
-            let size = get_size();
-
-            if (size.width == 0 || size.height == 0) {
-                return;
-            }
-
-            this.uplot.setSize(size);
-        };
-
         try {
             this.observer = new ResizeObserver(() => {
-                resize();
+                this.resize();
             });
 
             this.observer.observe(div);
         } catch (e) {
             setInterval(() => {
-                resize();
+                this.resize();
             }, 500);
 
             window.addEventListener("resize", e => {
-                resize();
+                this.resize();
             });
         }
 
@@ -379,6 +356,37 @@ class UplotWrapper extends Component<UplotWrapperProps, {}> {
     render(props?: UplotWrapperProps, state?: Readonly<{}>, context?: any): ComponentChild {
         // the plain div is neccessary to make the size calculation stable in safari. without this div the height continues to grow
         return <div><div ref={this.div_ref} id={props.id} class={props.class} style={`display: ${props.show ? 'block' : 'none'};`} /></div>;
+    }
+
+    resize() {
+        let size = this.get_size();
+
+        if (size.width == 0 || size.height == 0) {
+            return;
+        }
+
+        if (this.uplot) {
+            this.uplot.setSize(size);
+        }
+        else {
+            window.setTimeout(() => {
+                this.resize();
+            }, 100);
+        }
+    }
+
+    get_size() {
+        let div = this.div_ref.current;
+        let aspect_ratio = parseFloat(getComputedStyle(div).aspectRatio);
+
+        if (isNaN(aspect_ratio)) {
+            aspect_ratio = this.props.aspect_ratio;
+        }
+
+        return {
+            width: div.clientWidth,
+            height: Math.floor((div.clientWidth + (window.innerWidth - document.documentElement.clientWidth)) / aspect_ratio),
+        }
     }
 
     set_show(show: boolean) {
@@ -606,12 +614,11 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
     history_data: CachedData = {timestamps: [], samples: []};
     uplot_wrapper_live_ref = createRef();
     uplot_wrapper_history_ref = createRef();
-    status_ref: RefObject<MetersStatus> = null;
     value_ids: {[meter_slot: number]: Readonly<number[]>} = {};
     value_idx_by_id: {[meter_slot: number]: NumberToNumber} = {};
     values: {[meter_slot: number]: Readonly<number[]>} = {};
 
-    constructor(props: MetersProps) {
+    constructor() {
         super('meters/0/config',
               __("meters.script.save_failed"),
               __("meters.script.reboot_content_changed"), {
@@ -625,10 +632,7 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
                   editMeterSlot: null,
                   editMeter: [MeterClassID.None, null],
                   extraShow: new Array<boolean>(7),
-              },
-              props);
-
-        this.status_ref = props.status_ref;
+              });
 
         this.state.extraShow.fill(false);
 
@@ -897,14 +901,14 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
     }
 
     update_status_uplot() {
-        if (this.status_ref.current && this.status_ref.current.uplot_wrapper_ref.current) {
+        if (this.props.status_ref && this.props.status_ref.current && this.props.status_ref.current.uplot_wrapper_ref.current) {
             let status_data: UplotData = {
                 keys: [null],
                 names: [null],
                 values: [this.history_data.timestamps],
             };
 
-            let meter_slot = this.status_ref.current.state.meter_slot;
+            let meter_slot = this.props.status_ref.current.state.meter_slot;
 
             if (this.history_data.samples[meter_slot].length > 0) {
                 status_data.keys.push('meter_' + meter_slot);
@@ -912,7 +916,7 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
                 status_data.values.push(this.history_data.samples[meter_slot]);
             }
 
-            this.status_ref.current.uplot_wrapper_ref.current.set_data(status_data);
+            this.props.status_ref.current.uplot_wrapper_ref.current.set_data(status_data);
         }
     }
 
@@ -1012,18 +1016,29 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
                                 let energy_export: number = null;
                                 let phases: ["?"|"d"|"c"|"a", "?"|"d"|"c"|"a", "?"|"d"|"c"|"a"] = ["?", "?", "?"]; // [d]isconected, [c]onnected, [a]ctive
                                 let values_by_id = state.values_by_id[meter_slot];
+                                let highlighted_value_ids: number[] = [];
 
                                 if (util.hasValue(values_by_id)) {
                                     power = values_by_id[MeterValueID.PowerActiveLSumImExDiff];
+                                    highlighted_value_ids.push(MeterValueID.PowerActiveLSumImExDiff);
+
                                     energy_import = values_by_id[MeterValueID.EnergyActiveLSumImportResettable];
                                     energy_export = values_by_id[MeterValueID.EnergyActiveLSumExportResettable];
 
-                                    if (!util.hasValue(energy_import)) {
+                                    if (util.hasValue(energy_import)) {
+                                        highlighted_value_ids.push(MeterValueID.EnergyActiveLSumImportResettable);
+                                    }
+                                    else {
                                         energy_import = values_by_id[MeterValueID.EnergyActiveLSumImport];
+                                        highlighted_value_ids.push(MeterValueID.EnergyActiveLSumImport);
                                     }
 
-                                    if (!util.hasValue(energy_export)) {
+                                    if (util.hasValue(energy_export)) {
+                                        highlighted_value_ids.push(MeterValueID.EnergyActiveLSumExportResettable);
+                                    }
+                                    else {
                                         energy_export = values_by_id[MeterValueID.EnergyActiveLSumExport];
+                                        highlighted_value_ids.push(MeterValueID.EnergyActiveLSumExport);
                                     }
 
                                     let voltage_L1 = values_by_id[MeterValueID.VoltageL1N];
@@ -1093,14 +1108,28 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
                                     meter_is_resettable ||= path[path.length - 1] == "resettable";
                                 }
 
+                                let input_time: h.JSX.Element;
+                                let input_date: h.JSX.Element;
+                                const last_reset = API.get_unchecked(`meters/${meter_slot}/last_reset`);
+                                if (!last_reset) {
+                                    input_time = <InputText class="form-control-sm" value={__("meters.content.never")}/>
+                                    input_date = <InputText class="form-control-sm" value={__("meters.content.never")}/>
+                                } else if (last_reset.last_reset * 1000 < 1000000000) {
+                                    input_time = <InputText class="form-control-sm" value={__("meters.content.last_reset_unknown")}/>
+                                    input_date = <InputText class="form-control-sm" value={__("meters.content.last_reset_unknown")}/>
+                                } else {
+                                    input_date = <InputDate className={"form-control-sm"} date={new Date(last_reset.last_reset * 1000)}/>
+                                    input_time = <InputTime className={"form-control-sm"} date={new Date(last_reset.last_reset * 1000)}/>
+                                }
+
                                 let meter_reset_row: ComponentChild[] = !meter_is_resettable ? [] : [
                                     <FormRow label={__("meters.content.last_reset")} small>
                                         <div class="row mx-n1 mx-xl-n3">
                                             <div class="col-sm-4 px-1 px-xl-3">
-                                                <InputDate className={"form-control-sm"} date={new Date(API.get_unchecked(`meters/${meter_slot}/last_reset`).last_reset * 1000)}/>
+                                                {input_date}
                                             </div>
                                             <div class="col-sm-4 px-1 px-xl-3">
-                                                <InputTime className={"form-control-sm"} date={new Date(API.get_unchecked(`meters/${meter_slot}/last_reset`).last_reset * 1000)}/>
+                                                {input_time}
                                             </div>
                                             <div class="col-sm-4 px-1 px-xl-3">
                                                 <Button size="sm" className="form-control" variant="danger" onClick={async () => {
@@ -1128,14 +1157,30 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
                                             <div class="row mx-n1 mx-xl-n3">
                                             {order.ids.map((id) =>
                                                 <div class="col-sm-4 px-1 px-xl-3">
-                                                    <OutputFloat value={util.hasValue(state.values_by_id[meter_slot][id]) ? this.state.values_by_id[meter_slot][id] : null} digits={METER_VALUE_INFOS[id].digits} scale={0} unit={METER_VALUE_INFOS[id].unit} small={true}/>
+                                                    <OutputFloat
+                                                        value={util.hasValue(state.values_by_id[meter_slot][id]) ? this.state.values_by_id[meter_slot][id] : null}
+                                                        digits={METER_VALUE_INFOS[id].digits}
+                                                        scale={0}
+                                                        unit={METER_VALUE_INFOS[id].unit}
+                                                        small={true}
+                                                        class={util.hasValue(state.values_by_id[meter_slot][id]) ? (highlighted_value_ids.indexOf(id) >= 0 ? "input-indicator input-indicator-primary" : undefined) : "input-indicator input-indicator-warning"}
+                                                    />
                                                 </div>)}
                                             </div>
                                         </FormRow>
                                         : <FormRow label={translate_unchecked(`meters.content.value_${order.ids[0]}`)} label_muted={translate_unchecked(`meters.content.value_${order.ids[0]}_muted`)} small={true}>
-                                            <div class="row mx-n1 mx-xl-n3"><div class="col-sm-4 px-1 px-xl-3">
-                                                <OutputFloat value={this.state.values_by_id[meter_slot][order.ids[0]]} digits={METER_VALUE_INFOS[order.ids[0]].digits} scale={0} unit={METER_VALUE_INFOS[order.ids[0]].unit} small={true}/>
-                                            </div></div>
+                                            <div class="row mx-n1 mx-xl-n3">
+                                                <div class="col-sm-4 px-1 px-xl-3">
+                                                    <OutputFloat
+                                                        value={this.state.values_by_id[meter_slot][order.ids[0]]}
+                                                        digits={METER_VALUE_INFOS[order.ids[0]].digits}
+                                                        scale={0}
+                                                        unit={METER_VALUE_INFOS[order.ids[0]].unit}
+                                                        small={true}
+                                                        class={util.hasValue(state.values_by_id[meter_slot][order.ids[0]]) ? (highlighted_value_ids.indexOf(order.ids[0]) >= 0 ? "input-indicator input-indicator-primary" : undefined) : "input-indicator input-indicator-warning"}
+                                                    />
+                                                </div>
+                                            </div>
                                         </FormRow>);
 
                                 if (allValues.length == 0) {
@@ -1172,7 +1217,15 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
                                     extraValue: extraValue,
                                     fieldWithBox: [true, true, true, true, false],
                                     editTitle: __("meters.content.edit_meter_title"),
-                                    onEditShow: async () => this.setState({editMeterSlot: meter_slot, editMeter: config_plugins[config[0]].clone_config(config)}),
+                                    onEditShow: async () => {
+                                        let config_plugin = config_plugins[config[0]];
+                                        if (!config_plugin) {
+                                            console.log("No config plugin available for meter type", config[0]);
+                                            this.setState({editMeterSlot: meter_slot, editMeter: [0, null]});
+                                            return;
+                                        }
+                                        this.setState({editMeterSlot: meter_slot, editMeter: config_plugin.clone_config(config)});
+                                    },
                                     onEditGetChildren: () => {
                                         let slots: [string, string][] = [];
                                         let classes: [string, string][] = [];

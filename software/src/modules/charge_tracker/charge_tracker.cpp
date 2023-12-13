@@ -313,6 +313,7 @@ void ChargeTracker::removeOldRecords()
     // Now only users that are safe to remove remain.
     for (int user_id = 0; user_id < 256; ++user_id) {
         if ((users_to_delete[user_id / 32] & (1 << (user_id % 32))) != 0) {
+            // remove_from_username_file only removes if the user is not configured
             users.remove_from_username_file(user_id);
         }
     }
@@ -397,7 +398,6 @@ bool ChargeTracker::setupRecords()
     this->first_charge_record = first;
     this->last_charge_record = last;
 
-    removeOldRecords();
     return true;
 }
 
@@ -715,6 +715,12 @@ void ChargeTracker::repair_charges() {
 
 void ChargeTracker::register_urls()
 {
+    // We have to do this here, not at the end of setup,
+    // because removeOldRecords calls users.remove_from_username_file
+    // which requires that the user config is already loaded from flash.
+    // This happens in users::setup() i.e. _after_ charge_tracker::setup()
+    removeOldRecords();
+
     api.addPersistentConfig("charge_tracker/config", &config, {}, 1000);
 
     api.addCommand("charge_tracker/electricity_price_update", &electricity_price_update, {}, [this]() {

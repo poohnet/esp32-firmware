@@ -28,7 +28,7 @@ import { FormRow } from "../../ts/components/form_row";
 import { InputText } from "../../ts/components/input_text";
 import { InputSelect } from '../../ts/components/input_select';
 
-const MAX_VALUES = 100;
+const MAX_VALUES = 96;
 
 export type APIMetersConfig = [
     MeterClassID.API,
@@ -139,7 +139,7 @@ class MeterValueIDSelector extends Component<MeterValueIDSelectorProps, MeterVal
                             let is_valid = true;
 
                             if (value_id !== null) {
-                                let idx = this.props.value_ids.findIndex((other) => other === value_id);
+                                let idx = this.props.value_ids.indexOf(value_id);
 
                                 if (idx >= 0 && idx !== this.props.edit_idx) {
                                     is_valid = false;
@@ -241,11 +241,36 @@ interface PresetSelectorState {
 }
 
 class PresetSelector extends Component<PresetSelectorProps, PresetSelectorState> {
+    presets: Readonly<number[][]> = [
+        [],
+        [139,255,258,261,262,256,259],
+        [0,1,2,15,27,39,91,103,115,203,206,209,152,164,176,411,412,413,6,63,75,139,215,200,414,422,255,258,3,4,5,7,51,261,309,262,256,259],
+        [0,1,2,15,27,39,91,103,115,203,206,209,152,164,176,411,412,413,423,424,425,6,63,75,139,215,200,414,426,422,255,258,303,306,405,453,140,141,216,217,52,53,3,4,5,7,51,427,428,429,435,436,437,433,438,16,28,40,17,29,41,430,431,432,434,261,309,219,231,243,222,234,246,225,237,249,267,279,291,270,282,294,273,285,297,262,256,259]
+    ];
+
     constructor(props: PresetSelectorProps) {
         super(props);
 
+        let preset: string;
+        switch (props.config[1].value_ids.toString()) {
+            case this.presets[1].toString():
+                preset = "1";
+                break;
+
+            case this.presets[2].toString():
+                preset = "2";
+                break;
+
+            case this.presets[3].toString():
+                preset = "3";
+                break;
+
+            default:
+                preset = "0";
+                break;
+        }
         this.state = {
-            preset: "0"
+            preset: preset
         } as any;
     }
 
@@ -254,39 +279,33 @@ class PresetSelector extends Component<PresetSelectorProps, PresetSelectorState>
             <InputSelect
                 items={[
                     ["0", __("meters_api.content.api_meter_no_preset")],
-                    ["1", "test"],
-                    ["2", "test2"],
-                    ["3", "test3"]
+                    ["1", __("meters_api.content.api_meter_preset_1")],
+                    ["2", __("meters_api.content.api_meter_preset_2")],
+                    ["3", __("meters_api.content.api_meter_preset_3")]
                 ]}
                 value={this.state.preset}
                 onValue={async (v) => {
-                    const presets = [
-                        [],
-                        [0, 1, 2],
-                        [3, 4, 5],
-                        [6, 7, 8]
-                    ]
 
                     let value_ids: number[] = [];
                     switch (v) {
                         case "0":
-                            value_ids = presets[0];
+                            value_ids = this.presets[0];
                             break;
 
                         case "1":
-                            value_ids = presets[1];
+                            value_ids = this.presets[1];
                             break;
 
                         case "2":
-                            value_ids = presets[2];
+                            value_ids = this.presets[2];
                             break;
 
                         case "3":
-                            value_ids = presets[3];
+                            value_ids = this.presets[3];
                             break;
                     }
 
-                    if (this.props.config[1].value_ids.toString() !== presets[parseInt(this.state.preset)].toString()) {
+                    if (this.props.config[1].value_ids.toString() !== this.presets[parseInt(this.state.preset)].toString()) {
                         if (!await util.async_modal_ref.current.show({
                             title: __("meters_api.content.override_modal_title"),
                             body: __("meters_api.content.override_modal_body"),

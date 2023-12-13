@@ -31,11 +31,6 @@
 #pragma GCC diagnostic ignored "-Wuseless-cast"
 #endif
 
-// string_length_visitor assumes that a float is max. 20 byte long
-// We need n+1 bytes extra for n meter values for '[', ',' and ']'
-// The MQTT send buffer is 2K on a WARP1 -> 2048/21 ~ 97,5.
-#define METERS_MAX_VALUES_PER_METER 96
-
 static MeterGeneratorNone meter_generator_none;
 
 static void init_uint32_array(uint32_t *arr, size_t len, uint32_t val)
@@ -304,7 +299,12 @@ void Meters::register_urls()
                     //FIXME not Y2038-safe
                     meter_slot.last_reset.get("last_reset")->updateUint(static_cast<uint32_t>(tv_now.tv_sec));
                 } else {
-                    meter_slot.last_reset.get("last_reset")->updateUint(0);
+                    uint32_t last = meter_slot.last_reset.get("last_reset")->asUint();
+                    if (last < 1000000000) {
+                        meter_slot.last_reset.get("last_reset")->updateUint(last + 1);
+                    } else {
+                        meter_slot.last_reset.get("last_reset")->updateUint(1);
+                    }
                 }
                 api.writeConfig(get_path(slot, Meters::PathType::LastReset), &meter_slot.last_reset);
             }, true);

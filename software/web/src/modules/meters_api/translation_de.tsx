@@ -15,7 +15,10 @@ let x = {
             "edit_value_title": "Wert bearbeiten",
             "api_meter_preset": "Vorlagen",
             "api_meter_no_preset": "Keine Vorlage ausgewählt",
-            "override_modal_title": "Stromzälerwerte überschreiben",
+            "api_meter_preset_1": "SDM72",
+            "api_meter_preset_2": "SDM72v2",
+            "api_meter_preset_3": "SDM630",
+            "override_modal_title": "Stromzählerwerte überschreiben",
             "override_modal_body": "Die Stromzählerwerte werden überschrieben. Sind Sie sicher?",
             "override_modal_confirm": "Überschreiben",
             "override_modal_cancel": "Abbrechen"

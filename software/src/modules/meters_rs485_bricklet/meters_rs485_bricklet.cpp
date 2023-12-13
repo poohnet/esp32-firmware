@@ -26,7 +26,7 @@ void MetersRS485Bricklet::pre_setup()
     this->DeviceModule::pre_setup();
 
     config_prototype = Config::Object({
-        {"display_name", Config::Str("Wallbox", 0, 32)}, // FIXME: translate
+        {"display_name", Config::Str("WARP Charger", 0, 32)},
         {"type_override", Config::Uint8(METER_TYPE_AUTO_DETECT)}
     });
 
@@ -147,7 +147,7 @@ IMeter * MetersRS485Bricklet::new_meter(uint32_t slot, Config *state, Config * e
         return nullptr;
     }
     // FIXME: sdm630_reset_prototype should be copied?
-    meter_instance = new MeterRS485Bricklet(slot, &device, state, errors, &sdm630_reset_prototype);
+    meter_instance = new MeterRS485Bricklet(slot, this, &device, state, errors, &sdm630_reset_prototype);
     return meter_instance;
 }
 

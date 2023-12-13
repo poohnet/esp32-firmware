@@ -20,22 +20,21 @@
 
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
-
 import { h, Component, Fragment } from "preact";
 import { Button } from "react-bootstrap";
-import { CollapsedSection } from "src/ts/components/collapsed_section";
-import { DebugLogger } from "src/ts/components/debug_logger";
-import { FormRow } from "src/ts/components/form_row";
-import { FormSeparator } from "src/ts/components/form_separator";
-import { IndicatorGroup } from "src/ts/components/indicator_group";
-import { InputFile } from "src/ts/components/input_file";
-import { InputIndicator } from "src/ts/components/input_indicator";
-import { InputText } from "src/ts/components/input_text";
-import { PageHeader } from "src/ts/components/page_header";
-import { SubPage } from "src/ts/components/sub_page";
-import { __, translate_unchecked } from "src/ts/translation";
+import { CollapsedSection } from "../../ts/components/collapsed_section";
+import { DebugLogger } from "../../ts/components/debug_logger";
+import { FormRow } from "../../ts/components/form_row";
+import { FormSeparator } from "../../ts/components/form_separator";
+import { IndicatorGroup } from "../../ts/components/indicator_group";
+import { InputFile } from "../../ts/components/input_file";
+import { InputIndicator } from "../../ts/components/input_indicator";
+import { InputText } from "../../ts/components/input_text";
+import { PageHeader } from "../../ts/components/page_header";
+import { SubPage } from "../../ts/components/sub_page";
+import { __, translate_unchecked } from "../../ts/translation";
 import { EVSE_SLOT_EXTERNAL } from "./api";
-import { OutputFloat } from "src/ts/components/output_float";
+import { OutputFloat } from "../../ts/components/output_float";
 
 let toDisplayCurrent = (x: number) => util.toLocaleFixed(x / 1000.0, 3) + " A"
 
@@ -363,7 +362,7 @@ export class EVSE extends Component<{}, {}> {
                             <InputText value={util.format_timespan_ms(ll_state.charging_time)}/>
                         </FormRow>
 
-                        {!is_evse_v2 ? undefined :
+                        {!is_evse_v3 ? undefined :
                         <>
                             <FormRow label={__("evse.content.temperature")}>
                                 <OutputFloat value={ll_state.temperature} digits={2} scale={2} unit="°C"/>
@@ -380,7 +379,11 @@ export class EVSE extends Component<{}, {}> {
                             <FormRow label={__("evse.content.phases_status")}>
                                 <InputText value={ll_state.phases_status}/>
                             </FormRow>
+                        </>
+                        }
 
+                        {!is_evse_v3 && !is_evse_v2 ? undefined :
+                        <>
                             <FormRow label={__("evse.content.time_since_dc_fault_check")}>
                                 <InputText value={util.format_timespan_ms(ll_state.time_since_dc_fault_check)}/>
                             </FormRow>
@@ -396,7 +399,7 @@ export class EVSE extends Component<{}, {}> {
                         }
 
                         <FormRow label={__("evse.content.reset_description")} label_muted={__("evse.content.reset_description_muted")}>
-                            {!is_evse_v3 && !is_evse_v2 ? undefined :
+                            {!is_evse_v3 ? undefined :
                                 <div class="input-group pb-2">
                                     <Button variant="primary" className="form-control rounded-right mr-2" onClick={() => API.call('evse/debug_switch_to_one_phase', {}, "")}>{__("evse.content.switch_to_one_phase")}</Button>
                                     <Button variant="primary" className="form-control rounded-left" onClick={() => API.call('evse/debug_switch_to_three_phases', {}, "")}>{__("evse.content.switch_to_three_phases")}</Button>

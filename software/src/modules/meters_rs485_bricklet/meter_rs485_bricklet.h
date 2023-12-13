@@ -37,10 +37,12 @@
     #pragma GCC diagnostic ignored "-Weffc++"
 #endif
 
+class MetersRS485Bricklet;
+
 class MeterRS485Bricklet final : public IMeter
 {
 public:
-    MeterRS485Bricklet(uint32_t slot_, TF_RS485* rs485_, Config *state_, Config *errors_, ConfigRoot *sdm630_reset_) : slot(slot_), rs485(rs485_), state(state_), errors(errors_), sdm630_reset(sdm630_reset_) {}
+    MeterRS485Bricklet(uint32_t slot_, MetersRS485Bricklet *generator_, TF_RS485* rs485_, Config *state_, Config *errors_, ConfigRoot *sdm630_reset_) : slot(slot_), generator(generator_), rs485(rs485_), state(state_), errors(errors_), sdm630_reset(sdm630_reset_) {}
 
     // IMeter
     MeterClassID get_class() const override;
@@ -76,6 +78,7 @@ private:
     void update_all_values();
 
     uint32_t slot;
+    MetersRS485Bricklet *generator;
     TF_RS485* rs485;
     Config *state;
     uint8_t type_override;
@@ -102,8 +105,6 @@ private:
     size_t modbus_read_state_slow = 0;
     bool last_read_was_fast = false;
 
-    /*uint32_t next_modbus_read_deadline = 0;
-    uint32_t next_power_history_entry = 0;*/
     UserData callback_data;
 
     bool reset_requested = false;
