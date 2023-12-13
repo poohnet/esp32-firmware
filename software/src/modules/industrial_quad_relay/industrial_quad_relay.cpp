@@ -30,6 +30,7 @@ IndustrialQuadRelay::~IndustrialQuadRelay()
 
 void IndustrialQuadRelay::pre_setup()
 {
+  this->DeviceModule::pre_setup();
 }
 
 void IndustrialQuadRelay::setup_IndustrialQuadRelay()
