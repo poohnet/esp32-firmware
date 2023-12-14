@@ -1,0 +1,23 @@
+name: Delete old workflow runs
+on: workflow_dispatch
+jobs:
+  delete-old-workflow-runs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete workflow runs WARP Energy Manager
+        uses: MajorScruffy/delete-old-workflow-runs@v0.3.0
+        with:
+          repository: ${{ github.repository }}
+          workflow: ".github/workflows/energy_manager.yml"
+          older-than-seconds: 2592000 # 30*24*60*60
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete workflow runs WARP on Steroids
+        uses: MajorScruffy/delete-old-workflow-runs@v0.3.0
+        with:
+          repository: ${{ github.repository }}
+          workflow: ".github/workflows/warp2_poohnet.yml"
+          older-than-seconds: 2592000 # 30*24*60*60
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
