@@ -284,6 +284,7 @@ classes = [
     'API',
     'Sun Spec',
     'Modbus TCP',
+    'SMA'
     #'MQTT Subscription'
 ]
 
