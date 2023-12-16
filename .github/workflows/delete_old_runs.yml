@@ -1,8 +1,11 @@
 name: Delete old workflow runs
-on: workflow_dispatch
+
+on: [push]
+
 jobs:
   delete-old-workflow-runs:
     runs-on: ubuntu-latest
+
     steps:
       - name: Delete workflow runs WARP Energy Manager
         uses: MajorScruffy/delete-old-workflow-runs@v0.3.0
