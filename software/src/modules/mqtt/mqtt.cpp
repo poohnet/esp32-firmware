@@ -40,8 +40,8 @@ extern char local_uid_str[32];
 #define MQTT_RECV_BUFFER_SIZE 6144U
 #define MQTT_SEND_BUFFER_SIZE 32768U
 #else
-#define MQTT_RECV_BUFFER_SIZE 2048U
-#define MQTT_SEND_BUFFER_SIZE 2048U
+#define MQTT_RECV_BUFFER_SIZE 4096U
+#define MQTT_SEND_BUFFER_SIZE 4096U
 #endif
 
 #define MQTT_RECV_BUFFER_HEADROOM (MQTT_RECV_BUFFER_SIZE / 4)
@@ -80,8 +80,8 @@ void Mqtt::pre_setup()
     cron.register_trigger(
         CronTriggerID::MQTT,
         Config::Object({
-            {"topic", Config::Str("", 0, 64)},
-            {"payload", Config::Str("", 0, 64)},
+            {"topic", Config::Str("", 0, 32)},
+            {"payload", Config::Str("", 0, 32)},
             {"retain", Config::Bool(false)},
             {"use_prefix", Config::Bool(false)}
         }),
@@ -97,8 +97,8 @@ void Mqtt::pre_setup()
     cron.register_action(
         CronActionID::MQTT,
         Config::Object({
-            {"topic", Config::Str("", 0, 64)},
-            {"payload", Config::Str("", 0, 64)},
+            {"topic", Config::Str("", 0, 32)},
+            {"payload", Config::Str("", 0, 32)},
             {"retain", Config::Bool(false)},
             {"use_prefix", Config::Bool(false)}
         }),
@@ -393,7 +393,7 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
     // The spec says:
     // It MUST set the RETAIN flag to 0 when a PUBLISH Packet is sent to a Client
     // because it matches an established subscription regardless of how the flag was set in the message it received [MQTT-3.3.1-9].
-    if (!retain && memcmp(topic, "cron_trigger/", 13) && memcmp(topic, "cron_action/", 12))
+    if (!retain && strncmp(topic, "cron_trigger/", topic_len) != 0 && strncmp(topic, "cron_action/", topic_len) != 0)
         logger.printfln("MQTT: Received message on unknown topic '%.*s' (data_len=%u)", static_cast<int>(topic_len), topic, data_len);
 }
 

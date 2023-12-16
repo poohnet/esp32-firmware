@@ -955,10 +955,11 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
         }
 
         let active_meter_slots = Object.keys(state.configs_table).filter((meter_slot_str) => state.configs_table[parseInt(meter_slot_str)][0] != MeterClassID.None);
+        let show_plot = API.hasFeature("meter") || API.hasFeature("energy_manager");
 
         return (
             <SubPage colClasses="col-xl-10">
-                <PageHeader title={__("meters.content.meters")}/>
+                {show_plot ? <><PageHeader title={__("meters.content.meters")}/>
 
                 <FormSeparator heading={__("meters.status.power_history")} first={true} colClasses={"justify-content-between align-items-center col"} extraClasses={"pr-0 pr-lg-3"} >
                     <div class="mb-2">
@@ -1005,9 +1006,10 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
                                 x_height={50}
                                 x_include_date={true}
                                 y_min={0}
-                                y_max={1500} />
+                                y_max={1500} /></>
+                : undefined}
 
-                <ConfigForm id="meters_config_form" title={__("meters.content.settings")} isModified={this.isModified()} isDirty={this.isDirty()} onSave={this.save} onReset={this.reset} onDirtyChange={this.setDirty} small={true}>
+                <ConfigForm id="meters_config_form" title={show_plot ? __("meters.content.settings") : __("meters.content.meters")} isModified={this.isModified()} isDirty={this.isDirty()} onSave={this.save} onReset={this.reset} onDirtyChange={this.setDirty} small={show_plot}>
                     <div class="mb-3">
                         <Table
                             tableTill="lg"
@@ -1361,7 +1363,7 @@ export class Meters extends ConfigComponent<'meters/0/config', MetersProps, Mete
     }
 }
 
-interface MeterStatusState {
+interface MetersStatusState {
     meter_slot: number,
     meter_configs: {[meter_slot: number]: MeterConfig},
 }
@@ -1376,7 +1378,7 @@ function get_meter_name(meter_configs: {[meter_slot: number]: MeterConfig}, mete
     return meter_name;
 }
 
-export class MetersStatus extends Component<{}, MeterStatusState> {
+export class MetersStatus extends Component<{}, MetersStatusState> {
     uplot_wrapper_ref = createRef();
 
     constructor() {
@@ -1400,13 +1402,13 @@ export class MetersStatus extends Component<{}, MeterStatusState> {
         }
     }
 
-    render(props: {}, state: MeterStatusState) {
+    render(props: {}, state: MetersStatusState) {
         // Don't check util.render_allowed() here.
         // We can receive graph data points with the first web socket packet and
         // want to push them into the uplot graph immediately.
         // This only works if the wrapper component is already created.
         // Hide the form rows to fix any visual bugs instead.
-        let show = util.render_allowed() && !API.hasFeature("energy_manager");
+        let show = util.render_allowed() && API.hasFeature("meter") && !API.hasFeature("energy_manager");
 
         // As we don't check util.render_allowed(),
         // we have to handle rendering before the web socket connection is established.

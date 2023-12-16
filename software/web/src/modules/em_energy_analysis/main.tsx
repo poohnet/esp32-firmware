@@ -38,6 +38,8 @@ import { uPlotTimelinePlugin } from "../../ts/uplot-plugins";
 import { MeterValueID } from "../meters/meter_value_id";
 import { MeterConfig } from "../meters/types";
 
+const UPDATE_RETRY_DELAY = 500; // ms
+
 interface CachedData {
     update_timestamp: number;
     use_timestamp: number;
@@ -1179,8 +1181,8 @@ export class EMEnergyAnalysisStatus extends Component<{}, EMEnergyAnalysisStatus
             });
         }
 
-        util.addApiEventListener("energy_manager/config", () => {
-            let config = API.get("energy_manager/config");
+        util.addApiEventListener("power_manager/config", () => {
+            let config = API.get("power_manager/config");
 
             this.setState({meter_slot: config.meter_slot_grid_power});
         });
@@ -1547,8 +1549,8 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
             }
         });
 
-        util.addApiEventListener("energy_manager/config", () => {
-            let config = API.get("energy_manager/config");
+        util.addApiEventListener("power_manager/config", () => {
+            let config = API.get("power_manager/config");
 
             this.setState({meter_slot_status: config.meter_slot_grid_power});
         });
@@ -2579,7 +2581,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                 if (!success) {
                     window.setTimeout(() => {
                         this.reload_wallbox_cache();
-                    }, 100);
+                    }, UPDATE_RETRY_DELAY);
 
                     return;
                 }
@@ -2623,7 +2625,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                 if (!success) {
                     window.setTimeout(() => {
                         this.update_current_5min_cache();
-                    }, 100);
+                    }, UPDATE_RETRY_DELAY);
 
                     return;
                 }
@@ -2645,7 +2647,7 @@ export class EMEnergyAnalysis extends Component<EMEnergyAnalysisProps, EMEnergyA
                 if (!success) {
                     window.setTimeout(() => {
                         this.update_current_daily_cache();
-                    }, 100);
+                    }, UPDATE_RETRY_DELAY);
 
                     return;
                 }

@@ -34,7 +34,7 @@ import { Task, CronTriggerComponents, CronActionComponents } from "./types";
 import { plugins_init } from "./plugins";
 import { SubPage } from "src/ts/components/sub_page";
 
-const MAX_RULES = 20;
+const MAX_RULES = 14;
 
 type CronState = {
     displayed_trigger: number;
@@ -141,6 +141,9 @@ export class Cron extends ConfigComponent<"cron/config", {}, CronState> {
         const action_children = cron_action_components[this.state.displayed_action];
         if (action_children) {
             preview.push(action_children.get_table_children(this.state.edit_task.action));
+        }
+        if (preview.length === 0) {
+            return triggerSelector.concat(actionSelector);
         }
         return triggerSelector.concat(actionSelector).concat(<hr/>).concat(<div class="pb-3">{preview}</div>);
     }

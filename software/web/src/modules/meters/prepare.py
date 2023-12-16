@@ -3,6 +3,7 @@ import sys
 import re
 import importlib.util
 import importlib.machinery
+from pathlib import PurePath
 
 software_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
@@ -19,7 +20,7 @@ if 'software' not in sys.modules:
 
 from software import util
 
-with open(os.path.join(software_dir, "web", "src", "build.ts")) as f:
+with open(os.path.join(software_dir, "web", "src", "build.ts"), "r", encoding='utf-8') as f:
     content = f.read()
     match = re.search(r"export const METERS_SLOTS = (\d+);", content)
     if match is None:
@@ -33,7 +34,7 @@ inits = []
 configs = []
 
 for plugin in util.find_frontend_plugins('Meters', 'Config'):
-    import_path = '../' + plugin.module_name + '/' + plugin.import_name
+    import_path = PurePath('..', plugin.module_name, plugin.import_name).as_posix()
     imports.append("import * as {0}_config from '{1}'".format(plugin.module_name, import_path))
     inits.append("result.push({0}_config.init());".format(plugin.module_name))
 
