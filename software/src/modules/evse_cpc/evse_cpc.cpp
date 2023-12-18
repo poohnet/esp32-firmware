@@ -20,38 +20,25 @@
 #include "evse_cpc.h"
 #include "module_dependencies.h"
 
+static const char* toString(bool cp_disconnect)
+{
+  return cp_disconnect ? "disconnected" : "connected";
+}
+
 EvseCPC::EvseCPC()
-{
-}
-
-EvseCPC::~EvseCPC()
-{
-}
-
-void EvseCPC::pre_setup()
 {
 }
 
 void EvseCPC::setup()
 {
   if (!industrial_quad_relay.initialized) {
-    logger.printfln("EvseCPC: Industrial Quad Relay Bricklet not initialized. Disabling feature CP-Disconnect.");
+    logger.printfln("EvseCPC::setup(): Industrial Quad Relay Bricklet not initialized. Disabling feature CP-Disconnect.");
     return;
   }
 
   initialized = true;
   api.addFeature("cp_disconnect");
-
-  logger.printfln("EvseCPC: Enabling Control Pilot.");
-  industrial_quad_relay.setValue(0, true);
-}
-
-void EvseCPC::register_urls()
-{
-}
-
-void EvseCPC::loop()
-{
+  set_control_pilot_disconnect(false, nullptr);
 }
 
 bool EvseCPC::get_control_pilot_disconnect()
@@ -65,8 +52,15 @@ bool EvseCPC::get_control_pilot_disconnect()
 
 void EvseCPC::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected)
 {
+  static bool old_cp_disconnect = true;
+
   if (initialized) {
     industrial_quad_relay.setValue(0, !cp_disconnect);
+
+    if (cp_disconnect != old_cp_disconnect) {
+      logger.printfln("EvseCPC::set_control_pilot_disconnect(): %s => %s", toString(old_cp_disconnect), toString(cp_disconnect));
+      old_cp_disconnect = cp_disconnect;
+    }
   }
 
   if (cp_disconnected) {

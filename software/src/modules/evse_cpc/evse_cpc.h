@@ -25,12 +25,8 @@ class EvseCPC final : public IModule
 {
 public:
   EvseCPC();
-  ~EvseCPC() override;
 
-  void pre_setup() override;
   void setup() override;
-  void register_urls() override;
-  void loop() override;
 
   bool get_control_pilot_disconnect();
   void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
