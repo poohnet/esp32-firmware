@@ -53,22 +53,22 @@ obis kennzahlen[] = {
   obis(MeterValueID::EnergyActiveL3Import,        0, 61, 8, 0, 3600000.0, 8),  // L3
 
   // Blindleistung Bezug (aktueller Mittelwert)
-  obis(MeterValueID::PowerReactiveLSumIndCapSum,  0,  3, 4, 0,      10.0, 4),  // Summe
-  obis(MeterValueID::PowerReactiveL1IndCapSum,    0, 23, 4, 0,      10.0, 4),  // L1
-  obis(MeterValueID::PowerReactiveL2IndCapSum,    0, 43, 4, 0,      10.0, 4),  // L2
-  obis(MeterValueID::PowerReactiveL3IndCapSum,    0, 63, 4, 0,      10.0, 4),  // L3
+  obis(MeterValueID::PowerReactiveLSumInductive,  0,  3, 4, 0,      10.0, 4),  // Summe
+  obis(MeterValueID::PowerReactiveL1Inductive,    0, 23, 4, 0,      10.0, 4),  // L1
+  obis(MeterValueID::PowerReactiveL2Inductive,    0, 43, 4, 0,      10.0, 4),  // L2
+  obis(MeterValueID::PowerReactiveL3Inductive,    0, 63, 4, 0,      10.0, 4),  // L3
 
   // Blindleistung Bezug (Zählerstand)
-  obis(MeterValueID::EnergyReactiveLSumIndCapSum, 0,  3, 8, 0, 3600000.0, 8),  // Summe
-  obis(MeterValueID::EnergyReactiveL1IndCapSum,   0, 23, 8, 0, 3600000.0, 8),  // L1
-  obis(MeterValueID::EnergyReactiveL2IndCapSum,   0, 43, 8, 0, 3600000.0, 8),  // L2
-  obis(MeterValueID::EnergyReactiveL3IndCapSum,   0, 63, 8, 0, 3600000.0, 8),  // L3
+  obis(MeterValueID::EnergyReactiveLSumInductive, 0,  3, 8, 0, 3600000.0, 8),  // Summe
+  obis(MeterValueID::EnergyReactiveL1Inductive,   0, 23, 8, 0, 3600000.0, 8),  // L1
+  obis(MeterValueID::EnergyReactiveL2Inductive,   0, 43, 8, 0, 3600000.0, 8),  // L2
+  obis(MeterValueID::EnergyReactiveL3Inductive,   0, 63, 8, 0, 3600000.0, 8),  // L3
 
   // Scheinleistung Bezug (aktueller Mittelwert)
-  obis(MeterValueID::PowerApparentLSum,           0,  9, 4, 0,      10.0, 4),  // Summe
-  obis(MeterValueID::PowerApparentL1,             0, 29, 4, 0,      10.0, 4),  // L1
-  obis(MeterValueID::PowerApparentL2,             0, 49, 4, 0,      10.0, 4),  // L2
-  obis(MeterValueID::PowerApparentL3,             0, 69, 4, 0,      10.0, 4),  // L3
+  obis(MeterValueID::PowerApparentLSumImport,     0,  9, 4, 0,      10.0, 4),  // Summe
+  obis(MeterValueID::PowerApparentL1Import,       0, 29, 4, 0,      10.0, 4),  // L1
+  obis(MeterValueID::PowerApparentL2Import,       0, 49, 4, 0,      10.0, 4),  // L2
+  obis(MeterValueID::PowerApparentL3Import,       0, 69, 4, 0,      10.0, 4),  // L3
 
   // Scheinleistung Bezug (Zählerstand)
   obis(MeterValueID::EnergyApparentLSumImport,    0,  9, 8, 0, 3600000.0, 8),  // Summe
@@ -88,25 +88,23 @@ obis kennzahlen[] = {
   obis(MeterValueID::EnergyActiveL2Export,        0, 42, 8, 0, 3600000.0, 8),  // L2
   obis(MeterValueID::EnergyActiveL3Export,        0, 62, 8, 0, 3600000.0, 8),  // L3
 
-  /*
   // Blindleistung Einspeisung (aktueller Mittelwert)
-  obis(MeterValueID::0,  4, 4, 0,      10.0, 4),  // Summe
-  obis(MeterValueID::0, 24, 4, 0,      10.0, 4),  // L1
-  obis(MeterValueID::0, 44, 4, 0,      10.0, 4),  // L2
-  obis(MeterValueID::0, 64, 4, 0,      10.0, 4),  // L3
+  obis(MeterValueID::PowerReactiveLSumCapacitive, 0,  4, 4, 0,      10.0, 4),  // Summe
+  obis(MeterValueID::PowerReactiveL1Capacitive,   0, 24, 4, 0,      10.0, 4),  // L1
+  obis(MeterValueID::PowerReactiveL2Capacitive,   0, 44, 4, 0,      10.0, 4),  // L2
+  obis(MeterValueID::PowerReactiveL3Capacitive,   0, 64, 4, 0,      10.0, 4),  // L3
 
   // Blindleistung Einspeisung (Zählerstand)
-  obis(MeterValueID::0,  4, 8, 0, 3600000.0, 8),  // Summe
-  obis(MeterValueID::0, 24, 8, 0, 3600000.0, 8),  // L1
-  obis(MeterValueID::0, 44, 8, 0, 3600000.0, 8),  // L2
-  obis(MeterValueID::0, 64, 8, 0, 3600000.0, 8),  // L3
+  obis(MeterValueID::EnergyReactiveLSumCapacitive,0,  4, 8, 0, 3600000.0, 8),  // Summe
+  obis(MeterValueID::EnergyReactiveL1Capacitive,  0, 24, 8, 0, 3600000.0, 8),  // L1
+  obis(MeterValueID::EnergyReactiveL2Capacitive,  0, 44, 8, 0, 3600000.0, 8),  // L2
+  obis(MeterValueID::EnergyReactiveL3Capacitive,  0, 64, 8, 0, 3600000.0, 8),  // L3
 
   // Scheinleistung Einspeisung (aktueller Mittelwert)
   obis(MeterValueID::PowerApparentLSumExport,     0, 10, 4, 0,      10.0, 4),  // Summe
   obis(MeterValueID::PowerApparentL1Export,       0, 30, 4, 0,      10.0, 4),  // L1
   obis(MeterValueID::PowerApparentL2Export,       0, 50, 4, 0,      10.0, 4),  // L2
   obis(MeterValueID::PowerApparentL3Export,       0, 70, 4, 0,      10.0, 4),  // L3
-  */
 
   // Scheinleistung Einspeisung (Zählerstand)
   obis(MeterValueID::EnergyApparentLSumExport,    0, 10, 8, 0, 3600000.0, 8),  // Summe
