@@ -18,13 +18,10 @@
  */
 
 import $ from "../../ts/jq";
-
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
-
-import { h, render, Fragment } from "preact";
+import { h, render, Fragment, Component } from "preact";
 import { __ } from "../../ts/translation";
-
 import { FormRow } from "../../ts/components/form_row";
 import { FormSeparator } from "../../ts/components/form_separator";
 import { InputText } from "../../ts/components/input_text";
@@ -465,63 +462,65 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
 
 render(<ChargeTracker/>, $('#charge_tracker')[0]);
 
-function ChargeTrackerStatus() {
-    if (!util.render_allowed())
-        return <></>;
-
-    let last_charges = API.get('charge_tracker/last_charges');
-    let cc = API.get('charge_tracker/current_charge');
-    let evse_uptime = API.get('evse/low_level_state').uptime;
-    let energy_abs = API.get('meter/values').energy_abs;
-    let users = API.get('users/config').users;
-    let electricity_price = API.get('charge_tracker/config').electricity_price;
-
-    let electricity_price_edit = <FormRow label={__("charge_tracker.status.current_price")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
-        <InputText value={util.toLocaleFixed(electricity_price / 100, 2) + " ct/kWh"}/>
-    </FormRow>
-
-    let current_charge = <></>;
-
-    if (cc.user_id != -1) {
-        let charge_duration = evse_uptime - cc.evse_uptime_start
-        if (evse_uptime < cc.evse_uptime_start)
-            charge_duration += 0xFFFFFFFF;
-
-        charge_duration = Math.floor(charge_duration / 1000);
-
-        let charge: Charge = {
-            charge_duration: charge_duration,
-            energy_charged: (energy_abs === null || cc.meter_start === null) ? null : (energy_abs - cc.meter_start),
-            timestamp_minutes: cc.timestamp_minutes,
-            user_id: cc.user_id,
-            electricity_price: cc.electricity_price
-        };
-
-        current_charge = <FormRow label={__("charge_tracker.status.current_charge")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
-            <ListGroup>
-                <TrackedCharge charge={charge}
-                                users={users}
-                                />
-            </ListGroup>
-        </FormRow>;
-    }
-
-    let last_charges_list = last_charges.length == 0 ? <></>
-        : <FormRow label={__("charge_tracker.status.last_charges")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
-            <ListGroup>
-                {last_charges.slice(-3).map(c =>
-                    <TrackedCharge charge={c}
+export class ChargeTrackerStatus extends Component {
+    render() {
+        if (!util.render_allowed())
+            return <></>;
+    
+        let last_charges = API.get('charge_tracker/last_charges');
+        let cc = API.get('charge_tracker/current_charge');
+        let evse_uptime = API.get('evse/low_level_state').uptime;
+        let energy_abs = API.get('meter/values').energy_abs;
+        let users = API.get('users/config').users;
+        let electricity_price = API.get('charge_tracker/config').electricity_price;
+    
+        let electricity_price_edit = <FormRow label={__("charge_tracker.status.current_price")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
+            <InputText value={util.toLocaleFixed(electricity_price / 100, 2) + " ct/kWh"}/>
+        </FormRow>
+    
+        let current_charge = <></>;
+    
+        if (cc.user_id != -1) {
+            let charge_duration = evse_uptime - cc.evse_uptime_start
+            if (evse_uptime < cc.evse_uptime_start)
+                charge_duration += 0xFFFFFFFF;
+    
+            charge_duration = Math.floor(charge_duration / 1000);
+    
+            let charge: Charge = {
+                charge_duration: charge_duration,
+                energy_charged: (energy_abs === null || cc.meter_start === null) ? null : (energy_abs - cc.meter_start),
+                timestamp_minutes: cc.timestamp_minutes,
+                user_id: cc.user_id,
+                electricity_price: cc.electricity_price
+            };
+    
+            current_charge = <FormRow label={__("charge_tracker.status.current_charge")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
+                <ListGroup>
+                    <TrackedCharge charge={charge}
                                     users={users}
                                     />
-                ).reverse()}
-            </ListGroup>
-        </FormRow>;
-
+                </ListGroup>
+            </FormRow>;
+        }
+    
+        let last_charges_list = last_charges.length == 0 ? <></>
+            : <FormRow label={__("charge_tracker.status.last_charges")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
+                <ListGroup>
+                    {last_charges.slice(-3).map(c =>
+                        <TrackedCharge charge={c}
+                                        users={users}
+                                        />
+                    ).reverse()}
+                </ListGroup>
+            </FormRow>;
+    
     return <>
                 {electricity_price_edit}
                 {current_charge}
                 {last_charges_list}
         </>;
+    }
 }
 
 render(<ChargeTrackerStatus />, $("#status-charge_tracker")[0]);

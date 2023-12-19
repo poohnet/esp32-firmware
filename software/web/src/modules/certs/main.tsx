@@ -18,13 +18,10 @@
  */
 
 import $ from "../../ts/jq";
-
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
-
 import { h, render, Fragment, Component } from "preact";
 import { __ } from "../../ts/translation";
-
 import { InputText } from "../../ts/components/input_text";
 import { SubPage } from "../../ts/components/sub_page";
 import { PageHeader } from "../../ts/components/page_header";
@@ -58,7 +55,7 @@ export class Certs extends Component<{}, State> {
                                         [cert.name]
                                     ],
                                     editTitle: __("certs.content.edit_cert_title"),
-                                    onEditStart: async () => this.setState({editCert: {id: cert.id, name: cert.name, cert: "", file: null, file_too_large: false}}),
+                                    onEditShow: async () => this.setState({editCert: {id: cert.id, name: cert.name, cert: "", file: null, file_too_large: false}}),
                                     onEditGetChildren: () => [<>
                                         <FormRow label={__("certs.content.cert_name")}>
                                             <InputText value={state.editCert.name}
@@ -81,7 +78,7 @@ export class Certs extends Component<{}, State> {
                                             </div>
                                         </FormRow>
                                     </>],
-                                    onEditCommit: async () => {
+                                    onEditSubmit: async () => {
                                         await API.call('certs/modify', {
                                             id: state.editCert.id,
                                             name: state.editCert.name,
@@ -144,9 +141,11 @@ export class Certs extends Component<{}, State> {
 
 render(<Certs />, $("#certs")[0]);
 
-export function init() {}
+export function init() {
+}
 
-export function add_event_listeners(source: API.APIEventTarget) {}
+export function add_event_listeners(source: API.APIEventTarget) {
+}
 
 export function update_sidebar_state(module_init: any) {
     $('#sidebar-certs').prop('hidden', !module_init.certs);
