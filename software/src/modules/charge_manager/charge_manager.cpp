@@ -561,8 +561,7 @@ void ChargeManager::distribute_current()
         printed_all_chargers_seen = true;
     }
 
-    uint32_t available_current_init = seen_all_chargers_local ? available_current.get("current")->asUint() : 0;
-    uint32_t available_current = available_current_init;
+    uint32_t available = seen_all_chargers_local ? available_current.get("current")->asUint() : 0;
 
     bool use_3phase_minimum_current = available_phases.get("phases")->asUint() >= 3;
     uint32_t minimum_current = use_3phase_minimum_current ? this->minimum_current :
@@ -648,7 +647,7 @@ void ChargeManager::distribute_current()
 
         if (unreachable_evse_found) {
             // Shut down everything.
-            available_current = 0;
+            available = 0;
             LOCAL_LOG("%s", "stage 0: Unreachable, unreactive or misconfigured EVSE(s) found. Setting available current to 0 mA.");
             state.get("state")->updateUint(2);
 
@@ -685,7 +684,7 @@ void ChargeManager::distribute_current()
                   chargers_requesting_current,
                   chargers_requesting_current == 1 ? "" : "s",
                   chargers_requesting_current == 1 ? "s" : "",
-                  available_current);
+                  available);
 
         std::stable_sort(idx_array, idx_array + charger_count, [this](int left, int right) {
             return this->charger_state[left].requested_current < this->charger_state[right].requested_current;
@@ -723,8 +722,8 @@ void ChargeManager::distribute_current()
                 continue;
             }
 
-            if (available_current < current_to_set) {
-                LOCAL_LOG("stage 0: %u mA left, but %u mA required to unblock another charger. Blocking all following chargers.",available_current, current_to_set);
+            if (available < current_to_set) {
+                LOCAL_LOG("stage 0: %u mA left, but %u mA required to unblock another charger. Blocking all following chargers.",available, current_to_set);
                 current_to_set = 0;
             }
 
@@ -733,17 +732,17 @@ void ChargeManager::distribute_current()
             }
 
             current_array[idx_array[i]] = current_to_set;
-            available_current -= current_to_set;
+            available -= current_to_set;
 
             LOCAL_LOG("stage 0: Calculated target for %s (%s) of %u mA. %u mA left.",
                       this->get_charger_name(idx_array[i]),
                       this->hosts[idx_array[i]],
                       current_to_set,
-                      available_current);
+                      available);
         }
 
-        if (available_current > 0) {
-            LOCAL_LOG("stage 0: %u mA still available. Recalculating targets.", available_current);
+        if (available > 0) {
+            LOCAL_LOG("stage 0: %u mA still available. Recalculating targets.", available);
 
             int chargers_reallocated = 0;
             for (int i = 0; i < charger_count; ++i) {
@@ -751,7 +750,7 @@ void ChargeManager::distribute_current()
                     continue;
 
                 auto &charger = this->charger_state[idx_array[i]];
-                uint16_t current_per_charger = MIN(32000, available_current / (chargers_allocated_current_to - chargers_reallocated));
+                uint16_t current_per_charger = MIN(32000, available / (chargers_allocated_current_to - chargers_reallocated));
 
                 uint16_t requested_current = charger.requested_current;
                 // Protect against overflow.
@@ -763,21 +762,21 @@ void ChargeManager::distribute_current()
                 ++chargers_reallocated;
 
                 current_array[idx_array[i]] += current_to_add;
-                available_current -= current_to_add;
+                available -= current_to_add;
 
                 LOCAL_LOG("stage 0: Recalculated target for %s (%s) of %u mA. %u mA left.",
                           this->get_charger_name(idx_array[i]),
                           this->hosts[idx_array[i]],
                           current_array[idx_array[i]],
-                          available_current);
+                          available);
             }
         }
     }
 
     // Wake up chargers that already charged once.
     {
-        if (available_current > 0) {
-            LOCAL_LOG("stage 0: %u mA still available. Attempting to wake up chargers that already charged their vehicle once.", available_current);
+        if (available > 0) {
+            LOCAL_LOG("stage 0: %u mA still available. Attempting to wake up chargers that already charged their vehicle once.", available);
 
             uint16_t current_to_set = minimum_current;
             for (int i = 0; i < charger_count; ++i) {
@@ -801,8 +800,8 @@ void ChargeManager::distribute_current()
                               current_to_set);
                 }
 
-                if (available_current < current_to_set) {
-                    LOCAL_LOG("stage 0: %u mA left, but %u mA required to unblock another charger. Blocking all following chargers.",available_current, current_to_set);
+                if (available < current_to_set) {
+                    LOCAL_LOG("stage 0: %u mA left, but %u mA required to unblock another charger. Blocking all following chargers.",available, current_to_set);
                     current_to_set = 0;
                 }
 
@@ -811,13 +810,13 @@ void ChargeManager::distribute_current()
                 }*/
 
                 current_array[idx_array[i]] = current_to_set;
-                available_current -= current_to_set;
+                available -= current_to_set;
 
                 LOCAL_LOG("stage 0: Calculated target for %s (%s) of %u mA. %u mA left.",
                           this->get_charger_name(idx_array[i]),
                           this->hosts[idx_array[i]],
                           current_to_set,
-                          available_current);
+                          available);
             }
         }
     }
@@ -912,8 +911,14 @@ void ChargeManager::distribute_current()
     }
 
     if (allocated_current_callback) {
+        uint32_t allocated_current = 0;
+        for (int i = 0; i < charger_count; ++i) {
+            auto &charger = this->charger_state[i];
+            allocated_current += charger.allocated_current;
+        }
+
         // Inform callback about how much current we distributed to chargers.
-        allocated_current_callback(available_current_init - available_current);
+        allocated_current_callback(allocated_current);
     }
 
 #if MODULE_ENERGY_MANAGER_AVAILABLE() && !MODULE_EVSE_COMMON_AVAILABLE()
