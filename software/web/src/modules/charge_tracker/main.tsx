@@ -35,6 +35,7 @@ import { ConfigForm } from "../../ts/components/config_form";
 import { InputFloat } from "../../ts/components/input_float";
 import { SubPage } from "../../ts/components/sub_page";
 import { useMemo } from "preact/hooks";
+import { OutputFloat } from "../../ts/components/output_float";
 
 type Charge = API.getType["charge_tracker/last_charges"][0];
 type ChargeTrackerConfig = API.getType["charge_tracker/config"];
@@ -475,7 +476,7 @@ export class ChargeTrackerStatus extends Component {
         let electricity_price = API.get('charge_tracker/config').electricity_price;
     
         let electricity_price_edit = <FormRow label={__("charge_tracker.status.current_price")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
-            <InputText value={util.toLocaleFixed(electricity_price / 100, 2) + " ct/kWh"}/>
+            <OutputFloat value={electricity_price} digits={2} scale={2} unit={'ct/kWh'}/>
         </FormRow>
     
         let current_charge = <></>;
