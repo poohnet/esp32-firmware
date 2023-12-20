@@ -20,6 +20,7 @@
 #pragma once
 
 #include "module.h"
+#include "bindings/bricklet_industrial_quad_relay_v2.h"
 
 class EvseCPC final : public IModule
 {
@@ -30,4 +31,7 @@ public:
 
   bool get_control_pilot_disconnect();
   void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
+
+private:
+  TF_IndustrialQuadRelayV2 device;
 };

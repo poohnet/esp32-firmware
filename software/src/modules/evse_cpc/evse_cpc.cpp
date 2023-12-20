@@ -17,8 +17,16 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include "api.h"
+#include "event_log.h"
 #include "evse_cpc.h"
-#include "module_dependencies.h"
+
+#include "bindings/hal_common.h"
+#include "bindings/errors.h"
+
+extern TF_HAL hal;
+
+#define CP_CHANNEL 0
 
 static const char* toString(bool cp_disconnect)
 {
@@ -31,9 +39,15 @@ EvseCPC::EvseCPC()
 
 void EvseCPC::setup()
 {
-  if (!industrial_quad_relay.initialized) {
-    logger.printfln("EvseCPC::setup(): Industrial Quad Relay Bricklet not initialized. Disabling feature CP-Disconnect.");
+  if (tf_industrial_quad_relay_v2_create(&device, nullptr, &hal) != TF_E_OK) {
+    logger.printfln("EvseCPC::setup(): No Industrial Quad Relay Bricklet 2.0 found, disabling feature CP-Disconnect.");
     return;
+  }
+
+  tf_industrial_quad_relay_v2_set_status_led_config(&device, TF_INDUSTRIAL_QUAD_RELAY_V2_STATUS_LED_CONFIG_SHOW_STATUS);
+
+  for (uint8_t channel = 0; channel < 4; channel++) {
+    tf_industrial_quad_relay_v2_set_channel_led_config(&device, channel, TF_INDUSTRIAL_QUAD_RELAY_V2_CHANNEL_LED_CONFIG_SHOW_CHANNEL_STATUS);
   }
 
   initialized = true;
@@ -44,7 +58,15 @@ void EvseCPC::setup()
 bool EvseCPC::get_control_pilot_disconnect()
 {
   if (initialized) {
-    return !industrial_quad_relay.getValue(0);
+    bool values[4] = { false };
+    int rc = tf_industrial_quad_relay_v2_get_value(&device, values);
+
+    if (rc != TF_E_OK) {
+      logger.printfln("EvseCPC::get_control_pilot_disconnect(): tf_industrial_quad_relay_v2_get_value() returned %d", rc);
+      return false;
+    }
+
+    return !values[CP_CHANNEL];
   }
 
   return false;
@@ -55,7 +77,12 @@ void EvseCPC::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconne
   static bool old_cp_disconnect = true;
 
   if (initialized) {
-    industrial_quad_relay.setValue(0, !cp_disconnect);
+    int rc = tf_industrial_quad_relay_v2_set_selected_value(&device, CP_CHANNEL, !cp_disconnect);
+
+    if (rc != TF_E_OK) {
+      logger.printfln("EvseCPC::set_control_pilot_disconnect(): tf_industrial_quad_relay_v2_set_selected_value() returned %d", rc);
+      return;
+    }
 
     if (cp_disconnect != old_cp_disconnect) {
       logger.printfln("EvseCPC::set_control_pilot_disconnect(): %s => %s", toString(old_cp_disconnect), toString(cp_disconnect));
