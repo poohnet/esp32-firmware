@@ -37,6 +37,13 @@ EvseCPC::EvseCPC()
 {
 }
 
+void EvseCPC::pre_setup()
+{
+    state = Config::Object({
+      {"connected", Config::Bool(false)},
+    });
+}
+
 void EvseCPC::setup()
 {
   if (tf_industrial_quad_relay_v2_create(&device, nullptr, &hal) != TF_E_OK) {
@@ -48,11 +55,19 @@ void EvseCPC::setup()
 
   for (uint8_t channel = 0; channel < 4; channel++) {
     tf_industrial_quad_relay_v2_set_channel_led_config(&device, channel, TF_INDUSTRIAL_QUAD_RELAY_V2_CHANNEL_LED_CONFIG_SHOW_CHANNEL_STATUS);
+    tf_industrial_quad_relay_v2_set_selected_value(&device, channel, false);
   }
+
+  state.get("connected")->updateBool(false);
 
   initialized = true;
   api.addFeature("cp_disconnect");
   set_control_pilot_disconnect(false, nullptr);
+}
+
+void EvseCPC::register_urls()
+{
+  api.addState("evse_cpc/state", &state);
 }
 
 bool EvseCPC::get_control_pilot_disconnect()
@@ -74,23 +89,24 @@ bool EvseCPC::get_control_pilot_disconnect()
 
 void EvseCPC::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected)
 {
-  static bool old_cp_disconnect = true;
-
   if (initialized) {
-    int rc = tf_industrial_quad_relay_v2_set_selected_value(&device, CP_CHANNEL, !cp_disconnect);
-
-    if (rc != TF_E_OK) {
-      logger.printfln("EvseCPC::set_control_pilot_disconnect(): tf_industrial_quad_relay_v2_set_selected_value() returned %d", rc);
-      return;
-    }
+    bool old_cp_disconnect = get_control_pilot_disconnect();
 
     if (cp_disconnect != old_cp_disconnect) {
-      logger.printfln("EvseCPC::set_control_pilot_disconnect(): %s => %s", toString(old_cp_disconnect), toString(cp_disconnect));
-      old_cp_disconnect = cp_disconnect;
-    }
-  }
+      int rc = tf_industrial_quad_relay_v2_set_selected_value(&device, CP_CHANNEL, !cp_disconnect);
 
-  if (cp_disconnected) {
-    *cp_disconnected = get_control_pilot_disconnect();
+      if (rc != TF_E_OK) {
+        logger.printfln("EvseCPC::set_control_pilot_disconnect(): tf_industrial_quad_relay_v2_set_selected_value() returned %d", rc);
+        return;
+      }
+
+      cp_disconnect = get_control_pilot_disconnect();
+      state.get("connected")->updateBool(!cp_disconnect);
+      logger.printfln("EvseCPC::set_control_pilot_disconnect(): %s => %s", toString(old_cp_disconnect), toString(cp_disconnect));
+    }
+
+    if (cp_disconnected) {
+      *cp_disconnected = cp_disconnect;
+    }
   }
 }

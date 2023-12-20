@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "module.h"
 #include "bindings/bricklet_industrial_quad_relay_v2.h"
 
@@ -27,11 +28,14 @@ class EvseCPC final : public IModule
 public:
   EvseCPC();
 
+  void pre_setup() override;
   void setup() override;
+  void register_urls() override;
 
   bool get_control_pilot_disconnect();
   void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
 
 private:
+  ConfigRoot state;
   TF_IndustrialQuadRelayV2 device;
 };
