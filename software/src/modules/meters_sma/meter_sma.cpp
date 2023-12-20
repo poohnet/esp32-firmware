@@ -140,7 +140,7 @@ MeterSMA::MeterSMA(uint32_t slot)
 _ATTRIBUTE((const))
 MeterClassID MeterSMA::get_class() const
 {
-  return MeterClassID::EnergyManager;
+  return MeterClassID::SMA;
 }
 
 void MeterSMA::setup(Config &ephemeral_config)
