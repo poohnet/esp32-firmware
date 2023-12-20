@@ -28,26 +28,26 @@
 
 #include "pdf_charge_log.h"
 
-struct ChargeStart {
+struct [[gnu::packed]] ChargeStart {
     uint32_t timestamp_minutes = 0;
     float meter_start = 0.0f;
     uint8_t user_id = 0;
     uint16_t electricity_price = 0;
     uint8_t __dummy[5] = {0};
-} __attribute__((packed));
+};
 
 static_assert(sizeof(ChargeStart) == 16, "Unexpected size of ChargeStart");
 
-struct ChargeEnd {
+struct [[gnu::packed]] ChargeEnd {
     uint32_t charge_duration = 0;
     float meter_end = 0.0f;
     uint8_t __dummy[8] = {0};
-} __attribute__((packed));
+};
 
-struct Charge {
+struct [[gnu::packed]] Charge {
     ChargeStart cs;
     ChargeEnd ce;
-} __attribute__((packed));
+};
 
 static bool repair_logic(Charge *);
 

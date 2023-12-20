@@ -29,7 +29,7 @@ void MetersEM::pre_setup()
     });
 
     state_prototype = Config::Object({
-        {"type",  Config::Uint(0)}  // 0 - not available, 1 - sdm72, 2 - sdm630, 3 - sdm72v2, ... see meter.h
+        {"type", Config::Uint(0)}, // 0 - not available, 1 - sdm72, 2 - sdm630, 3 - sdm72v2, ... see meter_defs.h
     });
 
     errors_prototype = Config::Object({
@@ -41,10 +41,10 @@ void MetersEM::pre_setup()
         {"slave_device_failure", Config::Uint32(0)},
     });
 
-    meters.register_meter_generator(MeterClassID::EnergyManager, this);
+    meters.register_meter_generator(get_class(), this);
 }
 
-_ATTRIBUTE((const))
+[[gnu::const]]
 MeterClassID MetersEM::get_class() const
 {
     return MeterClassID::EnergyManager;
@@ -60,13 +60,13 @@ IMeter * MetersEM::new_meter(uint32_t slot, Config *state, Config * errors)
     return meter_instance;
 }
 
-_ATTRIBUTE((const))
+[[gnu::const]]
 const Config * MetersEM::get_config_prototype()
 {
     return &config_prototype;
 }
 
-_ATTRIBUTE((const))
+[[gnu::const]]
 const Config * MetersEM::get_state_prototype()
 {
     return &state_prototype;
