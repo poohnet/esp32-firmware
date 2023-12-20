@@ -93,9 +93,6 @@ bool ChargeManager::action_triggered(Config *config, void *data) {
 static bool trigger_action(Config *config, void *data) {
     return charge_manager.action_triggered(config, data);
 }
-void ChargeManager::trigger_wd() {
-    cron.trigger_action(CronTriggerID::ChargeManagerWd, nullptr, trigger_action);
-}
  #endif
 #endif
 
@@ -224,6 +221,11 @@ void ChargeManager::pre_setup()
         [this](const Config *config) {
             this->available_current.get("current")->updateUint(config->get("current")->asUint());
             this->last_available_current_update = millis();
+        },
+        [](const Config *config) -> String {
+            if (config->get("current")->asUint() > max_avail_current)
+                return "Current too large: maximum available current is configured to " + String(max_avail_current);
+            return "";
         });
 #endif
 }
