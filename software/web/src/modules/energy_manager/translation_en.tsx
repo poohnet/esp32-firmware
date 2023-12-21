@@ -122,22 +122,22 @@ let x = {
             "hysteresis_time": "Hysteresis time",
             "hysteresis_time_muted": "Minimum delay before phase switches or starting or stopping a charge, to avoid excessive wear on the vehicle's charge electronics by switching too often."
         },
-        "cron": {
+        "automation": {
             "slot": "Blocking slot",
             "block_charge": "Block charging",
             "unblock_charge": "Unblock charging",
             "block_mode": "Mode",
-            "cron_block_charge_action_text": /*FFN*/(slot: number, block: boolean) => {
+            "automation_block_charge_action_text": /*FFN*/(slot: number, block: boolean) => {
                 if (block) {
-                    return <>block charging with slot {slot}.</>
+                    return <><b>block</b> charging with slot <b>{slot}</b>.</>
                 }
-                return <>unblock charging with slot {slot}.</>
+                return <><b>unblock</b> charging with slot <b>{slot}</b>.</>
             }/*NF*/,
             "limit_max_current": "Limit maximum total current",
             "limit_mode": "Mode",
             "reset_limit_max_current": "Reset maximum total current limit",
             "max_current": "Maximum total current",
-            "cron_limit_max_current_action_text": /*FFN*/(current: number, default_current: number) => {
+            "automation_limit_max_current_action_text": /*FFN*/(current: number, default_current: number) => {
                 if (current === -1) {
                     return <>reset maximum total current limit to the configured default current (<b>{default_current / 1000} A</b>).</>
                 }
@@ -146,30 +146,30 @@ let x = {
             "grid_power_draw": "Grid power draw",
             "drawing": "Drawing power from the grid",
             "feeding": "Feeding power to the grid",
-            "cron_grid_power_draw_text": /*FFN*/(drawing_power: boolean) => {
+            "automation_grid_power_draw_text": /*FFN*/(drawing_power: boolean) => {
                 if (drawing_power) {
-                    return <>When power is drawn from the grid, </>;
+                    return <>When <b>power is drawn</b> from the grid, </>;
                 } else {
-                    return <>When power is fed the grid, </>;
+                    return <>When <b>power is fed</b> the grid, </>;
                 }
             }/*NF*/,
             "power_available": "Power available",
             "not_available": "not available",
             "available": "available",
             "power": "Power",
-            "cron_power_available_text": /*FFN*/(power: boolean) => {
+            "automation_power_available_text": /*FFN*/(power: boolean) => {
                 let not = <></>
                 if (!power) {
                     not = <><b>not </b></>
                 }
-                return <>When {not}enough power for charging is available, </>
+                return <>When {not}<b>enough</b> power for charging is available, </>
             }/*NF*/,
             "contactor_monitoring": "Contactor monitoring",
-            "cron_contactor_monitoring_text": /*FFN*/(contactor: boolean) => {
+            "automation_contactor_monitoring_text": /*FFN*/(contactor: boolean) => {
                 if (contactor) {
-                    return <>When <b>no</b> contactor error is detected on boot, </>
+                    return <>When <b>no contactor error</b> is detected on boot, </>
                 } else {
-                    return <>When a contactor error is detected, </>
+                    return <>When <b>a contactor error</b> is detected, </>
                 }
             }/*NF*/,
             "contactor_monitoring_state": "State",
@@ -177,7 +177,7 @@ let x = {
             "contactor_okay": "No contactor error on boot",
             "phase_switch": "Phase switching",
             "phase": "Phase",
-            "cron_phase_switch_text": /*FFN*/(phase: number) => {
+            "automation_phase_switch_text": /*FFN*/(phase: number) => {
                 let ret = <></>;
                 switch (phase) {
                     case 1:
@@ -194,16 +194,16 @@ let x = {
             "state": "State",
             "closed": "Closed",
             "open": "Open",
-            "cron_input_text": /*FFN*/(input: number, state: boolean) => {
+            "automation_input_text": /*FFN*/(input: number, state: boolean) => {
                 let ret = state ? <><b>closed</b></> : <><b>open</b></>
-                return <>If Input {input} switches to state {ret}, </>
+                return <>If <b>Input {input}</b> switches to state {ret}, </>
             }/*NF*/,
             "switch_relay": "Switch relay",
             "relay_state": "Swtich to",
             "relay_state_open": "Open",
             "relay_state_closed": "Closed",
             "relay_action_text": /*FFN*/(state: boolean) => {
-                let ret = state ? <><b>Close</b></> : <><b>Open</b></>
+                let ret = state ? <><b>close</b></> : <><b>open</b></>
                 return <>{ret} relay.</>
             }/*NF*/,
             "charge_mode_default": "Default mode",
@@ -244,7 +244,7 @@ let x = {
             "phases_wanted": "Switch to",
             "single_phase": "Single-phase",
             "three_phase": "Three-phase",
-            "cron_action_text": /*SFN*/(phases: number) => "Switch to " + (phases == 1 ? "Single-phase." : "Thress-phase.")/*NF*/
+            "automation_action_text": /*FFN*/(phases: number) => <>switch to <b>{phases == 1 ? "Single-phase" : "Three-phase"}</b></>/*NF*/
         },
         "script": {
             "save_failed": "Failed to save energy manager settings.",

@@ -97,9 +97,9 @@ void ChargeTracker::pre_setup()
         {"electricity_price", Config::Uint16(0)}
     })};
 
-// #if MODULE_CRON_AVAILABLE()
-//     cron.register_action(
-//         CronActionID::ChargeTrackerReset,
+// #if MODULE_AUTOMATION_AVAILABLE()
+//     automation.register_action(
+//         AutomationActionID::ChargeTrackerReset,
 //         *Config::Null(),
 //         [this](const Config *conf) {
 //             (void)conf;
@@ -337,6 +337,10 @@ bool ChargeTracker::setupRecords()
         String name = String(f.name());
         if (f.isDirectory()) {
             logger.printfln("Unexpected directory %s in charge record folder", name.c_str());
+            continue;
+        }
+
+        if (name == "use_imexsum") {
             continue;
         }
 

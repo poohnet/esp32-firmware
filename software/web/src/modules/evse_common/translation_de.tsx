@@ -116,7 +116,7 @@ let x = {
             "meter_monitoring": "Zählerüberwachung",
             "meter_monitoring_desc": "Überwacht den Stromzähler und blockiert Ladevorgänge im Falle eines Defekts.",
 
-            "enable_led_api": "Status-LED Steuerung",
+            "enable_led_api": "Status-LED-Steuerung",
             "enable_led_api_desc": "Erlaubt die externe Steuerung der Status-LED.",
 
             "slot": /*SFN*/(i: number) => { return {
@@ -134,7 +134,7 @@ let x = {
                 11: "OCPP",
                 12: "Energie-/Zeitlimit",
                 13: "Zählerüberwachung",
-                14: "Cron"
+                14: "Automatisierung"
             }[i];}/*NF*/,
 
             // EVSE V1 only
@@ -175,7 +175,7 @@ let x = {
             "active_high_suffix": " wenn geöffnet",
 
             "todo": "Ideen bzw. Wünsche? Schreib eine Mail an info@tinkerforge.com",
-            "gpio_in_muted": "Kann als GPIO 16 gelesen werden",
+            "gpio_in_muted": "kann als GPIO 16 gelesen werden",
             "gpio_out_muted": <><a href="https://de.wikipedia.org/wiki/Open-Collector-Ausgang">Open-Collector-Ausgang</a></>,
             "button_configuration_muted": "Aktion, die bei Druck des Tasters ausgeführt wird.",
             "button_configuration_deactivated": "Keine Aktion",
@@ -218,15 +218,11 @@ let x = {
             "switch_to_one_phase": "Umschalten auf einphasig",
             "switch_to_three_phases": "Umschalten auf dreiphasig"
         },
-        "cron" : {
-            "external_current_wd": "Externer Steuerungs Watchdog",
-            "external_current_wd_trigger": "Wenn der Watchdog der Externen steuerung auslöst, ",
+        "automation" : {
+            "external_current_wd": "Watchdog der externen Steuerung",
+            "external_current_wd_trigger": <>Wenn der <b>Watchdog</b> der <b>externen</b> Steuerung auslöst, </>,
             "api_must_be_enabled": "Die API muss aktiviert sein, um die Status-LED steuern zu können.",
             "state_change": "Fahrzeugstatus gewechselt",
-            "cron_sd_trigger_text": /*FFN*/(state: boolean) => <>Wenn der Abschalteingang <b>{state ? "geöffnet" : "geschlossen"}</b> wird,{" "}</>/*NF*/,
-            "cron_gpin_trigger_text": /*FFN*/(state: boolean) => <>Wenn der Konfigurierbare Eingang <b>{state ? "geöffnet" : "geschlossen"}</b> wird,{" "}</>/*NF*/,
-            "cron_button_trigger_text": /*FFN*/(state: boolean) => <>Wenn der Fronttaster <b>{state ? "gedrückt" : "losgelassen"}</b> wird,{" "}</>/*NF*/,
-            "cron_gpout_action_text": /*FFN*/(state: number) => state ? <><b>schalte</b> den Konfigurierbaren Ausgang <b>hochohmig</b>.</> : <><b>verbinde</b> den Konfigurierbaren Ausgang <b>mit Masse</b>.</>/*NF*/,
             "led_duration": "Dauer",
             "led_state": "LED-Zustand",
             "led_state_off": "Aus",
@@ -241,9 +237,9 @@ let x = {
             "to": "Zu",
             "any": "Beliebiger Status",
             "allowed_charging_current": "Erlaubter Ladestrom",
-            "cron_state_change_trigger": /*FFN*/(old_state: string, new_state: string) => <>Wenn der Ladecontroller vom Zustand "<b>{old_state}</b>" auf Zustand "<b>{new_state}</b>" wechselt,{" "}</>/*NF*/,
-            "cron_action_text": /*FFN*/(current: string) => <>setze den erlaubten Ladestrom auf <b>{current} A</b>.</>/*NF*/,
-            "cron_led_action_text": /*FFN*/(state: string, duration: number) => (state == "An" || state == "Aus") ? <>schalte die Status-LED für <b>{duration / 1000} Sekunden</b> <b>{state}</b>.</> : <>zeige <b>{state}</b> für <b>{duration / 1000} Sekunden</b> auf der Status-LED.</>/*NF*/
+            "automation_state_change_trigger": /*FFN*/(old_state: string, new_state: string) => <>Wenn der Fahrzeugstatus von "<b>{old_state}</b>" auf "<b>{new_state}</b>" wechselt,{" "}</>/*NF*/,
+            "automation_action_text": /*FFN*/(current: string) => <>setze den erlaubten Ladestrom auf <b>{current} A</b>.</>/*NF*/,
+            "automation_led_action_text": /*FFN*/(state: string, duration: number) => (state == "An" || state == "Aus") ? <>schalte die Status-LED für <b>{duration / 1000} Sekunden</b> <b>{state}</b>.</> : <>zeige <b>{state}</b> für <b>{duration / 1000} Sekunden</b> auf der Status-LED.</>/*NF*/
         },
         "script": {
             "set_charging_current_failed": "Konnte Ladestrom nicht setzen",
@@ -287,7 +283,7 @@ let x = {
                 11: "OCPP",
                 12: "Energie-/Zeitlimit",
                 13: "Zählerüberwachung",
-                14: "Cron"
+                14: "Automation"
             }[i];}/*NF*/,
 
             "reboot_content_changed": "Ladeeinstellungen",

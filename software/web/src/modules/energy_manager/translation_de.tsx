@@ -122,22 +122,22 @@ let x = {
             "hysteresis_time": "Hysterese-Zeit",
             "hysteresis_time_muted": "Minimale Wartezeit vor Phasenumschaltungen bzw. Anfang und Ende eines Ladevorganges, um die Ladeelektronik des Fahrzeuges nicht durch häufige Schaltvorgänge zu belasten."
         },
-        "cron": {
+        "automation": {
             "slot": "Blockierungsslot",
             "block_charge": "Laden blockieren",
             "unblock_charge": "Laden freigeben",
             "block_mode": "Modus",
-            "cron_block_charge_action_text": /*FFN*/(slot: number, block: boolean) => {
+            "automation_block_charge_action_text": /*FFN*/(slot: number, block: boolean) => {
                 if (block) {
-                    return <>blockiere das Laden durch Slot {slot}.</>
+                    return <><b>blockiere</b> das Laden durch Slot <b>{slot}</b>.</>
                 }
-                return <>gebe das Laden durch Slot {slot} frei.</>
+                return <><b>gebe</b> das Laden durch Slot <b>{slot} frei</b>.</>
             }/*NF*/,
             "limit_max_current": "Maximalen Gesamtstrom begrenzen",
             "limit_mode": "Modus",
             "reset_limit_max_current": "Maximalen Gesamtstrom zurücksetzen",
             "max_current": "Maximaler Gesamtstrom",
-            "cron_limit_max_current_action_text": /*FFN*/(current: number, default_current: number) => {
+            "automation_limit_max_current_action_text": /*FFN*/(current: number, default_current: number) => {
                 if (current === -1) {
                     return <>setze den maximalen Gesamtstrom zurück auf den Standardwert (<b>{default_current / 1000} A</b>).</>
                 }
@@ -146,30 +146,30 @@ let x = {
             "grid_power_draw": "Netzbezug",
             "drawing": "Bezieht Energie aus dem Netz",
             "feeding": "Speist Energie ins Netz ein",
-            "cron_grid_power_draw_text": /*FFN*/(drawing_power: boolean) => {
+            "automation_grid_power_draw_text": /*FFN*/(drawing_power: boolean) => {
                 if (drawing_power) {
-                    return <>Wenn Energie aus dem Stromnetz bezogen wird, </>;
+                    return <>Wenn <b>Energie</b> aus dem Stromnetz <b>bezogen</b> wird, </>;
                 } else {
-                    return <>Wenn Energie ins Stromnetz eingespeist wird, </>;
+                    return <>Wenn <b>Energie</b> ins Stromnetz <b>eingespeist</b> wird, </>;
                 }
             }/*NF*/,
             "power_available": "Leistung verfügbar",
             "not_available": "Nicht verfügbar",
             "available": "Verfügbar",
             "power": "Leistung",
-            "cron_power_available_text": /*FFN*/(power: boolean) => {
+            "automation_power_available_text": /*FFN*/(power: boolean) => {
                 let not = <></>
                 if (!power) {
                     not = <><b>nicht </b></>
                 }
-                return <>Wenn {not}genug Leistung zum Laden verfügbar ist, </>
+                return <>Wenn {not}<b>genug</b> Leistung zum Laden verfügbar ist, </>
             }/*NF*/,
             "contactor_monitoring": "Schützüberwachung",
-            "cron_contactor_monitoring_text": /*FFN*/(contactor: boolean) => {
+            "automation_contactor_monitoring_text": /*FFN*/(contactor: boolean) => {
                 if (contactor) {
-                    return <>Wenn beim Start <b>kein</b> Schützfehler erkannt wird, </>
+                    return <>Wenn beim Start <b>kein Schützfehler</b> erkannt wird, </>
                 } else {
-                    return <>Wenn <b>ein</b> Schützfehler erkannt wird, </>
+                    return <>Wenn <b>ein Schützfehler</b> erkannt wird, </>
                 }
             }/*NF*/,
             "contactor_monitoring_state": "Status",
@@ -177,7 +177,7 @@ let x = {
             "contactor_okay": "Kein Schützfehler bei Start",
             "phase_switch": "Phasenumschaltung",
             "phase": "Phase",
-            "cron_phase_switch_text": /*FFN*/(phase: number) => {
+            "automation_phase_switch_text": /*FFN*/(phase: number) => {
                 let ret = <></>;
                 switch (phase) {
                     case 1:
@@ -194,9 +194,9 @@ let x = {
             "state": "Zustand",
             "closed": "Geschlossen",
             "open": "Offen",
-            "cron_input_text": /*FFN*/(input: number, state: boolean) => {
+            "automation_input_text": /*FFN*/(input: number, state: boolean) => {
                 let ret = state ? <><b>geschlossen</b></> : <><b>offen</b></>
-                return <>Wenn Eingang {input} auf Zustand {ret} wechselt, </>
+                return <>Wenn <b>Eingang {input}</b> auf Zustand {ret} wechselt, </>
             }/*NF*/,
             "switch_relay": "Relay schalten",
             "relay_state": "Schalten auf",
@@ -238,13 +238,13 @@ let x = {
                         ret = <><b>Standardmodus ({modes[default_mode]})</b></>
                         break;
                 }
-                return <>wechsel Lademodus auf {ret}.</>
+                return <>wechsle Lademodus auf {ret}.</>
             }/*NF*/,
             "set_phases": "Phasenumschaltung",
             "phases_wanted": "Umschaltung auf",
             "single_phase": "Einphasig",
             "three_phase": "Dreiphasig",
-            "cron_action_text": /*SFN*/(phases: number) => "Umschaltung auf " + (phases == 1 ? "Einphasig." : "Dreiphasig.")/*NF*/
+            "automation_action_text": /*FFN*/(phases: number) => <>Schalte auf <b>{phases == 1 ? "Einphasig" : "Dreiphasig"}</b> um.</>/*NF*/
         },
         "script": {
             "save_failed": "Speichern der Energiemanager-Einstellungen fehlgeschlagen.",
