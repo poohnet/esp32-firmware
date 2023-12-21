@@ -36,6 +36,8 @@ public:
   void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
 
 private:
+  void update_all_data();
+
   ConfigRoot state;
   TF_IndustrialQuadRelayV2 device;
 };

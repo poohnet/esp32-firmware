@@ -19,6 +19,7 @@
 
 #include "api.h"
 #include "event_log.h"
+#include "task_scheduler.h"
 #include "evse_cpc.h"
 
 #include "bindings/hal_common.h"
@@ -58,11 +59,15 @@ void EvseCPC::setup()
     tf_industrial_quad_relay_v2_set_selected_value(&device, channel, false);
   }
 
-  state.get("connected")->updateBool(false);
-
   initialized = true;
   api.addFeature("cp_disconnect");
+
+  update_all_data();
   set_control_pilot_disconnect(false, nullptr);
+
+  task_scheduler.scheduleWithFixedDelay([this]() {
+    update_all_data();
+  }, 0, 250);
 }
 
 void EvseCPC::register_urls()
@@ -72,41 +77,46 @@ void EvseCPC::register_urls()
 
 bool EvseCPC::get_control_pilot_disconnect()
 {
-  if (initialized) {
-    bool values[4] = { false };
-    int rc = tf_industrial_quad_relay_v2_get_value(&device, values);
-
-    if (rc != TF_E_OK) {
-      logger.printfln("EvseCPC::get_control_pilot_disconnect(): tf_industrial_quad_relay_v2_get_value() returned %d", rc);
-      return false;
-    }
-
-    return !values[CP_CHANNEL];
-  }
-
-  return false;
+  return !state.get("connected")->asBool();
 }
 
 void EvseCPC::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected)
 {
-  if (initialized) {
-    bool old_cp_disconnect = get_control_pilot_disconnect();
-
-    if (cp_disconnect != old_cp_disconnect) {
-      int rc = tf_industrial_quad_relay_v2_set_selected_value(&device, CP_CHANNEL, !cp_disconnect);
-
-      if (rc != TF_E_OK) {
-        logger.printfln("EvseCPC::set_control_pilot_disconnect(): tf_industrial_quad_relay_v2_set_selected_value() returned %d", rc);
-        return;
-      }
-
-      cp_disconnect = get_control_pilot_disconnect();
-      state.get("connected")->updateBool(!cp_disconnect);
-      logger.printfln("EvseCPC::set_control_pilot_disconnect(): %s => %s", toString(old_cp_disconnect), toString(cp_disconnect));
-    }
-
-    if (cp_disconnected) {
-      *cp_disconnected = cp_disconnect;
-    }
+  if (!initialized) {
+    return;
   }
+
+  bool old_cp_disconnect = get_control_pilot_disconnect();
+
+  if (cp_disconnect != old_cp_disconnect) {
+    int rc = tf_industrial_quad_relay_v2_set_selected_value(&device, CP_CHANNEL, !cp_disconnect);
+
+    if (rc != TF_E_OK) {
+      logger.printfln("EvseCPC::set_control_pilot_disconnect(): tf_industrial_quad_relay_v2_set_selected_value() returned %d", rc);
+      return;
+    }
+
+    logger.printfln("EvseCPC::set_control_pilot_disconnect(): %s => %s", toString(old_cp_disconnect), toString(cp_disconnect));
+  }
+
+  if (cp_disconnected) {
+    *cp_disconnected = cp_disconnect;
+  }
+}
+
+void EvseCPC::update_all_data()
+{
+  if (!initialized) {
+    return;
+  }
+
+  bool values[4] = { false };
+  int rc = tf_industrial_quad_relay_v2_get_value(&device, values);
+
+  if (rc != TF_E_OK) {
+    logger.printfln("EvseCPC::get_control_pilot_disconnect(): tf_industrial_quad_relay_v2_get_value() returned %d", rc);
+    return;
+  }
+
+  state.get("connected")->updateBool(values[CP_CHANNEL]);
 }
