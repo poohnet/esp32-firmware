@@ -39,18 +39,13 @@
               (((uint64_t)(x) & 0x00000000000000ffULL) << 56)))
 #endif
 
-obis::obis(MeterValueID valueId, uint8_t kanal, uint8_t messgroesse, uint8_t messart, uint8_t tarifstufe, float faktor, uint8_t valueSize)
-  : _valueId(valueId), _faktor(faktor), _valueSize(valueSize), _position(0)
+obis::obis(uint8_t kanal, uint8_t messgroesse, uint8_t messart, uint8_t tarifstufe, float faktor, uint8_t valueSize)
+  : _faktor(faktor), _valueSize(valueSize), _position(0)
 {
   _obis[0] = kanal;
   _obis[1] = messgroesse;
   _obis[2] = messart;
   _obis[3] = tarifstufe;
-}
-
-MeterValueID obis::valueId() const
-{
-  return _valueId;
 }
 
 float obis::value(uint8_t buf[], size_t bufSize)

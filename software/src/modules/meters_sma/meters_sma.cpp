@@ -20,6 +20,7 @@
 #include "meter_sma.h"
 #include "meters_sma.h"
 #include "module_dependencies.h"
+#include "modules/meters/meter_defs.h"
 
 #include "gcc_warnings.h"
 

@@ -19,18 +19,26 @@
 
 #pragma once
 
+#include <map>
 #include <math.h>
 
-#include "config.h"
-#include "modules/energy_manager/structs.h"
-#include "modules/meters/meter_defs.h"
 #include "modules/meters/imeter.h"
+#include "modules/meters/meter_value_id.h"
+#include "obis.h"
 
 #if defined(__GNUC__)
   #pragma GCC diagnostic push
   #include "gcc_warnings.h"
   #pragma GCC diagnostic ignored "-Weffc++"
 #endif
+
+struct cmpMeterValueID
+{
+  bool operator()(MeterValueID left, MeterValueID right) const
+  {
+    return static_cast<uint16_t>(left) < static_cast<uint16_t>(right);
+  }
+};
 
 class MeterSMA final : public IMeter
 {
@@ -50,6 +58,7 @@ private:
   void update_all_values();
 
   uint32_t _slot;
+  std::map<MeterValueID, obis*, cmpMeterValueID> _values;
 };
 
 #if defined(__GNUC__)
