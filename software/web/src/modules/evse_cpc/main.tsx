@@ -58,5 +58,5 @@ export function add_event_listeners(source: API.APIEventTarget) {
 }
 
 export function update_sidebar_state(module_init: any) {
-    $("#sidebar-evse_cpc").prop("hidden", !module_init.evse_cpc);
+    $("#sidebar-evse_cpc").prop("hidden", true);
 }
