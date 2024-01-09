@@ -19,21 +19,38 @@
 
 #pragma once
 
+#include "meter_pv_faker.h"
+
+#include <stdint.h>
+
 #include "config.h"
+#include "modules/meters/imeter.h"
+#include "modules/meters/meter_generator.h"
 #include "module.h"
 
-class EmPvFaker final : public IModule
+#if defined(__GNUC__)
+    #pragma GCC diagnostic push
+    #include "gcc_warnings.h"
+    #pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
+class MetersPvFaker final : public IModule, public MeterGenerator
 {
 public:
-    EmPvFaker(){}
+    // for IModule
     void pre_setup() override;
-    void setup() override;
-    void register_urls() override;
 
-    ConfigRoot state;
+    // for MeterGenerator
+    [[gnu::const]] MeterClassID get_class() const override;
+    virtual IMeter *new_meter(uint32_t slot, Config *state, Config *errors) override;
+    [[gnu::const]] virtual const Config *get_config_prototype() override;
+    [[gnu::const]] virtual const Config *get_state_prototype()  override;
+    [[gnu::const]] virtual const Config *get_errors_prototype() override;
 
 private:
-    ConfigRoot config;
-    ConfigRoot runtime_config;
-    ConfigRoot runtime_config_update;
+    Config config_prototype;
 };
+
+#if defined(__GNUC__)
+    #pragma GCC diagnostic pop
+#endif

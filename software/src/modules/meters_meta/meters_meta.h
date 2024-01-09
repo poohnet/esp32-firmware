@@ -19,27 +19,42 @@
 
 #pragma once
 
+#include "meter_meta.h"
+
 #include <stdint.h>
-#include "ArduinoJson.h"
+#include <vector>
 
 #include "config.h"
+#include "modules/meters/imeter.h"
+#include "modules/meters/meter_generator.h"
 #include "module.h"
 
-class MqttMeter final : public IModule
+#if defined(__GNUC__)
+    #pragma GCC diagnostic push
+    #include "gcc_warnings.h"
+    #pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
+class MetersMeta final : public IModule, public MeterGenerator
 {
 public:
-    MqttMeter(){}
-    void pre_setup() override;
-    void setup() override;
-    void register_urls() override;
+    // for IModule
+    void pre_setup()       override;
+    void register_events() override;
 
-    ConfigRoot config;
+    // for MeterGenerator
+    [[gnu::const]] MeterClassID get_class() const override;
+    IMeter *new_meter(uint32_t slot, Config *state, Config *errors) override;
+    [[gnu::const]] const Config *get_config_prototype() override;
+    [[gnu::const]] const Config *get_state_prototype()  override;
+    [[gnu::const]] const Config *get_errors_prototype() override;
 
 private:
-    void onMessage(const char *topic, size_t topic_len, char *data, size_t data_len, void (MqttMeter::*message_handler)(const JsonDocument &doc));
+    ConfigRoot config_prototype;
 
-    void handle_mqtt_values(const JsonDocument &doc);
-    void handle_mqtt_all_values(const JsonDocument &doc);
-
-    uint8_t mqtt_meter_type = 0;
+    std::vector<MeterMeta *> *child_meters = nullptr;
 };
+
+#if defined(__GNUC__)
+    #pragma GCC diagnostic pop
+#endif
