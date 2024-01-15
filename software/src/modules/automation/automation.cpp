@@ -37,7 +37,7 @@ void Automation::pre_setup() {
         }
     );
     register_trigger(
-        AutomationTriggerID::Automation,
+        AutomationTriggerID::Cron,
         Config::Object({
             {"mday", Config::Int(-1, -1, 32)},
             {"wday", Config::Int(-1, -1, 9)},
@@ -114,7 +114,7 @@ void Automation::setup() {
     config_in_use = config;
     enabled_in_use = enabled;
 
-    if (is_trigger_active(AutomationTriggerID::Automation)) {
+    if (is_trigger_active(AutomationTriggerID::Cron)) {
         task_scheduler.scheduleWithFixedDelay([this]() {
             static int last_min = 0;
             static bool was_synced = false;
@@ -127,7 +127,7 @@ void Automation::setup() {
             tm time_struct;
             localtime_r(&tv.tv_sec, &time_struct);
             if (was_synced && time_struct.tm_min != last_min) {
-                trigger_action(AutomationTriggerID::Automation, &time_struct, func);
+                trigger_action(AutomationTriggerID::Cron, &time_struct, func);
             }
 
             last_min = time_struct.tm_min;
@@ -210,13 +210,13 @@ bool Automation::action_triggered(Config *conf, void *data) {
         triggered |= cfg->get("wday")->asInt() == 8 && time_struct->tm_wday > 0 && time_struct->tm_wday < 6;
         triggered |= cfg->get("wday")->asInt() == 9 && (time_struct->tm_wday == 0 || time_struct->tm_wday >= 6);
     } else {
-        triggered |= (cfg->get("wday")->asInt() % 7) == time_struct->tm_wday || cfg->get("wday")->asInt() == -1;
+        triggered |= (cfg->get("wday")->asInt() % 7) == time_struct->tm_wday;
     }
     triggered = (cfg->get("hour")->asInt() == time_struct->tm_hour || cfg->get("hour")->asInt() == -1) && triggered;
     triggered = (cfg->get("minute")->asInt() == time_struct->tm_min || cfg->get("minute")->asInt() == -1) && triggered;
 
     switch (conf->getTag<AutomationTriggerID>()) {
-        case AutomationTriggerID::Automation:
+        case AutomationTriggerID::Cron:
             if (triggered) {
                 return true;
             }
