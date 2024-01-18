@@ -190,7 +190,7 @@ def get_iec_state():
 
 def reset_dc_fault():
     global evse
-    return retry_wrapper(lambda: evse.reset(), "reset EVSE")
+    return retry_wrapper(lambda: evse.reset_dc_fault_current_state(0xDC42FA23), "reset DC fault current state")
 
 def has_evse_error():
     global evse
@@ -534,7 +534,6 @@ def main(stage3):
             do_factory_reset = len(user_config["users"]) != 1
         else:
             for i, u in enumerate(user_config["users"][1:]):
-                print(u)
                 if u["roles"] != 2 ** 16 - 1 or \
                    u["current"] != 32000 or \
                    u["display_name"] != "Benutzer {}".format(i + 1) or \

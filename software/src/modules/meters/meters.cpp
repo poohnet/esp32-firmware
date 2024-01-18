@@ -400,6 +400,7 @@ void Meters::register_urls()
 #if MODULE_METERS_LEGACY_API_AVAILABLE()
     if (meters_legacy_api.get_linked_meter_slot() < METERS_SLOTS) {
         api.addState("meter/error_counters", &meter_slots[meters_legacy_api.get_linked_meter_slot()].errors, {}, 1000);
+        meter_slots[meters_legacy_api.get_linked_meter_slot()].power_history.register_urls("meter/");
     }
 #endif
 }
@@ -783,6 +784,11 @@ void Meters::declare_value_ids(uint32_t slot, const MeterValueID new_value_ids[]
 
     meter_slot.values_declared = true;
     logger.printfln("meters: Meter in slot %u declared %u values.", slot, value_id_count);
+
+    if (!meters_feature_declared) {
+        api.addFeature("meters");
+        meters_feature_declared = true;
+    }
 }
 
 bool Meters::get_cached_power_index(uint32_t slot, uint32_t *index)
