@@ -41,7 +41,7 @@ size_t float_buf_size = 0;
 Config::ConfString::Slot *string_buf = nullptr;
 size_t string_buf_size = 0;
 
-#define ARRAY_SLOTS 32
+#define ARRAY_SLOTS 64
 Config::ConfArray::Slot *array_buf = nullptr;
 size_t array_buf_size = 0;
 
@@ -616,18 +616,40 @@ void config_pre_init()
 template<typename T>
 static void shrinkToFit(typename T::Slot * &buf, size_t &buf_size) {
     ASSERT_MAIN_THREAD();
-    size_t highest = 0;
-    int empty = 0;
-    for (size_t i = 0; i < buf_size; i++)
-        if (!T::slotEmpty(i))
-            highest = i;
-        else
-            ++empty;
+    size_t last_used_slot = 0;
+    int empty_slots = 0;
 
-    auto new_size = highest + 1 + std::max(0, SLOT_HEADROOM - empty);
+    // Search for last used slot first.
+    // All empty slots behind the last used slot will be cut off.
+    size_t pos = buf_size;
+    while (pos > 0) {
+        pos--;
+        if (!T::slotEmpty(pos)) {
+            last_used_slot = pos;
+            break;
+        }
+    }
+    while (pos > 0) {
+        pos--;
+        if (T::slotEmpty(pos)) {
+            empty_slots++;
+        }
+    }
+
+    // Shrink the buffer so that the last used slot fits
+    // (we are not allowed to move used slots in the buffer!)
+    // and we have SLOT_HEADROOM free slots.
+    // If there are empty slots before the last used one, prefer those.
+    // If there are not enough, add some empty slots behind the last used one.
+    size_t new_size = last_used_slot + 1 + (size_t)std::max(0, SLOT_HEADROOM - empty_slots);
+
+    // Don't increase buffer size. It will be increased automatically when required.
+    if (new_size >= buf_size)
+        return;
+
     auto new_buf = T::allocSlotBuf(new_size);
 
-    for(size_t i = 0; i <= highest; ++i)
+    for(size_t i = 0; i <= last_used_slot; ++i)
         new_buf[i] = std::move(buf[i]);
 
     T::freeSlotBuf(buf);
