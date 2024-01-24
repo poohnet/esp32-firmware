@@ -1,5 +1,5 @@
 /* esp32-firmware
- * Copyright (C) 2023 Thomas Hein
+ * Copyright (C) 2023-2024 Thomas Hein
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,9 +21,26 @@
 
 #include "config.h"
 #include "module.h"
-#include "bindings/bricklet_industrial_quad_relay_v2.h"
 
-class EvseCPC final : public IModule
+#include "bindings/bricklet_evse_cpc.h"
+
+#include "device_module.h"
+#include "evse_cpc_bricklet_firmware_bin.embedded.h"
+
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  //#include "gcc_warnings.h"
+  #pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
+class EvseCPC final : public DeviceModule<TF_EVSECPC,
+                                evse_cpc_bricklet_firmware_bin_data,
+                                evse_cpc_bricklet_firmware_bin_length,
+                                tf_evse_cpc_create,
+                                tf_evse_cpc_get_bootloader_mode,
+                                tf_evse_cpc_reset,
+                                tf_evse_cpc_destroy,
+                                false>
 {
 public:
   EvseCPC();
@@ -31,6 +48,9 @@ public:
   void pre_setup() override;
   void setup() override;
   void register_urls() override;
+  void loop() override;
+
+  void setup_evse_cpc();
 
   bool get_control_pilot_disconnect();
   void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
@@ -39,5 +59,8 @@ private:
   void update_all_data();
 
   ConfigRoot state;
-  TF_IndustrialQuadRelayV2 device;
 };
+
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif

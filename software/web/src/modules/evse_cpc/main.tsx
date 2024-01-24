@@ -38,7 +38,7 @@ export class EvseCPCStatus extends Component {
                 <IndicatorGroup
                     style="width: 100%"
                     class="flex-wrap"
-                    value={state.connected ? 1 : 0}
+                    value={state.channel0 ? 1 : 0}
                     items={[
                         ["warning", __("evse_cpc.status.disconnected")],
                         ["success", __("evse_cpc.status.connected")]

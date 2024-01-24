@@ -33,6 +33,7 @@ const char *tf_get_device_display_name(uint16_t device_id) {
         case 2146: return "E-Paper 296x128 Bricklet";
         case 2152: return "Energy Monitor Bricklet";
         case 2159: return "EVSE Bricklet";
+        case 9001: return "EVSE CPC Bricklet";
         case  276: return "GPS Bricklet 2.0";
         case 2171: return "GPS Bricklet 3.0";
         case 2132: return "Hall Effect Bricklet 2.0";

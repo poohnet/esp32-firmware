@@ -1,3 +1,4 @@
 export interface state {
-    connected: boolean;
+    channel0: boolean;
+    channel1: boolean;
 }
