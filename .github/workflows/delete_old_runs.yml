@@ -7,7 +7,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Delete workflow runs WARP Energy Manager
+      - name: Delete workflow runs for "Delete old workflow runs"
+        uses: poohnet/delete-old-workflow-runs@v0.3.1
+        with:
+          repository: ${{ github.repository }}
+          workflow: ".github/workflows/delete_old_runs.yml"
+          older-than-seconds: 86400 # 24*60*60
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete workflow runs for "WARP Energy Manager"
         uses: poohnet/delete-old-workflow-runs@v0.3.1
         with:
           repository: ${{ github.repository }}
@@ -16,7 +25,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Delete workflow runs WARP on Steroids
+      - name: Delete workflow runs for "WARP on Steroids"
         uses: poohnet/delete-old-workflow-runs@v0.3.1
         with:
           repository: ${{ github.repository }}
