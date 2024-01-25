@@ -8,7 +8,7 @@ jobs:
 
     steps:
       - name: Delete workflow runs WARP Energy Manager
-        uses: MajorScruffy/delete-old-workflow-runs@v0.3.0
+        uses: poohnet/delete-old-workflow-runs@v0.3.1
         with:
           repository: ${{ github.repository }}
           workflow: ".github/workflows/energy_manager.yml"
@@ -17,10 +17,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Delete workflow runs WARP on Steroids
-        uses: MajorScruffy/delete-old-workflow-runs@v0.3.0
+        uses: poohnet/delete-old-workflow-runs@v0.3.1
         with:
           repository: ${{ github.repository }}
-          workflow: ".github/workflows/warp2_poohnet.yml"
+          workflow: ".github/workflows/warp_on_steroids.yml"
           older-than-seconds: 2592000 # 30*24*60*60
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
