@@ -338,11 +338,11 @@ static const ConfigMigration migrations[] = {
                                 {"enabled", enable_nfc}
                             }});
 
-                            Config *button_cfg = api.getState("evse/button_configuration");
+                            const Config *button_cfg = api.getState("evse/button_configuration");
                             if (button_cfg == nullptr)
                                 return;
 
-                            uint8_t new_button_cfg = api.getState("evse/button_configuration")->get("button")->asUint();
+                            uint8_t new_button_cfg = button_cfg->get("button")->asUint();
                             if (disable_button)
                                 new_button_cfg &= ~0x02;
 
@@ -594,7 +594,7 @@ static const ConfigMigration migrations[] = {
                         }
                     }
 
-                    if (config["auto_reset_mode"].as<bool>() == true) {
+                    if (config["auto_reset_mode"].as<bool>()) {
                         DynamicJsonDocument task{16384};
                         auto trigger = task.createNestedArray("trigger");
                         trigger.add(1);
