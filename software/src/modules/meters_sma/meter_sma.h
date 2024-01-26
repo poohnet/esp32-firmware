@@ -46,7 +46,7 @@ public:
   MeterSMA(uint32_t slot);
 
   MeterClassID get_class() const override;
-  void setup(Config &ephemeral_config) override;
+  void setup(const Config &ephemeral_config) override;
 
   bool supports_power() override          {return true;}
   bool supports_energy_import() override  {return true;}

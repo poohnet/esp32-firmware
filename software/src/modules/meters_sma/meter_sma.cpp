@@ -44,7 +44,7 @@ MeterClassID MeterSMA::get_class() const
   return MeterClassID::SMA;
 }
 
-void MeterSMA::setup(Config &ephemeral_config)
+void MeterSMA::setup(const Config &ephemeral_config)
 {
   // Wirkleistung Bezug (aktueller Mittelwert)
   _values[MeterValueID::PowerActiveLSumImport]        = new obis(0,  1, 4, 0,      10.0, 4);  // Summe
