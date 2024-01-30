@@ -356,13 +356,13 @@ void WebSockets::receivedPong(int fd)
     }
 }
 
-bool WebSocketsClient::sendOwnedBlocking_HTTPThread(char *payload, size_t payload_len)
+bool WebSocketsClient::sendOwnedNoFreeBlocking_HTTPThread(char *payload, size_t payload_len)
 {
     ws_work_item wi{{this->fd, -1, -1, -1, -1}, payload, payload_len};
     bool result = send_ws_work_item(ws, wi);
-    clear_ws_work_item(&wi);
     return result;
 }
+
 
 void WebSocketsClient::close_HTTPThread() {
     ws->keepAliveCloseDead(fd);
@@ -594,7 +594,7 @@ void WebSockets::start(const char *uri)
         checkActiveClients();
     }, 100, 100);
 
-    api.addState("info/ws", &state, {}, 1000);
+    api.addState("info/ws", &state);
 }
 
 void WebSockets::onConnect_HTTPThread(std::function<void(WebSocketsClient)> fn)
