@@ -48,11 +48,13 @@ bool compare(const std::unique_ptr<Task> &a, const std::unique_ptr<Task> &b);
 class TaskQueue : public std::priority_queue<std::unique_ptr<Task>, std::vector<std::unique_ptr<Task>>, decltype(&compare)>
 {
     using std::priority_queue<std::unique_ptr<Task>, std::vector<std::unique_ptr<Task>>, decltype(&compare)>::priority_queue;
+
 public:
     bool removeByTaskID(uint64_t task_id);
     Task *findByTaskID(uint64_t task_id);
 
-    std::unique_ptr<Task> top_and_pop() {
+    std::unique_ptr<Task> top_and_pop()
+    {
         std::pop_heap(c.begin(), c.end(), comp);
         std::unique_ptr<Task> value = std::move(c.back());
         c.pop_back();

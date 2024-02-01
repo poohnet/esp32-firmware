@@ -127,15 +127,17 @@ void Ocpp::pre_setup()
 
 static const char *lookup = "0123456789ABCDEFabcdef";
 
-static uint8_t hex_digit_to_byte(char digit) {
-    for(size_t i = 0; i < strlen(lookup); ++i) {
+static uint8_t hex_digit_to_byte(char digit)
+{
+    for (size_t i = 0; i < strlen(lookup); ++i) {
         if (lookup[i] == digit)
             return i > 15 ? (i - 6) : i;
     }
     return 0xFF;
 }
 
-bool Ocpp::start_client() {
+bool Ocpp::start_client()
+{
     if (!config_in_use.get("enable_auth")->asBool()) {
         return cp->start(config_in_use.get("url")->asEphemeralCStr(), config_in_use.get("identity")->asEphemeralCStr(), nullptr, 0);
     }
@@ -143,7 +145,7 @@ bool Ocpp::start_client() {
     String pass = config_in_use.get("pass")->asString();
     bool pass_is_hex = pass.length() == 40;
     if (pass_is_hex) {
-        for(size_t i = 0; i < 40; ++i) {
+        for (size_t i = 0; i < 40; ++i) {
             if (!isxdigit(pass[i])) {
                 pass_is_hex = false;
                 break;
@@ -156,8 +158,8 @@ bool Ocpp::start_client() {
     }
 
     uint8_t pass_bytes[20] = {};
-    for(size_t i = 0; i < 20; ++i) {
-        pass_bytes[i] = hex_digit_to_byte(pass[2*i]) << 4 | hex_digit_to_byte(pass[2*i + 1]);
+    for (size_t i = 0; i < 20; ++i) {
+        pass_bytes[i] = hex_digit_to_byte(pass[2 * i]) << 4 | hex_digit_to_byte(pass[2 * i + 1]);
     }
     return cp->start(config.get("url")->asEphemeralCStr(), config_in_use.get("identity")->asEphemeralCStr(), pass_bytes, 20);
 }
@@ -210,7 +212,8 @@ void Ocpp::register_urls()
 }
 
 #if MODULE_NFC_AVAILABLE()
-void Ocpp::on_tag_seen(const char *tag_id) {
+void Ocpp::on_tag_seen(const char *tag_id)
+{
     if (tag_seen_cb == nullptr)
         return;
 
