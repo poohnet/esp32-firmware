@@ -159,14 +159,14 @@ bool platform_ws_connected(void *ctx)
     return tf_websocket_client_is_connected(client);
 }
 
-void platform_ws_send(void *ctx, const char *buf, size_t buf_len)
+bool platform_ws_send(void *ctx, const char *buf, size_t buf_len)
 {
-    tf_websocket_client_send_text(client, buf, buf_len, pdMS_TO_TICKS(1000));
+    return tf_websocket_client_send_text(client, buf, buf_len, pdMS_TO_TICKS(10), pdMS_TO_TICKS(1000)) == buf_len;
 }
 
-void platform_ws_send_ping(void *ctx)
+bool platform_ws_send_ping(void *ctx)
 {
-    tf_websocket_client_send_ping(client, pdMS_TO_TICKS(1000));
+    return tf_websocket_client_send_ping(client, pdMS_TO_TICKS(1000)) >= 0;
 }
 
 void platform_ws_register_receive_callback(void *ctx, void (*cb)(char *, size_t, void *), void *user_data)
@@ -737,10 +737,11 @@ void platform_set_charging_current(int32_t connectorId, uint32_t milliAmps)
 size_t platform_read_file(const char *name, char *buf, size_t len)
 {
     File f = LittleFS.open(PATH_PREFIX + name);
+    size_t read = f.read((uint8_t *)buf, len);
     // File::read can return 2^32-1 because it returns -1 if the file is not open but the return type is size_t.
-    if (f.read((uint8_t *)buf, len) > len)
+    if (read > len)
         return 0;
-    return len;
+    return read;
 }
 bool platform_write_file(const char *name, char *buf, size_t len)
 {
@@ -874,7 +875,7 @@ void platform_update_connector_state(int32_t connector_id,
                                      uint32_t tag_deadline,
                                      uint32_t cable_deadline,
                                      int32_t txn_id,
-                                     time_t transaction_confirmed_timestamp,
+                                     uint64_t transaction_confirmed_id,
                                      time_t transaction_start_time,
                                      uint32_t current_allowed,
                                      bool txn_with_invalid_id,
@@ -891,7 +892,7 @@ void platform_update_connector_state(int32_t connector_id,
     ocpp.state.get("tag_timeout")->updateUint(tag_deadline == 0 ? 0xFFFFFFFF : (tag_deadline - millis()));
     ocpp.state.get("cable_timeout")->updateUint(cable_deadline == 0 ? 0xFFFFFFFF : (cable_deadline - millis()));
     ocpp.state.get("txn_id")->updateInt(txn_id);
-    ocpp.state.get("txn_confirmed_time")->updateInt((int32_t)transaction_confirmed_timestamp);
+    ocpp.state.get("txn_confirmed_time")->updateInt((uint32_t)transaction_confirmed_id);
     ocpp.state.get("txn_start_time")->updateInt((int32_t)transaction_start_time);
     ocpp.state.get("current")->updateUint(current_allowed);
     ocpp.state.get("txn_with_invalid_id")->updateBool(txn_with_invalid_id);
