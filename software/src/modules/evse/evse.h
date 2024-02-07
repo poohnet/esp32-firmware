@@ -58,13 +58,8 @@ protected:
 
     void set_indicator_led(int16_t indication, uint16_t duration, uint16_t color_h, uint8_t color_s, uint8_t color_v, uint8_t *ret_status) override;
 
-    // Not supported, does nothing
-    void set_control_pilot_disconnect(bool cp_disconnect, bool *cp_disconnected) override {
-        (void)cp_disconnect; // not supported
-        (void)cp_disconnected;
-    }
-    // Not supported, always returns false
-    bool get_control_pilot_disconnect() override { return false; }
+    void set_control_pilot_disconnect(bool cp_disconnect, bool *cp_disconnected) override;
+    bool get_control_pilot_disconnect() override;
 
     void set_boost_mode(bool enabled) override;
 
@@ -92,4 +87,8 @@ protected:
     bool switch_phases_3phase(bool wants_3phase)                     override {return false;}
 
     ConfigRoot user_calibration;
+
+private:
+    ConfigRoot control_pilot_disconnect;
+    ConfigRoot control_pilot_disconnect_update;
 };
