@@ -1,0 +1,44 @@
+name: Delete old workflow runs
+
+on: [push]
+
+jobs:
+  delete-old-workflow-runs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete workflow runs for "Delete old workflow runs"
+        uses: poohnet/delete-old-workflow-runs@v0.3.1
+        with:
+          repository: ${{ github.repository }}
+          workflow: ".github/workflows/delete_old_runs.yml"
+          older-than-seconds: 86400 # 24*60*60
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete workflow runs for "WARP"
+        uses: poohnet/delete-old-workflow-runs@v0.3.1
+        with:
+          repository: ${{ github.repository }}
+          workflow: ".github/workflows/warp.yml"
+          older-than-seconds: 2592000 # 30*24*60*60
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete workflow runs for "WARP on Steroids"
+        uses: poohnet/delete-old-workflow-runs@v0.3.1
+        with:
+          repository: ${{ github.repository }}
+          workflow: ".github/workflows/warp_on_steroids.yml"
+          older-than-seconds: 2592000 # 30*24*60*60
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete workflow runs for "WARP Firmwares"
+        uses: poohnet/delete-old-workflow-runs@v0.3.1
+        with:
+          repository: ${{ github.repository }}
+          workflow: ".github/workflows/warp-firmwares.yml"
+          older-than-seconds: 604800 # 7*24*60*60
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
