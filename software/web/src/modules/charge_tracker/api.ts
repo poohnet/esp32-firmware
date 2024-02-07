@@ -3,6 +3,7 @@ interface Charge {
     charge_duration: number;
     user_id: number;
     energy_charged: number;
+    electricity_price: number;
 }
 
 export interface config {
@@ -20,6 +21,7 @@ interface current_charge_base {
     meter_start: number;
     evse_uptime_start: number;
     timestamp_minutes: number;
+    electricity_price: number;
 }
 
 interface current_charge_nfc {
