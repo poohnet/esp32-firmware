@@ -4,7 +4,8 @@ let x = {
     "charge_tracker": {
         "status": {
             "last_charges": "Letzte Ladevorgänge",
-            "current_charge": "Laufender Ladevorgang"
+            "current_charge": "Laufender Ladevorgang",
+            "current_price": "Aktueller Strompreis"
         },
         "navbar": {
             "charge_tracker": "Ladetracker"
@@ -65,7 +66,8 @@ let x = {
             "csv_header_duration": "Ladedauer in s",
             "csv_header_meter_start": "Zählerstand Start",
             "csv_header_meter_end": "Zählerstand Ende",
-            "csv_header_price": "Ladekosten in €; Arbeitspreis ",
+            "csv_header_energy_price": "Arbeitspreis in ct/kWh",
+            "csv_header_cost": "Ladekosten in €",
 
             "unknown_user": "Unbekannter Benutzer",
             "unknown_users": "Unbekannte Benutzer",

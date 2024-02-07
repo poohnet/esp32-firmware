@@ -4,7 +4,8 @@ let x = {
     "charge_tracker": {
         "status": {
             "last_charges": "Last charges",
-            "current_charge": "Current charge"
+            "current_charge": "Current charge",
+            "current_price": "Current price"
         },
         "navbar": {
             "charge_tracker": "Charge Tracker"
@@ -65,7 +66,8 @@ let x = {
             "csv_header_duration": "Charge duration in s",
             "csv_header_meter_start": "Meter reading start",
             "csv_header_meter_end": "Meter reading end",
-            "csv_header_price": "Charging costs in € Working price ",
+            "csv_header_energy_price": "Price in ct/kWh",
+            "csv_header_cost": "Charging costs in €",
 
             "unknown_user": "Unknown user",
             "unknown_users": "Unknown users",
