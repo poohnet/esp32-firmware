@@ -28,13 +28,14 @@ import { InputText } from "../../ts/components/input_text";
 import { InputDate } from "../../ts/components/input_date";
 import { Button, Collapse, ListGroup, ListGroupItem, Spinner } from "react-bootstrap";
 import { InputSelect } from "../../ts/components/input_select";
-import { BatteryCharging, Calendar, Clock, Download, User } from "react-feather";
+import { BatteryCharging, Calendar, Clock, DollarSign, Download, User } from "react-feather";
 import { getAllUsernames } from "../users/main";
 import { ConfigComponent } from "../../ts/components/config_component";
 import { ConfigForm } from "../../ts/components/config_form";
 import { InputFloat } from "../../ts/components/input_float";
 import { SubPage } from "../../ts/components/sub_page";
 import { useMemo } from "preact/hooks";
+import { OutputFloat } from "../../ts/components/output_float";
 
 const MAX_TRACKED_CHARGES = 7680;
 
@@ -57,7 +58,7 @@ type ChargeTrackerState = S & API.getType['charge_tracker/state'];
 
 let wallet_icon = <svg class="feather feather-wallet mr-1" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>
 
-function TrackedCharge(props: {charge: Charge, users: API.getType['users/config']['users'], electricity_price: number}) {
+function TrackedCharge(props: {charge: Charge, users: API.getType['users/config']['users']}) {
     const display_name = useMemo(
         () => {
             let result = __("charge_tracker.script.unknown_user");
@@ -74,19 +75,17 @@ function TrackedCharge(props: {charge: Charge, users: API.getType['users/config'
         [props.users, props.charge.user_id]
     );
 
-    let have_charge_cost = props.electricity_price > 0 && props.charge.energy_charged != null;
-    let price_div = have_charge_cost ? <div>{wallet_icon}<span style="vertical-align: middle;">{util.toLocaleFixed(props.electricity_price / 100 * props.charge.energy_charged / 100, 2)} €</span></div> : <></>
-
     return <ListGroupItem>
         <div class="row">
             <div class="col">
                 <div class="mb-2"><User/><span class="ml-1" style="vertical-align: middle;">{display_name}</span></div>
-                <div><Calendar/><span class="ml-1" style="vertical-align: middle;">{util.timestamp_min_to_date(props.charge.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
+                <div class="mb-2"><Calendar/><span class="ml-1" style="vertical-align: middle;">{util.timestamp_min_to_date(props.charge.timestamp_minutes, __("charge_tracker.script.unknown_charge_start"))}</span></div>
+                <div class="mb-2"><Clock/><span class="ml-1" style="vertical-align: middle;">{util.format_timespan(props.charge.charge_duration)}</span></div>
             </div>
             <div class="col-auto">
                 <div class="mb-2"><BatteryCharging/><span class="ml-1" style="vertical-align: middle;">{props.charge.energy_charged === null ? "N/A" : util.toLocaleFixed(props.charge.energy_charged, 3)} kWh</span></div>
-                <div class={have_charge_cost ? "mb-2" : ""}><Clock/><span class="ml-1" style="vertical-align: middle;">{util.format_timespan(props.charge.charge_duration)}</span></div>
-                {price_div}
+                <div class="mb-2"><DollarSign/><span class="ml-1" style="vertical-align: middle;">{props.charge.electricity_price === null ? "N/A" : util.toLocaleFixed(props.charge.electricity_price / 100, 2)} ct/kWh</span></div>
+                <div class="mb-2">{wallet_icon}<span style="vertical-align: middle;">{util.toLocaleFixed(props.charge.electricity_price / 100 * props.charge.energy_charged / 100, 2)} €</span></div>
             </div>
         </div>
     </ListGroupItem>
@@ -125,10 +124,10 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
         });
     }
 
-    get_last_charges(charges: Readonly<Charge[]>, price: number) {
+    get_last_charges(charges: Readonly<Charge[]>) {
         let users_config = API.get('users/config');
 
-        return charges.map(c => <TrackedCharge charge={c} users={users_config.users} electricity_price={price}/>)
+        return charges.map(c => <TrackedCharge charge={c} users={users_config.users} />)
                       .reverse();
     }
 
@@ -141,7 +140,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
         return line.join(",") + "\n";
     }
 
-    async downloadChargeLog(flavor: 'excel' | 'rfc4180', user_filter: number, start_date: Date, end_date: Date, price?: number) {
+    async downloadChargeLog(flavor: 'excel' | 'rfc4180', user_filter: number, start_date: Date, end_date: Date) {
         const [usernames, display_names] = await getAllUsernames()
             .catch(err => {
                 util.add_alert("download-usernames", "danger", __("charge_tracker.script.download_usernames_failed"), err);
@@ -157,13 +156,12 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
                 let line = [
                     __("charge_tracker.script.csv_header_start"),
                     __("charge_tracker.script.csv_header_display_name"),
-                    __("charge_tracker.script.csv_header_energy"),
                     __("charge_tracker.script.csv_header_duration"),
-                    "",
                     __("charge_tracker.script.csv_header_meter_start"),
                     __("charge_tracker.script.csv_header_meter_end"),
-                    __("charge_tracker.script.csv_header_username"),
-                    typeof price == 'number' && price > 0 ? __("charge_tracker.script.csv_header_price") + util.toLocaleFixed(price / 100, 2) + "ct/kWh" : "",
+                    __("charge_tracker.script.csv_header_energy"),
+                    __("charge_tracker.script.csv_header_energy_price"),
+                    __("charge_tracker.script.csv_header_cost"),
                 ];
 
                 let result = "";
@@ -193,14 +191,15 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
                 };
 
                 if (start <= end) {
-                    for(let i = 0; i < buffer.byteLength; i += 16) {
-                        let view = new DataView(buffer, i, 16);
+                    for(let i = 0; i < buffer.byteLength; i += 32) {
+                        let view = new DataView(buffer, i, 32);
 
                         let timestamp_minutes = view.getUint32(0, true);
                         let meter_start = view.getFloat32(4, true);
                         let user_id = view.getUint8(8);
-                        let charge_duration = view.getUint32(9, true) & 0x00FFFFFF;
-                        let meter_end = view.getFloat32(12, true);
+                        let electricity_price = view.getUint16(9, true);
+                        let charge_duration = view.getUint32(16, true);
+                        let meter_end = view.getFloat32(20, true);
 
                         if (timestamp_minutes != 0 && timestamp_minutes < start) {
                             // We know when this charge started and it was before the requested start date.
@@ -238,7 +237,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
 
                         let charged = (Number.isNaN(meter_start) || Number.isNaN(meter_end) || meter_end < meter_start) ? NaN : (meter_end - meter_start);
                         let charged_string;
-                        let charged_price = typeof price == 'number' ? charged / 100 * price / 100 : 0;
+                        let charged_price = charged / 100 * electricity_price / 100;
                         let charged_price_string;
                         if (Number.isNaN(charged) || charged < 0) {
                             charged_string = 'N/A';
@@ -251,13 +250,12 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
                         let line = [
                             util.timestamp_min_to_date(timestamp_minutes, __("charge_tracker.script.unknown_charge_start")),
                             display_name,
-                            charged_string,
                             charge_duration.toString(),
-                            "",
                             Number.isNaN(meter_start) ? 'N/A' : util.toLocaleFixed(meter_start, 3),
                             Number.isNaN(meter_end) ? 'N/A' : util.toLocaleFixed(meter_end, 3),
-                            username,
-                            price > 0 ? charged_price_string : ""
+                            charged_string,
+                            util.toLocaleFixed(electricity_price / 100, 2),
+                            charged_price_string
                         ];
 
                         result += this.to_csv_line(line, flavor);
@@ -409,7 +407,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
                                     end = new Date(Date.now());
 
                                 try {
-                                    await this.downloadChargeLog(state.csv_flavor, parseInt(state.user_filter), start ,end, state.electricity_price);
+                                    await this.downloadChargeLog(state.csv_flavor, parseInt(state.user_filter), start, end);
                                 } finally {
                                     this.setState({show_spinner: false});
                                 }
@@ -457,7 +455,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
 
                 <FormRow label={__("charge_tracker.content.last_charges")} label_muted={__("charge_tracker.content.last_charges_desc")}>
                     <ListGroup>
-                        {this.get_last_charges(state.last_charges ?? [], state.electricity_price)}
+                        {this.get_last_charges(state.last_charges ?? [])}
                     </ListGroup>
                 </FormRow>
             </SubPage>
@@ -471,53 +469,57 @@ export class ChargeTrackerStatus extends Component {
     render() {
         if (!util.render_allowed())
             return <></>;
-
+    
         let last_charges = API.get('charge_tracker/last_charges');
         let cc = API.get('charge_tracker/current_charge');
         let evse_uptime = API.get('evse/low_level_state').uptime;
         let energy_abs = API.get('meter/values').energy_abs;
         let users = API.get('users/config').users;
         let electricity_price = API.get('charge_tracker/config').electricity_price;
-
+    
+        let electricity_price_edit = <FormRow label={__("charge_tracker.status.current_price")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
+            <OutputFloat value={electricity_price} digits={2} scale={2} unit={'ct/kWh'}/>
+        </FormRow>
+    
         let current_charge = <></>;
-
+    
         if (cc.user_id != -1) {
             let charge_duration = evse_uptime - cc.evse_uptime_start
             if (evse_uptime < cc.evse_uptime_start)
                 charge_duration += 0xFFFFFFFF;
-
+    
             charge_duration = Math.floor(charge_duration / 1000);
-
+    
             let charge: Charge = {
                 charge_duration: charge_duration,
                 energy_charged: (energy_abs === null || cc.meter_start === null) ? null : (energy_abs - cc.meter_start),
                 timestamp_minutes: cc.timestamp_minutes,
-                user_id: cc.user_id
+                user_id: cc.user_id,
+                electricity_price: cc.electricity_price
             };
-
+    
             current_charge = <FormRow label={__("charge_tracker.status.current_charge")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
                 <ListGroup>
                     <TrackedCharge charge={charge}
                                     users={users}
-                                    electricity_price={electricity_price}
                                     />
                 </ListGroup>
             </FormRow>;
         }
-
+    
         let last_charges_list = last_charges.length == 0 ? <></>
             : <FormRow label={__("charge_tracker.status.last_charges")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
                 <ListGroup>
                     {last_charges.slice(-3).map(c =>
                         <TrackedCharge charge={c}
                                         users={users}
-                                        electricity_price={electricity_price}
                                         />
                     ).reverse()}
                 </ListGroup>
             </FormRow>;
-
+    
     return <>
+                {electricity_price_edit}
                 {current_charge}
                 {last_charges_list}
         </>;

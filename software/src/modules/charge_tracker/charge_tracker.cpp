@@ -32,13 +32,16 @@ struct [[gnu::packed]] ChargeStart {
     uint32_t timestamp_minutes = 0;
     float meter_start = 0.0f;
     uint8_t user_id = 0;
+    uint16_t electricity_price = 0;
+    uint8_t __dummy[5] = {0};
 };
 
-static_assert(sizeof(ChargeStart) == 9, "Unexpected size of ChargeStart");
+static_assert(sizeof(ChargeStart) == 16, "Unexpected size of ChargeStart");
 
 struct [[gnu::packed]] ChargeEnd {
-    uint32_t charge_duration : 24;
+    uint32_t charge_duration = 0;
     float meter_end = 0.0f;
+    uint8_t __dummy[8] = {0};
 };
 
 struct [[gnu::packed]] Charge {
@@ -48,11 +51,11 @@ struct [[gnu::packed]] Charge {
 
 static bool repair_logic(Charge *);
 
-static_assert(sizeof(ChargeEnd) == 7, "Unexpected size of ChargeEnd");
+static_assert(sizeof(ChargeEnd) == 16, "Unexpected size of ChargeEnd");
 
 #define CHARGE_RECORD_SIZE (sizeof(ChargeStart) + sizeof(ChargeEnd))
 
-static_assert(CHARGE_RECORD_SIZE == 16, "Unexpected size of ChargeStart + ChargeEnd");
+static_assert(CHARGE_RECORD_SIZE == 32, "Unexpected size of ChargeStart + ChargeEnd");
 
 // 30 files with 256 records each: 7680 records @ ~ max. 10 records per day = ~ 2 years and one month of records.
 // Also update frontend when changing this!
@@ -68,7 +71,8 @@ void ChargeTracker::pre_setup()
             {"timestamp_minutes", Config::Uint32(0)},
             {"charge_duration", Config::Uint32(0)},
             {"user_id", Config::Uint8(0)},
-            {"energy_charged", Config::Float(0)}
+            {"energy_charged", Config::Float(0)},
+            {"electricity_price", Config::Uint16(0)}
         })}, 0, CHARGE_RECORD_LAST_CHARGES_SIZE, Config::type_id<Config::ConfObject>());
 
     current_charge = Config::Object({
@@ -76,6 +80,7 @@ void ChargeTracker::pre_setup()
         {"meter_start", Config::Float(0)},
         {"evse_uptime_start", Config::Uint32(0)},
         {"timestamp_minutes", Config::Uint32(0)},
+        {"electricity_price", Config::Uint16(0)},
         {"authorization_type", Config::Uint8(0)},
         {"authorization_info", Config{Config::ConfVariant()}}
     });
@@ -88,6 +93,10 @@ void ChargeTracker::pre_setup()
     config = Config::Object({
         {"electricity_price", Config::Uint16(0)}
     });
+
+    electricity_price_update = ConfigRoot{Config::Object({
+        {"electricity_price", Config::Uint16(0)}
+    })};
 
 // #if MODULE_AUTOMATION_AVAILABLE()
 //     automation.register_action(
@@ -174,9 +183,12 @@ bool ChargeTracker::startCharge(uint32_t timestamp_minutes, float meter_start, u
         file = LittleFS.open(new_file_name, "w", true);
     }
 
+    uint16_t electricity_price = config.get("electricity_price")->asUint();
+
     cs.timestamp_minutes = timestamp_minutes;
     cs.meter_start = meter_start;
     cs.user_id = user_id;
+    cs.electricity_price = electricity_price;
 
     uint8_t buf[sizeof(ChargeStart)] = {0};
     memcpy(buf, &cs, sizeof(cs));
@@ -188,6 +200,7 @@ bool ChargeTracker::startCharge(uint32_t timestamp_minutes, float meter_start, u
     current_charge.get("meter_start")->updateFloat(meter_start);
     current_charge.get("evse_uptime_start")->updateUint(evse_uptime);
     current_charge.get("timestamp_minutes")->updateUint(timestamp_minutes);
+    current_charge.get("electricity_price")->updateUint(electricity_price);
     current_charge.get("authorization_type")->updateUint(auth_type);
     current_charge.get("authorization_info")->value = auth_info;
     current_charge.get("authorization_info")->value.updated = 0xFF;
@@ -231,6 +244,7 @@ void ChargeTracker::endCharge(uint32_t charge_duration_seconds, float meter_end)
     current_charge.get("meter_start")->updateFloat(0);
     current_charge.get("evse_uptime_start")->updateUint(0);
     current_charge.get("timestamp_minutes")->updateUint(0);
+    current_charge.get("electricity_price")->updateUint(0);
     current_charge.get("authorization_type")->updateUint(0);
     current_charge.get("authorization_info")->value = Config::ConfVariant{};
 
@@ -428,6 +442,7 @@ void ChargeTracker::readNRecords(File *f, size_t records_to_read)
         last_charges.get(last_charges.count() - 1)->get("charge_duration")->updateUint(ce.charge_duration);
         last_charges.get(last_charges.count() - 1)->get("user_id")->updateUint(cs.user_id);
         last_charges.get(last_charges.count() - 1)->get("energy_charged")->updateFloat(charged_invalid(cs, ce) ? NAN : ce.meter_end - cs.meter_start);
+        last_charges.get(last_charges.count() - 1)->get("electricity_price")->updateUint(cs.electricity_price);
     }
 }
 
@@ -521,12 +536,47 @@ static int get_display_name(uint8_t user_id, char *ret_buf)
     return result;
 }
 
-static char *tracked_charge_to_string(char *buf, ChargeStart cs, ChargeEnd ce, bool english, uint32_t electricity_price)
+static char *tracked_charge_to_string(char *buf, ChargeStart cs, ChargeEnd ce, bool english)
 {
     buf += 1 + timestamp_min_to_date_time_string(buf, cs.timestamp_minutes, english);
 
     get_display_name(cs.user_id, buf);
     buf += 1 + strnlen(buf, DISPLAY_NAME_LENGTH);
+
+    // charge duration is a bitfield value of 24 bits.
+    // This results in a maximum duration of 2^24/3600 ~ 4660 hours.
+    // We handle up to 9999 hours here -> No need for a fallback.
+    int hours = ce.charge_duration / 3600;
+    ce.charge_duration = ce.charge_duration % 3600;
+    int minutes = ce.charge_duration / 60;
+    ce.charge_duration = ce.charge_duration % 60;
+    int seconds = ce.charge_duration;
+
+    buf += 1 + sprintf(buf, "%2.2i:%2.2i:%2.2i", hours, minutes, seconds);
+
+    if (isnan(cs.meter_start)) {
+        memcpy(buf, "N/A", ARRAY_SIZE("N/A"));
+        buf += ARRAY_SIZE("N/A");
+    } else {
+        int written = sprintf(buf, "%.3f", cs.meter_start);
+        if (!english)
+            for(int i = 0; i < written; ++i)
+                if (buf[i] == '.')
+                    buf[i] = ',';
+        buf += 1 + written;
+    }
+
+    if (isnan(ce.meter_end)) {
+        memcpy(buf, "N/A", ARRAY_SIZE("N/A"));
+        buf += ARRAY_SIZE("N/A");
+    } else {
+        int written = sprintf(buf, "%.3f", ce.meter_end);
+        if (!english)
+            for(int i = 0; i < written; ++i)
+                if (buf[i] == '.')
+                    buf[i] = ',';
+        buf += 1 + written;
+    }
 
     if (charged_invalid(cs, ce)) {
         memcpy(buf, "N/A", ARRAY_SIZE("N/A"));
@@ -547,30 +597,15 @@ static char *tracked_charge_to_string(char *buf, ChargeStart cs, ChargeEnd ce, b
         }
     }
 
-    // charge duration is a bitfield value of 24 bits.
-    // This results in a maximum duration of 2^24/3600 ~ 4660 hours.
-    // We handle up to 9999 hours here -> No need for a fallback.
-    int hours = ce.charge_duration / 3600;
-    ce.charge_duration = ce.charge_duration % 3600;
-    int minutes = ce.charge_duration / 60;
-    ce.charge_duration = ce.charge_duration % 60;
-    int seconds = ce.charge_duration;
-
-    buf += 1 + sprintf(buf, "%i:%2.2i:%2.2i", hours, minutes, seconds);
-
-    if (isnan(cs.meter_start)) {
-        memcpy(buf, "N/A", ARRAY_SIZE("N/A"));
-        buf += ARRAY_SIZE("N/A");
-    } else {
-        int written = sprintf(buf, "%.3f", cs.meter_start);
-        if (!english)
-            for (int i = 0; i < written; ++i)
-                if (buf[i] == '.')
-                    buf[i] = ',';
-        buf += 1 + written;
+    if (cs.electricity_price == 0) {
+        memcpy(buf, "---", ARRAY_SIZE("---"));
+        buf += ARRAY_SIZE("---");
+    }
+    else {
+        buf += 1 + sprintf(buf, "%d%c%02d", cs.electricity_price / 100, english ? '.' : ',', cs.electricity_price % 100);
     }
 
-    if (electricity_price == 0) {
+    if (cs.electricity_price == 0) {
         memcpy(buf, "---", ARRAY_SIZE("---"));
         buf += ARRAY_SIZE("---");
     } else if (charged_invalid(cs, ce)) {
@@ -578,7 +613,7 @@ static char *tracked_charge_to_string(char *buf, ChargeStart cs, ChargeEnd ce, b
         buf += ARRAY_SIZE("N/A");
     } else {
         double charged = ce.meter_end - cs.meter_start;
-        uint32_t cost = round(charged * electricity_price / 100.0f);
+        uint32_t cost = round(charged * cs.electricity_price / 100.0f);
         if (cost > 999999) {
             memcpy(buf, ">=10000", ARRAY_SIZE(">=10000"));
             buf += ARRAY_SIZE(">=10000");
@@ -699,6 +734,10 @@ void ChargeTracker::register_urls()
     removeOldRecords();
 
     api.addPersistentConfig("charge_tracker/config", &config);
+
+    api.addCommand("charge_tracker/electricity_price_update", &electricity_price_update, {}, [this]() {
+        config.get("electricity_price")->updateUint(electricity_price_update.get("electricity_price")->asUint());
+    }, true);
 
     server.on_HTTPThread("/charge_tracker/charge_log", HTTP_GET, [this](WebServerRequest request) {
         std::lock_guard<std::mutex> lock{records_mutex};
@@ -886,8 +925,8 @@ void ChargeTracker::register_urls()
                     else {
                         double charged = ce.meter_end - cs.meter_start;
                         charged_sum += charged;
-                        if (electricity_price != 0)
-                            charged_cost_sum += round(charged * electricity_price / 100.0f);
+                        if (cs.electricity_price != 0)
+                            charged_cost_sum += round(charged * cs.electricity_price / 100.0f);
                     }
                 }
             }
@@ -930,18 +969,15 @@ search_done:
                     stats_head[i] = ',';
         stats_head += 1 + written;
 
-        if (electricity_price != 0) {
-            written = sprintf(stats_head, "%s: %d.%02d€ (%.2f ct/kWh)%s",
-                            english ? "Total cost" : "Gesamtkosten",
-                            charged_cost_sum / 100, charged_cost_sum % 100,
-                            electricity_price / 100.0f,
-                            seen_charges_without_meter ? (english ? " Incomplete!" : " Unvollständig!") : "");
-            if (!english)
-                for (int i = 0; i < written; ++i)
-                    if (stats_head[i] == '.')
-                        stats_head[i] = ',';
-            stats_head += 1 + written;
-        }
+        written = sprintf(stats_head, "%s: %d.%02d€ %s",
+                        english ? "Total cost" : "Gesamtkosten",
+                        charged_cost_sum / 100, charged_cost_sum % 100,
+                        seen_charges_without_meter ? (english ? " Incomplete!" : " Unvollständig!") : "");
+        if (!english)
+            for (int i = 0; i < written; ++i)
+                if (stats_head[i] == '.')
+                    stats_head[i] = ',';
+        stats_head += 1 + written;
 
         // TODO: this is currently unnecessary, however if we support other ways of requesting a PDF
         // we have to lock the pdf generator.
@@ -951,12 +987,14 @@ search_done:
         int current_charge = (first_charge > -1 ? first_charge : 0);
         last_file = (last_file >= 0) ? last_file : this->last_charge_record;
 
-#define TABLE_LINE_LEN (17 /*start date: 01.02.3456 12:34\0 or 3456-02-01 12:34\0*/ \
-                      + 33 /*display name: max 32 chars + \0*/ \
-                      + 8  /*charged: (assumed max) "999.999\0" kWh else truncated to "> 1000\0"*/ \
-                      + 11 /* charge duration max "9999:59:59\0"*/ \
-                      + 16 /* meter start max 99'999'999.999\0*/ \
-                      + 8) /* cost max 9999.99\0 else truncated to >10000*/
+#define TABLE_LINE_LEN (17  /* start date: 01.02.3456 12:34\0 or 3456-02-01 12:34\0*/ \
+                      + 17  /* display name: max 16 chars + \0*/ \
+                      + 11  /* charge duration: max "9999:59:59\0"*/ \
+                      + 12  /* meter start: max 999'999.999\0*/ \
+                      + 12  /* meter end: max 999'999.999\0*/ \
+                      +  8  /* charged: (assumed max) "999.999\0" kWh else truncated to "> 1000\0"*/ \
+                      +  7  /* price: 999.99\0*/ \
+                      +  8) /* cost: max 9999.99\0 else truncated to >10000*/
 
         char table_lines_buffer[8 * TABLE_LINE_LEN];
 
@@ -967,22 +1005,26 @@ search_done:
 
         const char * table_header_de = "Startzeit\0"
                                        "Benutzer\0"
-                                       "geladen (kWh)\0"
                                        "Ladedauer\0"
-                                       "Zählerstand Start\0"
+                                       "Zähler Start\0"
+                                       "Zähler Ende\0"
+                                       "geladen (kWh)\0"
+                                       "Preis (ct/kWh)\0"
                                        "Kosten (€)";
 
         const char * table_header_en = "Start time\0"
                                        "User\0"
-                                       "Charged (kWh)\0"
                                        "Duration\0"
                                        "Meter start\0"
+                                       "Meter end\0"
+                                       "Charged (kWh)\0"
+                                       "Price (ct/kWh)\0"
                                        "Cost (€)";
 
 
         init_pdf_generator(&request,
                            "Title",
-                           stats_buf, (electricity_price == 0) ? 5 : 6,
+                           stats_buf, 6,
                            letterhead.get(), letterhead_lines,
                            english ? table_header_en : table_header_de,
                            charge_records,
@@ -996,7 +1038,6 @@ search_done:
                             last_charge,
                             &current_file,
                             &current_charge,
-                            electricity_price,
                             english,
                             configured_users]
                            (const char * * table_lines) {
@@ -1034,7 +1075,7 @@ search_done:
                         continue;
 
 
-                    table_lines_head = tracked_charge_to_string(table_lines_head, cs, ce, english, electricity_price);
+                    table_lines_head = tracked_charge_to_string(table_lines_head, cs, ce, english);
                     ++lines_generated;
                 }
 
