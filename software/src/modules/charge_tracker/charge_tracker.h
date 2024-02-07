@@ -27,7 +27,7 @@
 
 #define CHARGE_TRACKER_MAX_REPAIR 200
 
-#define CHARGE_RECORD_FOLDER "/charge-records"
+#define CHARGE_RECORD_FOLDER "/charge-records-2"
 
 class ChargeTracker final : public IModule
 {
@@ -58,6 +58,7 @@ public:
     ConfigRoot state;
 
     ConfigRoot config;
+    ConfigRoot electricity_price_update;
 
     std::mutex records_mutex;
     std::mutex pdf_mutex;
