@@ -39,7 +39,7 @@ void Ocpp::pre_setup()
         {"identity", Config::Str("", 0, 64)},
         {"enable_auth",Config::Bool(false)},
         {"pass", Config::Str("", 0, 64)},
-        {"cert_id", Config::Int(-1, -1, MAX_CERTS - 1)}
+        {"cert_id", Config::Int(-1, -1, MAX_CERT_ID)}
     });
 
     change_configuration = Config::Object({
@@ -60,8 +60,9 @@ void Ocpp::pre_setup()
         {"tag_expiry_date", Config::Int32(0)},
         {"tag_timeout", Config::Uint32(0)},
         {"cable_timeout", Config::Uint32(0)},
+        {"last_rejected_tag", Config::Str("", 0, 21)},
+        {"last_rejected_tag_reason", Config::Uint8(0)},
         {"txn_id", Config::Int32(0)},
-        {"txn_confirmed_time", Config::Int32(0)},
         {"txn_start_time", Config::Int32(0)},
         {"current", Config::Uint32(0)},
         {"txn_with_invalid_id", Config::Bool(false)},
@@ -212,10 +213,10 @@ void Ocpp::register_urls()
 }
 
 #if MODULE_NFC_AVAILABLE()
-void Ocpp::on_tag_seen(const char *tag_id)
+bool Ocpp::on_tag_seen(const char *tag_id)
 {
     if (tag_seen_cb == nullptr)
-        return;
+        return false;
 
     // We have to remove the separating ':'s from the tag_id.
     // OCPP expectes IDs that map to physical tag IDs to contain only the hex-bytes.
@@ -223,5 +224,6 @@ void Ocpp::on_tag_seen(const char *tag_id)
     remove_separator(tag_id, buf);
 
     tag_seen_cb(1, buf, tag_seen_cb_user_data);
+    return true;
 }
 #endif

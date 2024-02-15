@@ -52,7 +52,7 @@ void NFC::pre_setup()
         Config::type_id<Config::ConfObject>()
     );
 
-    config = ConfigRoot(Config::Object({
+    config = ConfigRoot{Config::Object({
         {"authorized_tags", Config::Array(
             {},
             new Config{Config::Object({
@@ -110,9 +110,9 @@ void NFC::pre_setup()
         }
 
         return "";
-    });
+    }};
 
-    inject_tag = ConfigRoot(Config::Object({
+    inject_tag = ConfigRoot{Config::Object({
         {"tag_type", Config::Uint(0, 0, 4)},
         {"tag_id", Config::Str("", 0, NFC_TAG_ID_STRING_LENGTH)}
     }), [this](Config &cfg, ConfigSource source) -> String {
@@ -130,7 +130,7 @@ void NFC::pre_setup()
         }
 
         return "";
-    });
+    }};
 
 #if MODULE_AUTOMATION_AVAILABLE()
     automation.register_trigger(
@@ -162,7 +162,7 @@ void NFC::pre_setup()
 
     auth_info = Config::Object({
         {"tag_type", Config::Uint8(0)},
-        {"tag_id", Config::Str("", 0, 30)}
+        {"tag_id", Config::Str("", 0, NFC_TAG_ID_STRING_LENGTH)}
     });
 }
 
@@ -248,8 +248,13 @@ void NFC::tag_seen(tag_info_t *tag, bool injected)
 
     if (user_id != 0) {
         // Found a new authorized tag.
+        bool blink_handled = false;
+#if MODULE_OCPP_AVAILABLE()
+        blink_handled = ocpp.on_tag_seen(tag->tag_id);
+#endif
 #if MODULE_EVSE_LED_AVAILABLE()
-        evse_led.set_module(EvseLed::Blink::Ack, 2000);
+        if (!blink_handled)
+            evse_led.set_module(EvseLed::Blink::Ack, 2000);
 #endif
 
         auth_info.get("tag_type")->updateUint(tag->tag_type);
@@ -257,15 +262,15 @@ void NFC::tag_seen(tag_info_t *tag, bool injected)
 
         users.trigger_charge_action(user_id, injected ? USERS_AUTH_TYPE_NFC_INJECTION : USERS_AUTH_TYPE_NFC, auth_info.value,
                 injected ? tag_injection_action : TRIGGER_CHARGE_ANY);
-#if MODULE_OCPP_AVAILABLE()
-        ocpp.on_tag_seen(tag->tag_id);
-#endif
+
     } else {
+        bool blink_handled = false;
 #if MODULE_OCPP_AVAILABLE()
-        ocpp.on_tag_seen(tag->tag_id);
+        blink_handled = ocpp.on_tag_seen(tag->tag_id);
 #endif
 #if MODULE_EVSE_LED_AVAILABLE()
-        evse_led.set_module(EvseLed::Blink::Nack, 2000);
+        if (!blink_handled)
+            evse_led.set_module(EvseLed::Blink::Nack, 2000);
 #endif
     }
 

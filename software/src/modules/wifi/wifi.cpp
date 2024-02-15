@@ -38,7 +38,7 @@ extern char passphrase[20];
 
 void Wifi::pre_setup()
 {
-    ap_config = ConfigRoot(Config::Object({
+    ap_config = ConfigRoot{Config::Object({
         {"enable_ap", Config::Bool(true)},
         {"ap_fallback_only", Config::Bool(false)},
         {"ssid", Config::Str("", 0, 32)},
@@ -73,7 +73,7 @@ void Wifi::pre_setup()
             return "Invalid IP, subnet mask, or gateway passed: IP and gateway are not in the same network according to the subnet mask.";
 
         return "";
-    });
+    }};
     state = Config::Object({
         {"connection_state", Config::Int((int32_t)WifiState::NOT_CONFIGURED)},
         {"connection_start", Config::Uint32(0)},
@@ -90,19 +90,19 @@ void Wifi::pre_setup()
 
     // Max len of identity is currently limited by arduino.
     eap_config_prototypes.push_back({EapConfigID::TLS, Config::Object({
-        {"ca_cert_id", Config::Int(-1, -1, MAX_CERTS)},
+        {"ca_cert_id", Config::Int(-1, -1, MAX_CERT_ID)},
         {"identity", Config::Str("", 0, 64)},
-        {"client_cert_id", Config::Int(0, 0, MAX_CERTS)},
-        {"client_key_id", Config::Int(0, 0, MAX_CERTS)}
+        {"client_cert_id", Config::Int(0, 0, MAX_CERT_ID)},
+        {"client_key_id", Config::Int(0, 0, MAX_CERT_ID)}
     })});
 
     eap_config_prototypes.push_back({EapConfigID::PEAP_TTLS, Config::Object({
-        {"ca_cert_id", Config::Int(-1, -1, MAX_CERTS)},
+        {"ca_cert_id", Config::Int(-1, -1, MAX_CERT_ID)},
         {"identity", Config::Str("", 0, 64)},
         {"username", Config::Str("", 0, 64)},
         {"password", Config::Str("", 0, 64)},
-        {"client_cert_id", Config::Int(-1, -1, MAX_CERTS)},
-        {"client_key_id", Config::Int(-1, -1, MAX_CERTS)}
+        {"client_cert_id", Config::Int(-1, -1, MAX_CERT_ID)},
+        {"client_key_id", Config::Int(-1, -1, MAX_CERT_ID)}
     })});
 
     Config eap_proto = Config::Union<EapConfigID>(
@@ -111,7 +111,7 @@ void Wifi::pre_setup()
         eap_config_prototypes.data(),
         eap_config_prototypes.size());
 
-    sta_config = ConfigRoot(Config::Object({
+    sta_config = ConfigRoot{Config::Object({
         {"enable_sta", Config::Bool(false)},
         {"ssid", Config::Str("", 0, 32)},
         {"bssid", Config::Array({
@@ -168,8 +168,17 @@ void Wifi::pre_setup()
         if (!unused.fromString(cfg.get("dns2")->asEphemeralCStr()))
             return "Failed to parse \"dns2\": Expected format is dotted decimal, i.e. 10.0.0.1";
 
+        if (cfg.get("wpa_eap_config")->getTag<EapConfigID>() == EapConfigID::PEAP_TTLS) {
+            int client_cert_id = cfg.get("wpa_eap_config")->get()->get("client_cert_id")->asInt();
+            int client_key_id = cfg.get("wpa_eap_config")->get()->get("client_key_id")->asInt();
+
+            if ((client_cert_id != -1 && client_key_id == -1) || (client_cert_id == -1 && client_key_id != -1)) {
+                return "Must provide both, a client certificate and a client key";
+            }
+        }
+
         return "";
-    });
+    }};
 }
 
 float rssi_to_weight(int rssi)
@@ -673,6 +682,8 @@ void Wifi::setup()
     if (eap_config_id != EapConfigID::None) {
         const OwnedConfig::OwnedConfigWrap &eap_config = sta_config_in_use.get("wpa_eap_config")->get();
         int ca_id = eap_config->get("ca_cert_id")->asInt();
+        int client_cert_id = eap_config->get("client_cert_id")->asInt();
+        int client_key_id = eap_config->get("client_key_id")->asInt();
         eap_identity = eap_config->get("identity")->asString();
         if (ca_id != -1) {
             ca_cert = certs.get_cert(ca_id, &ca_cert_len);
@@ -680,8 +691,8 @@ void Wifi::setup()
         switch (eap_config_id) {
             case EapConfigID::TLS:
             {
-                client_cert = certs.get_cert(eap_config->get("client_cert_id")->asInt(), &client_cert_len);
-                client_key = certs.get_cert(eap_config->get("client_key_id")->asInt(), &client_key_len);
+                client_cert = certs.get_cert(client_cert_id, &client_cert_len);
+                client_key = certs.get_cert(client_key_id, &client_key_len);
 
                 const CoolString &tmp_identity = eap_config->get("identity")->asString();
                 if (tmp_identity.length() > 0) {
@@ -696,8 +707,12 @@ void Wifi::setup()
                 eap_username = eap_config->get("username")->asString();
                 eap_password = eap_config->get("password")->asString();
 
-                client_cert = certs.get_cert(eap_config->get("client_cert_id")->asInt(), &client_cert_len);
-                client_key = certs.get_cert(eap_config->get("client_key_id")->asInt(), &client_key_len);
+                if (client_cert_id != -1) {
+                    client_cert = certs.get_cert(eap_config->get("client_cert_id")->asInt(), &client_cert_len);
+                }
+                if (client_key_id != -1) {
+                    client_key = certs.get_cert(eap_config->get("client_key_id")->asInt(), &client_key_len);
+                }
 
                 break;
 
