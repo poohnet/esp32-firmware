@@ -20,7 +20,7 @@
 
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
-import { h, Fragment } from "preact";
+import { h, Fragment, Component } from "preact";
 import { __ } from "../../ts/translation";
 import { FormRow } from "../../ts/components/form_row";
 import { SubPage } from "../../ts/components/sub_page";
@@ -29,6 +29,26 @@ import { ConfigComponent } from "../../ts/components/config_component";
 import { InputSelect } from "../../ts/components/input_select";
 import { ConfigForm } from "../../ts/components/config_form";
 import { Switch } from "../../ts/components/switch";
+import { NavbarItem } from "../../ts/components/navbar_item";
+import { Settings } from "react-feather";
+
+export class EVSESettingsNavbar extends Component<{}, {hidden: boolean}> {
+    constructor() {
+        super();
+
+        this.state = {
+            hidden: true
+        } as any;
+
+        util.addApiEventListener("info/modules", () => {
+            this.setState({hidden: !API.hasModule("evse_v2") && !API.hasModule("evse")});
+        });
+    }
+
+    render() {
+        return <NavbarItem name="evse-settings" title={__("evse.navbar.evse_settings")} symbol={<Settings />} hidden={this.state.hidden} />;
+    }
+}
 
 interface EVSESettingsState {
     button_cfg: API.getType['evse/button_configuration']
@@ -190,7 +210,7 @@ export class EVSESettings extends ConfigComponent<"charge_limits/default_limits"
                                             }}/>
                                     </FormRow>;
 
-        return <SubPage>
+        return <SubPage name="evse-settings">
                 <ConfigForm id="evse_settings" title={__("evse.content.settings")} isModified={this.isModified()} isDirty={this.isDirty()} onSave={this.save} onReset={this.reset} onDirtyChange={this.setDirty}>
                     <FormRow label={__("evse.content.auto_start_description")} label_muted={__("evse.content.auto_start_description_muted")}>
                         <Switch desc={__("evse.content.auto_start_enable")}
@@ -262,6 +282,8 @@ export class EVSESettings extends ConfigComponent<"charge_limits/default_limits"
                                             ["0",__("evse.content.gpio_shutdown_not_configured")],
                                             ["1",__("evse.content.gpio_shutdown_on_open")],
                                             ["2",__("evse.content.gpio_shutdown_on_close")],
+                                            ["3",__("evse.content.gpio_4300w_on_open")],
+                                            ["4",__("evse.content.gpio_4300w_on_close")],
                                         ]}
                                     value={gpio_cfg.shutdown_input}
                                     onValue={async (v) => {

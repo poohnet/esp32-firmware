@@ -6,22 +6,22 @@ let x = {
             "automation": "Automation"
         },
         "automation": {
-            "clock": "Time",
-            "time": "Time",
-            "mday": "Day",
-            "monday": "Monday",
-            "tuesday": "Tuesday",
-            "wednesday": "Wednesday",
-            "thursday": "Thursday",
-            "friday": "Friday",
-            "saturday": "Saturday",
-            "sunday": "Sunday",
-            "every_day": "Daily",
-            "every_hour": "Every hour",
-            "every_minute": "Every minute",
-            "weekdays": "Weekdays",
-            "weekends": "Weekends",
-            "month_end": "Month End",
+            "cron": "Time",
+            "cron_time": "Time",
+            "cron_mday": "Day",
+            "cron_monday": "Monday",
+            "cron_tuesday": "Tuesday",
+            "cron_wednesday": "Wednesday",
+            "cron_thursday": "Thursday",
+            "cron_friday": "Friday",
+            "cron_saturday": "Saturday",
+            "cron_sunday": "Sunday",
+            "cron_every_day": "Daily",
+            "cron_every_hour": "Every hour",
+            "cron_every_minute": "Every minute",
+            "cron_weekdays": "Weekdays",
+            "cron_weekends": "Weekends",
+            "cron_month_end": "Month End",
             "cron_translation_function": /*FFN*/(mday: number, wday: number, hour: number, minute: number) => {
                 const wdays = [
                     "Sundays",
@@ -86,6 +86,39 @@ let x = {
                 }
 
                 return <>{day}{time}, </>;
+            }/*NF*/,
+
+            "http": "HTTP message received",
+            "http_method": "Allowed method",
+            "http_get": "GET",
+            "http_post": "POST",
+            "http_put": "PUT",
+            "http_post_put": "POST or PUT",
+            "http_get_post_put": "GET, POST or PUT",
+            "http_url_suffix": "URL suffix",
+            "http_payload": "Message",
+            "http_match_any": "Accept any message",
+            "http_translation_function": /*FFN*/(method: number, url: string, payload: string) => {
+                let methods = [
+                    "GET",
+                    "POST",
+                    "PUT",
+                    "POST or PUT",
+                    "GET, POST or PUT",
+                ];
+
+                let payload_str = <></>;
+                if (payload.length == 0) {
+                    payload_str = <>containing any message</>;
+                } else {
+                    payload_str = <>containing the message "<b>{payload}</b>"</>;
+                }
+
+                let ret = <>If a HTTP {methods[method]} request {payload_str}</>;
+
+                return <>
+                    {ret} is received on URL <b><a href={url}>{url}</a></b>{", "}
+                </>
             }/*NF*/,
 
             "print_action": "Print to event log",

@@ -17,10 +17,9 @@
  * Boston, MA 02111-1307, USA.
  */
 
-import $ from "../../ts/jq";
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
-import { h, render, Fragment, Component } from "preact";
+import { h, Fragment, Component, RefObject } from "preact";
 import { __ } from "../../ts/translation";
 import { FormRow } from "../../ts/components/form_row";
 import { FormSeparator } from "../../ts/components/form_separator";
@@ -28,14 +27,20 @@ import { InputText } from "../../ts/components/input_text";
 import { InputDate } from "../../ts/components/input_date";
 import { Button, Collapse, ListGroup, ListGroupItem, Spinner } from "react-bootstrap";
 import { InputSelect } from "../../ts/components/input_select";
-import { BatteryCharging, Calendar, Clock, DollarSign, Download, User } from "react-feather";
 import { getAllUsernames } from "../users/main";
 import { ConfigComponent } from "../../ts/components/config_component";
 import { ConfigForm } from "../../ts/components/config_form";
 import { InputFloat } from "../../ts/components/input_float";
 import { SubPage } from "../../ts/components/sub_page";
 import { useMemo } from "preact/hooks";
+import { NavbarItem } from "../../ts/components/navbar_item";
+import { StatusSection } from "../../ts/components/status_section";
+import { BatteryCharging, Calendar, Clock, DollarSign, Download, User, List } from "react-feather";
 import { OutputFloat } from "../../ts/components/output_float";
+
+export function ChargeTrackerNavbar() {
+    return <NavbarItem name="charge_tracker" module="charge_tracker" title={__("charge_tracker.navbar.charge_tracker")} symbol={<List />} />;
+}
 
 const MAX_TRACKED_CHARGES = 7680;
 
@@ -56,7 +61,7 @@ interface S {
 
 type ChargeTrackerState = S & API.getType['charge_tracker/state'];
 
-let wallet_icon = <svg class="feather feather-wallet mr-1" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>
+let wallet_icon = <svg width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="6.0999" width="22" height="16" rx="2" ry="2"/><path d="m2.9474 6.0908 15.599-4.8048s0.59352-0.22385 0.57647 0.62527c-0.02215 1.1038-0.01535 3.6833-0.01535 3.6833"/></svg>
 
 function TrackedCharge(props: {charge: Charge, users: API.getType['users/config']['users']}) {
     const display_name = useMemo(
@@ -85,13 +90,13 @@ function TrackedCharge(props: {charge: Charge, users: API.getType['users/config'
             <div class="col-auto">
                 <div class="mb-2"><BatteryCharging/><span class="ml-1" style="vertical-align: middle;">{props.charge.energy_charged === null ? "N/A" : util.toLocaleFixed(props.charge.energy_charged, 3)} kWh</span></div>
                 <div class="mb-2"><DollarSign/><span class="ml-1" style="vertical-align: middle;">{props.charge.electricity_price === null ? "N/A" : util.toLocaleFixed(props.charge.electricity_price / 100, 2)} ct/kWh</span></div>
-                <div class="mb-2">{wallet_icon}<span style="vertical-align: middle;">{util.toLocaleFixed(props.charge.electricity_price / 100 * props.charge.energy_charged / 100, 2)} €</span></div>
+                <div class="mb-2">{wallet_icon}<span class="ml-1" style="vertical-align: middle;">{util.toLocaleFixed(props.charge.electricity_price / 100 * props.charge.energy_charged / 100, 2)} €</span></div>
             </div>
         </div>
     </ListGroupItem>
 }
 
-export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, ChargeTrackerState & ChargeTrackerConfig> {
+export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {status_ref?: RefObject<ChargeTrackerStatus>}, ChargeTrackerState & ChargeTrackerConfig> {
     constructor() {
         super('charge_tracker/config',
               __("charge_tracker.script.save_failed"),
@@ -279,7 +284,7 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
             return <></>
 
         return (
-            <SubPage>
+            <SubPage name="charge_tracker">
                 <ConfigForm id="charge_tracker_config_form" title={__("charge_tracker.content.charge_tracker")} isModified={this.isModified()} isDirty={this.isDirty()} onSave={this.save} onReset={this.reset} onDirtyChange={this.setDirty}>
                     <FormRow label={__("charge_tracker.content.price")}>
                         <InputFloat class={state.electricity_price == 0 || state.electricity_price >= 100 ? "" : "is-invalid"} value={state.electricity_price} onValue={this.set('electricity_price')} digits={2} unit={'ct/kWh'} max={65535} min={0}/>
@@ -463,33 +468,31 @@ export class ChargeTracker extends ConfigComponent<'charge_tracker/config', {}, 
     }
 }
 
-render(<ChargeTracker/>, $('#charge_tracker')[0]);
-
 export class ChargeTrackerStatus extends Component {
     render() {
         if (!util.render_allowed())
-            return <></>;
-    
+            return <StatusSection name="charge_tracker" />;
+
         let last_charges = API.get('charge_tracker/last_charges');
         let cc = API.get('charge_tracker/current_charge');
         let evse_uptime = API.get('evse/low_level_state').uptime;
         let energy_abs = API.get('meter/values').energy_abs;
         let users = API.get('users/config').users;
         let electricity_price = API.get('charge_tracker/config').electricity_price;
-    
+
         let electricity_price_edit = <FormRow label={__("charge_tracker.status.current_price")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
             <OutputFloat value={electricity_price} digits={2} scale={2} unit={'ct/kWh'}/>
         </FormRow>
-    
+
         let current_charge = <></>;
-    
+
         if (cc.user_id != -1) {
             let charge_duration = evse_uptime - cc.evse_uptime_start
             if (evse_uptime < cc.evse_uptime_start)
                 charge_duration += 0xFFFFFFFF;
-    
+
             charge_duration = Math.floor(charge_duration / 1000);
-    
+
             let charge: Charge = {
                 charge_duration: charge_duration,
                 energy_charged: (energy_abs === null || cc.meter_start === null) ? null : (energy_abs - cc.meter_start),
@@ -497,7 +500,7 @@ export class ChargeTrackerStatus extends Component {
                 user_id: cc.user_id,
                 electricity_price: cc.electricity_price
             };
-    
+
             current_charge = <FormRow label={__("charge_tracker.status.current_charge")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
                 <ListGroup>
                     <TrackedCharge charge={charge}
@@ -506,7 +509,7 @@ export class ChargeTrackerStatus extends Component {
                 </ListGroup>
             </FormRow>;
         }
-    
+
         let last_charges_list = last_charges.length == 0 ? <></>
             : <FormRow label={__("charge_tracker.status.last_charges")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
                 <ListGroup>
@@ -517,21 +520,14 @@ export class ChargeTrackerStatus extends Component {
                     ).reverse()}
                 </ListGroup>
             </FormRow>;
-    
-    return <>
+
+        return <StatusSection name="charge_tracker">
                 {electricity_price_edit}
                 {current_charge}
                 {last_charges_list}
-        </>;
+            </StatusSection>;
     }
 }
 
-render(<ChargeTrackerStatus />, $("#status-charge_tracker")[0]);
-
-export function init() {}
-
-export function add_event_listeners(source: API.APIEventTarget) {}
-
-export function update_sidebar_state(module_init: any) {
-    $("#sidebar-charge_tracker").prop("hidden", !module_init.charge_tracker);
+export function init() {
 }

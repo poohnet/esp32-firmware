@@ -17,10 +17,9 @@
  * Boston, MA 02111-1307, USA.
  */
 
-import $ from "../../ts/jq";
 import * as API from "../../ts/api";
 import * as util from "../../ts/util";
-import { h, render, Fragment } from "preact";
+import { h, Fragment, Component } from "preact";
 import { ConfigComponent } from "../../ts/components/config_component";
 import { OutputDatetime } from "../../ts/components/output_datetime";
 import { FormRow } from "../../ts/components/form_row";
@@ -28,6 +27,26 @@ import { Switch } from "../../ts/components/switch";
 import { __ } from "../../ts/translation";
 import { ConfigForm } from "../../ts/components/config_form";
 import { SubPage } from "../../ts/components/sub_page";
+import { NavbarItem } from "../../ts/components/navbar_item";
+import { Watch } from "react-feather";
+
+export class RtcNavbar extends Component<{}, {hidden: boolean}> {
+    constructor() {
+        super();
+
+        this.state = {
+            hidden: true
+        } as any;
+
+        util.addApiEventListener("info/features", () => {
+            this.setState({hidden: !API.hasFeature("rtc")});
+        });
+    }
+
+    render() {
+        return <NavbarItem name="rtc" title={__("rtc.navbar.rtc")} symbol={<Watch />} hidden={this.state.hidden} />;
+    }
+}
 
 type RTCTime = API.getType['rtc/time'];
 type RTCConfig = API.getType['rtc/config'];
@@ -91,7 +110,7 @@ export class Rtc extends ConfigComponent<'rtc/config', {}, RtcPageState> {
         if (!util.render_allowed() || !API.hasFeature("rtc"))
             return <></>
 
-        return <SubPage>
+        return <SubPage name="rtc">
                     <ConfigForm id="rtc_config_form"
                                 title={__("rtc.content.rtc")}
                                 isModified={this.isModified()}
@@ -121,12 +140,4 @@ export class Rtc extends ConfigComponent<'rtc/config', {}, RtcPageState> {
 }
 
 export function init() {
-}
-render(<Rtc />, $("#rtc")[0]);
-
-export function add_event_listeners(source: API.APIEventTarget) {
-    source.addEventListener('info/features', () => $('#sidebar-rtc').prop('hidden', !API.hasFeature('rtc')));
-}
-
-export function update_sidebar_state(module_init: any) {
 }

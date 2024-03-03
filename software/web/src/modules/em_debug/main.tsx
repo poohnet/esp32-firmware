@@ -17,11 +17,10 @@
  * Boston, MA 02111-1307, USA.
  */
 
-import $ from "../../ts/jq";
 import * as API from "../../ts/api";
 import * as util from "../../ts/util";
 import { __ } from "../../ts/translation";
-import { h, render, Fragment, Component } from "preact";
+import { h, Fragment, Component } from "preact";
 import { DebugLogger    } from "../../ts/components/debug_logger";
 import { FormRow        } from "../../ts/components/form_row";
 import { FormSeparator  } from "../../ts/components/form_separator";
@@ -30,6 +29,12 @@ import { InputText      } from "../../ts/components/input_text";
 import { OutputFloat    } from "../../ts/components/output_float";
 import { PageHeader     } from "../../ts/components/page_header";
 import { SubPage } from "../../ts/components/sub_page";
+import { NavbarItem } from "../../ts/components/navbar_item";
+import { Tool } from "react-feather";
+
+export function EMDebugNavbar() {
+    return <NavbarItem name="em_debug" module="energy_manager" title={__("em_debug.navbar.em_debug")} symbol={<Tool />} />;
+}
 
 export class EMDebug extends Component {
     ms2time(ms: number) {
@@ -49,7 +54,7 @@ export class EMDebug extends Component {
         let pm_ll_state = API.get('power_manager/low_level_state');
 
         return (
-            <SubPage>
+            <SubPage name="em_debug">
                 <PageHeader title={__("em_debug.content.em_debug")}/>
 
                 <FormSeparator heading={__("em_debug.content.protocol")} first={true} />
@@ -217,12 +222,4 @@ export class EMDebug extends Component {
 }
 
 export function init() {
-}
-render(<EMDebug />, $("#em_debug")[0]);
-
-export function add_event_listeners(source: API.APIEventTarget) {
-}
-
-export function update_sidebar_state(module_init: any) {
-    $("#sidebar-em_debug").prop("hidden", !module_init.energy_manager);
 }

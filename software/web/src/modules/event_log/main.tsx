@@ -20,14 +20,19 @@
 import $ from "../../ts/jq";
 import * as util from "../../ts/util";
 import * as API from "../../ts/api";
-import { h, render, Fragment, Component } from "preact";
+import { h, Fragment, Component } from "preact";
 import { __ } from "../../ts/translation";
 import { PageHeader } from "../../ts/components/page_header";
 import { FormRow } from "../../ts/components/form_row";
 import { Button, Spinner } from "react-bootstrap";
-import { Download } from 'react-feather';
 import { SubPage } from "../../ts/components/sub_page";
 import { OutputTextarea } from "../../ts/components/output_textarea";
+import { NavbarItem } from "../../ts/components/navbar_item";
+import { Download, FileText } from "react-feather";
+
+export function EventLogNavbar() {
+    return <NavbarItem name="event_log" module="event_log" title={__("event_log.navbar.event_log")} symbol={<FileText />} />;
+}
 
 interface EventLogState {
     log: string;
@@ -60,12 +65,16 @@ export class EventLog extends Component<{}, EventLogState> {
             this.set_log(this.state.log + ev.data + "\n");
         });
 
-        // We have to use jquery here or else the events don't fire?
-        // This can be removed once the sidebar is ported to preact.
+        // FIXME: Bootstrap 4.x only provides jQuery events. We need to port
+        //        to Bootstrap 5.x before we can remove jQuery completly
+        //        https://getbootstrap.com/docs/5.0/getting-started/javascript/
         $('#sidebar-event_log').on('shown.bs.tab', () => {
             this.page_visible = true;
         });
 
+        // FIXME: Bootstrap 4.x only provides jQuery events. We need to port
+        //        to Bootstrap 5.x before we can remove jQuery completly
+        //        https://getbootstrap.com/docs/5.0/getting-started/javascript/
         $('#sidebar-event_log').on('hidden.bs.tab', () => {
             this.page_visible = false;
         });
@@ -218,7 +227,7 @@ export class EventLog extends Component<{}, EventLogState> {
             return (<></>);
 
         return (
-            <SubPage>
+            <SubPage name="event_log">
                 <PageHeader title={__("event_log.content.event_log")} />
 
                 <FormRow label={__("event_log.content.event_log_desc")} label_muted={__("event_log.content.event_log_desc_muted")}>
@@ -240,14 +249,5 @@ export class EventLog extends Component<{}, EventLogState> {
     }
 }
 
-render(<EventLog />, $("#event_log")[0]);
-
 export function init() {
-}
-
-export function add_event_listeners(source: API.APIEventTarget) {
-}
-
-export function update_sidebar_state(module_init: any) {
-    $("#sidebar-event_log").prop("hidden", !module_init.event_log);
 }

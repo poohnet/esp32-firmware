@@ -27,8 +27,10 @@ import { FormRow } from "../../ts/components/form_row";
 import { IndicatorGroup } from "../../ts/components/indicator_group";
 import { InputFloat } from "../../ts/components/input_float";
 import { InputText } from "../../ts/components/input_text";
+import { StatusSection } from "../../ts/components/status_section";
 
 interface EVSEStatusState {
+    hidden: boolean;
     state: API.getType["evse/state"];
     auto_start: API.getType["evse/auto_start_charging"];
     slots: Readonly<API.getType["evse/slots"]>;
@@ -37,12 +39,18 @@ interface EVSEStatusState {
 }
 
 export class EVSEStatus extends Component<{}, EVSEStatusState> {
-    timeout?: number;
+    timeout: number = undefined;
 
     constructor() {
         super();
 
-        this.timeout = undefined;
+        this.state = {
+            hidden: true,
+        } as any;
+
+        util.addApiEventListener("info/modules", () => {
+            this.setState({hidden: !API.hasModule("evse_v2") && !API.hasModule("evse")});
+        });
 
         util.addApiEventListener('evse/state', () => {
             this.setState({state: API.get('evse/state')})
@@ -104,12 +112,12 @@ export class EVSEStatus extends Component<{}, EVSEStatusState> {
     }
 
     render(props: {}, state: EVSEStatusState) {
-        if (!util.render_allowed() || !API.hasFeature("evse"))
-            return <></>;
+        if (!util.render_allowed() || !API.hasFeature("evse") || state.hidden)
+            return <StatusSection name="evse" />;
 
         let theoretical_max = Math.min(state.slots[0].max_current, state.slots[1].max_current);
 
-        return <>
+        return <StatusSection name="evse">
                 <FormRow label={__("evse.status.evse")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
                     <IndicatorGroup
                         style="width: 100%"
@@ -155,6 +163,6 @@ export class EVSEStatus extends Component<{}, EVSEStatusState> {
                 <FormRow label={__("evse.status.allowed_charging_current")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
                         <InputText value={this.update_evse_slots()} />
                 </FormRow>
-            </>;
+            </StatusSection>;
     }
 }

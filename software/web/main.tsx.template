@@ -21,18 +21,17 @@ import $ from "jquery";
 
 import "bootstrap";
 
-import * as feather from 'feather-icons';
+import { h, render } from "preact";
 import * as util from "./ts/util";
 import * as API from "./ts/api";
-import { translate_data_i18n/*, select_language*/ } from "./ts/translation";
+import { __ /*, select_language*/ } from "./ts/translation";
 import { init_async_modal } from "./ts/components/async_modal";
+import { App } from "./app";
 
 {{{module_imports}}}
 
 interface Module {
     init(): void;
-    add_event_listeners(source: API.APIEventTarget): void;
-    update_sidebar_state(m: API.Modules): void;
 }
 
 let modules: Module[] = [{{{modules}}}];
@@ -70,24 +69,19 @@ function navigate() {
 }
 
 function update_modules() {
-    let module_init = API.get('info/modules');
-    for (let m of modules) {
-        m.update_sidebar_state(module_init);
-    }
-
     if (first_module_init) {
         first_module_init = false;
-        navigate();
-        show_page();
+        // FIXME: navigate doesn't work if called directly here. probably
+        //        has something to do with preact render/event order
+        window.setTimeout(() => {
+            navigate();
+            show_page();
+        }, 0);
     }
 }
 
 export function registerEvents(eventSource: API.APIEventTarget) {
     eventSource.addEventListener('info/modules', update_modules);
-
-    for (let m of modules) {
-        m.add_event_listeners(eventSource);
-    }
 }
 
 // This is the part of the initialization to be done
@@ -129,7 +123,7 @@ function login() {
 function setup_normal() {
     window.setTimeout(show_page, 1000);
 
-    $('#sidebar-login').prop('hidden', true);
+    document.getElementById("sidebar-status").hidden = false;
     $('#sidebar-status').addClass('active');
     $('#status').addClass(['show', 'active']);
 
@@ -139,7 +133,7 @@ function setup_normal() {
 function setup_login() {
     window.setTimeout(show_page, 1000);
 
-    $('#sidebar-status').prop('hidden', true);
+    document.getElementById("sidebar-login").hidden = false;
     $('#sidebar-login').addClass('active');
     $('#login').addClass(['show', 'active']);
 
@@ -167,24 +161,21 @@ function setup_login() {
     }, false);
 }
 
-$(window).on('pageshow', (ev) => {
+window.addEventListener("pageshow", () => {
+    document.title = __("main.title");
+
     util.ifLoggedInElse(setup_normal, setup_login);
 
     init_async_modal();
-
-    feather.replace();
-
-    translate_data_i18n();
 
     // Disabled for now.
     // We somehow have to force preact to re-render all components for this to work.
     /*window.addEventListener('languagechange', () => {
         console.log("language change!");
         select_language();
-        translate_data_i18n();
     });*/
 
-    $('a[data-toggle="tab"]').on('show.bs.tab', () => {
+    $('a[data-toggle="tab"]').on('show.bs.tab', (event) => {
         $('a[data-toggle="tab"]').not(event.target as Element).removeClass("active");
         $('a[data-toggle="tab"]').not(event.target as Element).trigger("hidden.bs.tab");
     });
@@ -203,8 +194,10 @@ $(window).on('pageshow', (ev) => {
         setTimeout(() => window.scrollTo(0,0), 1);
     });
 
-    $("#reboot_button").on("click", () => {
+    document.getElementById("reboot_button").addEventListener("click", () => {
         $('#reboot').modal('hide');
         util.reboot();
     });
 });
+
+render(<App />, document.getElementById("app"));
