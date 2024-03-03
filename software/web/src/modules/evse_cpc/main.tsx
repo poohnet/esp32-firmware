@@ -24,16 +24,17 @@ import { h, render, Fragment, Component } from "preact";
 import { __ } from "../../ts/translation";
 import { FormRow } from "../../ts/components/form_row";
 import { IndicatorGroup  } from "../../ts/components/indicator_group";
+import { StatusSection } from "../../ts/components/status_section";
 
 export class EvseCPCStatus extends Component {
-    override render() {
+    render() {
         if (!util.render_allowed() || !API.hasFeature("cp_disconnect")) {
-            return <></>;
+            return <StatusSection name="evse_cpc" />;
         }
 
         let state = API.get('evse_cpc/state');
 
-        return <>
+        return <StatusSection name="evse_cpc">
             <FormRow label={__("evse_cpc.status.cp")} labelColClasses="col-lg-4" contentColClasses="col-lg-8 col-xl-4">
                 <IndicatorGroup
                     style="width: 100%"
@@ -45,18 +46,9 @@ export class EvseCPCStatus extends Component {
                     ]}
                 />
             </FormRow>
-        </>;
+        </StatusSection>;
     }
 }
 
 export function init() {
-}
-
-render(<EvseCPCStatus />, $("#status-evse_cpc")[0]);
-
-export function add_event_listeners(source: API.APIEventTarget) {
-}
-
-export function update_sidebar_state(module_init: any) {
-    $("#sidebar-evse_cpc").prop("hidden", true);
 }
