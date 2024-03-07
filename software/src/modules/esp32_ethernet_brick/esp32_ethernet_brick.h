@@ -23,6 +23,9 @@
 
 #include "module.h"
 
+#define I2C_TMP1075N_ADDR 0b1001001
+#define I2C_RTC_ADDRESS 0b1101000
+
 class ESP32EthernetBrick final : public IModule
 {
 public:
