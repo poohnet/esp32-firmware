@@ -95,7 +95,7 @@ void PhaseSwitcher::setup_phase_switcher()
   }
 
   initialized = true;
-  api.addFeature("cp_disconnect");
+  api.addFeature("phase_switcher");
 
   update_all_data();
   set_control_pilot_disconnect(false, nullptr);
@@ -111,10 +111,25 @@ void PhaseSwitcher::setup_phase_switcher()
         set_phases_wanted(0);
         break;
       case 1:
-        set_phases_wanted(1);
+        set_control_pilot_disconnect(true, nullptr);
         break;
       case 2:
+        set_phases_wanted(1);
+        break;
+      case 3:
+        set_control_pilot_disconnect(false, nullptr);
+        break;
+      case 4:
+        set_control_pilot_disconnect(true, nullptr);
+        break;
+      case 5:
         set_phases_wanted(3);
+        break;
+      case 6:
+        set_control_pilot_disconnect(false, nullptr);
+        break;
+      case 7:
+        set_control_pilot_disconnect(true, nullptr);
         break;
       default:
         step = 0;
