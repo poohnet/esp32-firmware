@@ -159,6 +159,11 @@ void EvseCommon::pre_setup()
         }
     );
 #endif
+
+#if MODULE_PHASE_SWITCHER_AVAILABLE()
+    phase_switcher_current = current_cfg;
+    phase_switcher_current_update = phase_switcher_current;
+#endif
 }
 
 bool EvseCommon::apply_slot_default(uint8_t slot, uint16_t current, bool enabled, bool clear)
@@ -620,6 +625,13 @@ void EvseCommon::register_urls()
     api.addCommand("evse/automation_current_update", &automation_current_update, {}, [this](){
         backend->set_charging_slot_max_current(CHARGING_SLOT_AUTOMATION, automation_current_update.get("current")->asUint());
     }, false); //TODO: should this be an action?
+#endif
+
+#if MODULE_PHASE_SWITCHER_AVAILABLE()
+    api.addState("evse/phase_switcher_current", &phase_switcher_current);
+    api.addCommand("evse/phase_switcher_current_update", &phase_switcher_current_update, {}, [this](){
+        backend->set_charging_slot_max_current(CHARGING_SLOT_PHASE_SWITCHER, phase_switcher_current_update.get("current")->asUint());
+    }, false);
 #endif
 }
 

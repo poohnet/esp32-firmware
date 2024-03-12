@@ -33,7 +33,7 @@ import { InputText } from "../../ts/components/input_text";
 import { PageHeader } from "../../ts/components/page_header";
 import { SubPage } from "../../ts/components/sub_page";
 import { __, translate_unchecked } from "../../ts/translation";
-import { EVSE_SLOT_EXTERNAL, EVSE_SLOT_AUTOMATION } from "./api";
+import { EVSE_SLOT_EXTERNAL, EVSE_SLOT_AUTOMATION, EVSE_SLOT_PHASE_SWITCHER } from "./api";
 import { EVSEStatus } from "./evse_status";
 import { OutputFloat } from "../../ts/components/output_float";
 import { NavbarItem } from "../../ts/components/navbar_item";
@@ -245,6 +245,18 @@ export class EVSE extends Component<{status_ref?: RefObject<EVSEStatus>}, {}> {
                                     <InputIndicator value={value} variant={variant as any}
                                         onReset={
                                             () => API.save('evse/automation_current',
+                                                    {"current": 32000},
+                                                    __("evse.script.reset_slot_failed"))
+                                        }
+                                        resetVariant="danger"
+                                        resetText={__("evse.content.reset_slot")}
+                                        resetHidden={!slot.active || slot.max_current == 32000}/>
+                                </FormRow>
+                            case EVSE_SLOT_PHASE_SWITCHER:
+                                return <FormRow key={i} label={__("evse.content.slot")(i)}>
+                                    <InputIndicator value={value} variant={variant as any}
+                                        onReset={
+                                            () => API.save('evse/phase_switcher_current',
                                                     {"current": 32000},
                                                     __("evse.script.reset_slot_failed"))
                                         }

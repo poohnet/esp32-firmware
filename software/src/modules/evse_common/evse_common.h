@@ -25,7 +25,7 @@
 #include "module.h"
 #include "tools.h"
 
-#define CHARGING_SLOT_COUNT 15
+#define CHARGING_SLOT_COUNT 16
 #define CHARGING_SLOT_COUNT_SUPPORTED_BY_EVSE 20
 
 #define CHARGING_SLOT_INCOMING_CABLE 0
@@ -43,6 +43,7 @@
 #define CHARGING_SLOT_CHARGE_LIMITS 12
 #define CHARGING_SLOT_REQUIRE_METER 13
 #define CHARGING_SLOT_AUTOMATION 14
+#define CHARGING_SLOT_PHASE_SWITCHER 15
 
 #define IEC_STATE_A 0
 #define IEC_STATE_B 1
@@ -209,6 +210,8 @@ private:
     ConfigRoot require_meter_enabled_update;
     ConfigRoot automation_current;
     ConfigRoot automation_current_update;
+    ConfigRoot phase_switcher_current;
+    ConfigRoot phase_switcher_current_update;
 
     // Stored on ESP
     ConfigRoot meter_config;

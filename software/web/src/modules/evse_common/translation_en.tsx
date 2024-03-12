@@ -134,7 +134,8 @@ let x = {
                 11: "OCPP",
                 12: "Energy/Time limit",
                 13: "Meter monitoring",
-                14: "Automation"
+                14: "Automation",
+                15: "Phase Switcher"
             }[i];}/*NF*/,
 
             // EVSE V1 only

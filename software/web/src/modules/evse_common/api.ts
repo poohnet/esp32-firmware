@@ -21,6 +21,7 @@ export const EVSE_SLOT_OCPP = 11;
 export const EVSE_SLOT_CHARGE_LIMITS = 12;
 export const EVSE_SLOT_REQUIRE_METER = 13;
 export const EVSE_SLOT_AUTOMATION = 14;
+export const EVSE_SLOT_PHASE_SWITCHER = 15;
 
 export type slots = Slot[];
 
@@ -92,6 +93,10 @@ export interface external_defaults {
 }
 
 export interface automation_current {
+    current: number;
+}
+
+export interface phase_switcher_current {
     current: number;
 }
 

@@ -33,6 +33,15 @@
   #pragma GCC diagnostic ignored "-Weffc++"
 #endif
 
+enum class SwitchingState
+{
+  Monitoring = 0,
+  Stopping,
+  DisconnectingCP,
+  TogglingContactor,
+  ConnectingCP
+};
+
 class PhaseSwitcher final : public DeviceModule<TF_PhaseSwitcher,
                                 phase_switcher_bricklet_firmware_bin_data,
                                 phase_switcher_bricklet_firmware_bin_length,
@@ -53,17 +62,26 @@ public:
   void setup_phase_switcher();
 
   bool get_control_pilot_disconnect() const;
-  void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
+  void set_control_pilot_disconnect(bool cp_disconnect);
 
   uint8_t get_phases_wanted() const;
   void set_phases_wanted(uint8_t phases_wanted);
 
   uint8_t get_phases_active() const;
 
+  void set_available_current(uint32_t current);
+
 private:
   void update_all_data();
+  void do_the_stuff();
 
   ConfigRoot state;
+  ConfigRoot external_control;
+  ConfigRoot external_control_update;
+
+  SwitchingState switching_state = SwitchingState::Monitoring;
+  uint32_t switching_start       = 0;
+
 };
 
 #if defined(__GNUC__)

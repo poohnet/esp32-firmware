@@ -24,6 +24,8 @@
 
 #include "bindings/errors.h"
 
+#include "module_dependencies.h"
+
 static const char* toString(bool cp_disconnect)
 {
   return cp_disconnect ? "disconnected" : "connected";
@@ -43,6 +45,12 @@ void PhaseSwitcher::pre_setup()
     {"phases_wanted", Config::Uint8(0)},
     {"phases_active", Config::Uint8(0)}
   });
+
+  external_control = Config::Object({
+    {"phases_wanted", Config::Uint32(0)},
+  });
+
+  external_control_update = external_control;
 }
 
 void PhaseSwitcher::setup()
@@ -52,11 +60,38 @@ void PhaseSwitcher::setup()
   if (!device_found) {
     return;
   }
+
+  task_scheduler.scheduleWithFixedDelay([this]() {
+    update_all_data();
+  }, 500, 500);
+
+  task_scheduler.scheduleWithFixedDelay([this]() {
+    do_the_stuff();
+  }, 1000, 1000);
 }
 
 void PhaseSwitcher::register_urls()
 {
   api.addState("phase_switcher/state", &state);
+
+  api.addCommand("power_manager/external_control_update", &external_control_update, {}, [this]() {
+    auto phases_wanted = external_control.get("phases_wanted");
+    uint32_t old_phases = phases_wanted->asUint();
+    uint32_t new_phases = external_control_update.get("phases_wanted")->asUint();
+
+    if (new_phases == old_phases) {
+      logger.printfln("PhaseSwitcher: Ignoring external control phase change request: Value is already %u.", new_phases);
+      return;
+    }
+
+    if (new_phases == 2 || new_phases > 3) {
+      logger.printfln("PhaseSwitcher: Ignoring external control phase change request: Value %u is invalid.", new_phases);
+      return;
+    }
+
+    logger.printfln("PhaseSwitcher: External control phase change request: Switching from %u to %u", old_phases, new_phases);
+    phases_wanted->updateUint(new_phases);
+  }, true);
 
   this->DeviceModule::register_urls();
 }
@@ -98,45 +133,7 @@ void PhaseSwitcher::setup_phase_switcher()
   api.addFeature("phase_switcher");
 
   update_all_data();
-  set_control_pilot_disconnect(false, nullptr);
-
-  task_scheduler.scheduleWithFixedDelay([this]() {
-    update_all_data();
-  }, 500, 500);
-
-  task_scheduler.scheduleWithFixedDelay([this]() {
-    static int step = 0;
-    switch (step++) {
-      case 0:
-        set_phases_wanted(0);
-        break;
-      case 1:
-        set_control_pilot_disconnect(true, nullptr);
-        break;
-      case 2:
-        set_phases_wanted(1);
-        break;
-      case 3:
-        set_control_pilot_disconnect(false, nullptr);
-        break;
-      case 4:
-        set_control_pilot_disconnect(true, nullptr);
-        break;
-      case 5:
-        set_phases_wanted(3);
-        break;
-      case 6:
-        set_control_pilot_disconnect(false, nullptr);
-        break;
-      case 7:
-        set_control_pilot_disconnect(true, nullptr);
-        break;
-      default:
-        step = 0;
-        break;
-    }
-  }, 5000, 5000);
-
+  set_control_pilot_disconnect(false);
 }
 
 bool PhaseSwitcher::get_control_pilot_disconnect() const
@@ -144,7 +141,7 @@ bool PhaseSwitcher::get_control_pilot_disconnect() const
   return state.get("cp_disconnect")->asBool();
 }
 
-void PhaseSwitcher::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected)
+void PhaseSwitcher::set_control_pilot_disconnect(bool cp_disconnect)
 {
   if (!initialized) {
     return;
@@ -165,10 +162,6 @@ void PhaseSwitcher::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_di
 
     logger.printfln("PhaseSwitcher::set_control_pilot_disconnect(): %s => %s", toString(old_cp_disconnect), toString(cp_disconnect));
   }
-
-  if (cp_disconnected) {
-    *cp_disconnected = cp_disconnect;
-  }
 }
 
 uint8_t PhaseSwitcher::get_phases_wanted() const
@@ -184,13 +177,12 @@ void PhaseSwitcher::set_phases_wanted(uint8_t phases_wanted)
 
   uint8_t old_phases_wanted = get_phases_wanted();
 
-  //if ((get_phases_active() == 0) && (phases_wanted != old_phases_wanted)) {
-  if (phases_wanted != old_phases_wanted) {
+  if (get_control_pilot_disconnect() && (phases_wanted != old_phases_wanted)) {
     int rc = tf_phase_switcher_set_phases_wanted(&device, phases_wanted);
 
     if (rc != TF_E_OK) {
       if (!is_in_bootloader(rc)) {
-        logger.printfln("PhaseSwitcher::set_phases(): tf_phase_switcher_set_phases_wanted() failed with rc %d", rc);
+        logger.printfln("PhaseSwitcher::set_phases_wanted(): tf_phase_switcher_set_phases_wanted() failed with rc %d", rc);
       }
 
       return;
@@ -203,6 +195,17 @@ void PhaseSwitcher::set_phases_wanted(uint8_t phases_wanted)
 uint8_t PhaseSwitcher::get_phases_active() const
 {
   return static_cast<uint8_t>(state.get("phases_active")->asUint());
+}
+
+void PhaseSwitcher::set_available_current(uint32_t current)
+{
+  String err = api.callCommand("evse/phase_switcher_current_update", Config::ConfUpdateObject{{
+    {"current", current},
+  }});
+
+  if (!err.isEmpty()) {
+    logger.printfln("PhaseSwitcher: set_available_current failed: %s", err.c_str());
+  }
 }
 
 void PhaseSwitcher::update_all_data()
@@ -226,4 +229,59 @@ void PhaseSwitcher::update_all_data()
   state.get("cp_disconnect")->updateBool(cp_disconnect);
   state.get("phases_wanted")->updateUint(phases_wanted);
   state.get("phases_active")->updateUint(phases_active);
+}
+
+void PhaseSwitcher::do_the_stuff()
+{
+  static SwitchingState prev_state = switching_state;
+
+  if (!initialized) {
+    return;
+  }
+
+  if (switching_state != prev_state) {
+    logger.printfln("PhaseSwitcher: Now in state %i", static_cast<int>(switching_state));
+    prev_state = switching_state;
+  }
+
+  uint8_t external_phases_wanted = static_cast<uint8_t>(external_control.get("phases_wanted")->asUint());
+
+  if (switching_state == SwitchingState::Monitoring) {
+    set_available_current(32000);
+
+    if (external_phases_wanted != get_phases_wanted()) {
+      switching_state = SwitchingState::Stopping;
+      switching_start = millis();
+    }
+  }
+  else if (switching_state == SwitchingState::Stopping) {
+    set_available_current(0);
+
+    if (get_phases_active() == 0) {
+      switching_state = SwitchingState::DisconnectingCP;
+      switching_start = millis();
+    }
+  }
+  else if (switching_state == SwitchingState::DisconnectingCP) {
+    set_control_pilot_disconnect(true);
+
+    if (get_control_pilot_disconnect()) {
+      switching_state = SwitchingState::TogglingContactor;
+      switching_start = millis();
+    }
+  }
+  else if (switching_state == SwitchingState::TogglingContactor) {
+    set_phases_wanted(external_phases_wanted);
+
+    if (get_phases_wanted() == external_phases_wanted) {
+      switching_state = SwitchingState::ConnectingCP;
+      switching_start = millis();
+    }
+  }
+  else if (switching_state == SwitchingState::ConnectingCP) {
+    set_control_pilot_disconnect(false);
+
+    switching_state = SwitchingState::Monitoring;
+    switching_start = 0;
+  }
 }
