@@ -20,6 +20,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <unordered_map>
 
 #include "ModbusTCP.h"
 
@@ -112,16 +113,14 @@ public:
     Modbus::ResultCode scan_read_result;
     ScanState scan_read_state;
     uint16_t scan_model_id;
+    std::unordered_map<uint16_t, uint16_t> scan_model_instances;
     size_t scan_block_length;
     char scan_printfln_buffer[512] = "";
     size_t scan_printfln_buffer_used = 0;
     micros_t scan_printfln_last_flush = 0_usec;
     char scan_common_manufacturer_name[32 + 1];
     char scan_common_model_name[32 + 1];
-    char scan_common_options[16 + 1];
-    char scan_common_version[16 + 1];
     char scan_common_serial_number[32 + 1];
-    uint16_t scan_common_device_address;
 };
 
 #if defined(__GNUC__)
