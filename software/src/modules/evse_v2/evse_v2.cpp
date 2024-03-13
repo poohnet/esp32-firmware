@@ -1014,6 +1014,8 @@ void EVSEV2::update_all_data()
 
     evse_common.require_meter_enabled.get("enabled")->updateBool(SLOT_ACTIVE(active_and_clear_on_disconnect[CHARGING_SLOT_REQUIRE_METER]));
 
+    evse_common.phase_switcher_enabled.get("enabled")->updateBool(SLOT_ACTIVE(active_and_clear_on_disconnect[CHARGING_SLOT_PHASE_SWITCHER]));
+
     gp_output.get("gp_output")->updateUint(gpio[10] ? TF_EVSE_V2_OUTPUT_CONNECTED_TO_GROUND : TF_EVSE_V2_OUTPUT_HIGH_IMPEDANCE);
 
     evse_common.low_level_state.get("temperature")->updateInt(temperature);

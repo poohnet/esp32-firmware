@@ -298,7 +298,8 @@ let x = {
                 11: "OCPP",
                 12: "energy/time limit",
                 13: "meter monitoring",
-                14: "automation"
+                14: "automation",
+                15: "Phase Switcher"
             }[i];}/*NF*/,
 
             "reboot_content_changed": "charge settings",

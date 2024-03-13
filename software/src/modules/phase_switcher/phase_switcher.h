@@ -69,8 +69,6 @@ public:
 
   uint8_t get_phases_active() const;
 
-  void set_available_current(uint32_t current);
-
 private:
   void update_all_data();
   void do_the_stuff();
@@ -80,8 +78,6 @@ private:
   ConfigRoot external_control_update;
 
   SwitchingState switching_state = SwitchingState::Monitoring;
-  uint32_t switching_start       = 0;
-
 };
 
 #if defined(__GNUC__)

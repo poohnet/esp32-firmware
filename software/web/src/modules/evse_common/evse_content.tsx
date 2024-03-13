@@ -252,18 +252,6 @@ export class EVSE extends Component<{status_ref?: RefObject<EVSEStatus>}, {}> {
                                         resetText={__("evse.content.reset_slot")}
                                         resetHidden={!slot.active || slot.max_current == 32000}/>
                                 </FormRow>
-                            case EVSE_SLOT_PHASE_SWITCHER:
-                                return <FormRow key={i} label={__("evse.content.slot")(i)}>
-                                    <InputIndicator value={value} variant={variant as any}
-                                        onReset={
-                                            () => API.save('evse/phase_switcher_current',
-                                                    {"current": 32000},
-                                                    __("evse.script.reset_slot_failed"))
-                                        }
-                                        resetVariant="danger"
-                                        resetText={__("evse.content.reset_slot")}
-                                        resetHidden={!slot.active || slot.max_current == 32000}/>
-                                </FormRow>
                             default:
                                 return <FormRow key={i} label={__("evse.content.slot")(i)}>
                                     <InputIndicator value={value} variant={variant as any} />

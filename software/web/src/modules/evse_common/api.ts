@@ -96,8 +96,8 @@ export interface automation_current {
     current: number;
 }
 
-export interface phase_switcher_current {
-    current: number;
+export interface phase_switcher_enabled {
+    enabled: boolean;
 }
 
 export interface start_charging {

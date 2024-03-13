@@ -210,12 +210,21 @@ private:
     ConfigRoot require_meter_enabled_update;
     ConfigRoot automation_current;
     ConfigRoot automation_current_update;
-    ConfigRoot phase_switcher_current;
-    ConfigRoot phase_switcher_current_update;
 
     // Stored on ESP
     ConfigRoot meter_config;
     uint32_t charger_meter_slot = 0;
 
     bool use_imexsum = false;
+
+public:
+    void set_phase_switcher_enabled(bool enabled);
+    bool get_phase_switcher_enabled();
+
+    void set_phase_switcher_blocking(bool blocking);
+    bool get_phase_switcher_blocking();
+
+private:
+    ConfigRoot phase_switcher_enabled;
+    ConfigRoot phase_switcher_enabled_update;
 };
