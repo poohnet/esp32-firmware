@@ -382,14 +382,10 @@ int idx_array[MAX_CONTROLLED_CHARGERS] = {0};
 
 void ChargeManager::setup()
 {
-    uint32_t control_cycle_time_ms;
     if (!api.restorePersistentConfig("charge_manager/config", &config)) {
         config.get("maximum_available_current")->updateUint(0);
 #if MODULE_ENERGY_MANAGER_AVAILABLE()
         apply_energy_manager_config(config);
-        control_cycle_time_ms = 5 * 1000;
-#else
-        control_cycle_time_ms = 10 * 1000;
 #endif
     }
 
@@ -439,7 +435,7 @@ void ChargeManager::setup()
 
     start_manager_task();
 
-    task_scheduler.scheduleWithFixedDelay([this](){this->distribute_current();}, control_cycle_time_ms, control_cycle_time_ms);
+    task_scheduler.scheduleWithFixedDelay([this](){this->distribute_current();}, 5000, 5000);
 
     if (config.get("enable_watchdog")->asBool()) {
         task_scheduler.scheduleWithFixedDelay([this](){this->check_watchdog();}, 1000, 1000);
@@ -756,6 +752,12 @@ void ChargeManager::distribute_current()
                 uint16_t current_per_charger = MIN(32000, available / (chargers_allocated_current_to - chargers_reallocated));
 
                 uint16_t requested_current = charger.requested_current;
+
+                // If exactly one charger is charging, double the current margin for faster power manager control.
+                if (chargers_allocated_current_to == 1) {
+                    requested_current += requested_current_margin;
+                }
+
                 // Protect against overflow.
                 if (requested_current < current_array[idx_array[i]])
                     continue;

@@ -51,8 +51,10 @@ public:
 
     void write(const char *buf, size_t len);
 
-    void printfln(const char *fmt, va_list args);
-    [[gnu::format(__printf__, 2, 3)]] void printfln(const char *fmt, ...);
+    int printfln(const char *fmt, va_list args);
+    [[gnu::format(__printf__, 2, 3)]] int printfln(const char *fmt, ...);
+
+    #define dbg(fmt, ...) printfln("[%s:%d] " fmt, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
 
     void drop(size_t count);
 
@@ -66,3 +68,5 @@ public:
 // Make global variable available everywhere because it is not declared in modules.h.
 // Definition is in event_log.cpp.
 extern EventLog logger;
+
+extern "C" int tf_event_log_printf(const char *fmt, va_list args);

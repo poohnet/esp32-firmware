@@ -85,6 +85,14 @@ void EventLog::write(const char *buf, size_t len)
     char timestamp_buf[TIMESTAMP_LEN + 1] = {0};
     this->get_timestamp(timestamp_buf);
 
+    // Strip away \r\n.
+    // We only use \n as line endings for the serial output as well as the event log.
+    // Removing \r\n by reducing the length works,
+    // because if a message does not end in \n we add the \n below.
+    if (len >= 2 && buf[len - 2] == '\r' && buf[len - 1] == '\n') {
+        len -= 2;
+    }
+
     Serial.print(timestamp_buf);
     Serial.write(buf, len);
 
@@ -134,7 +142,7 @@ void EventLog::write(const char *buf, size_t len)
 #endif
 }
 
-void EventLog::printfln(const char *fmt, va_list args)
+int EventLog::printfln(const char *fmt, va_list args)
 {
     char buf[256];
     auto buf_size = sizeof(buf) / sizeof(buf[0]);
@@ -147,14 +155,18 @@ void EventLog::printfln(const char *fmt, va_list args)
     }
 
     write(buf, written);
+
+    return written;
 }
 
-void EventLog::printfln(const char *fmt, ...)
+int EventLog::printfln(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    this->printfln(fmt, args);
+    int result = this->printfln(fmt, args);
     va_end(args);
+
+    return result;
 }
 
 void EventLog::drop(size_t count)
@@ -192,4 +204,9 @@ void EventLog::register_urls()
     });
 
     api.addState("event_log/boot_id", &boot_id);
+}
+
+int tf_event_log_printf(const char *fmt, va_list args)
+{
+    return logger.printfln(fmt, args);
 }
