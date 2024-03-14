@@ -78,6 +78,7 @@ private:
   ConfigRoot external_control_update;
 
   SwitchingState switching_state = SwitchingState::Monitoring;
+  uint32_t wait_after_cp_disconnect = 0;
 };
 
 #if defined(__GNUC__)

@@ -162,6 +162,11 @@ void PhaseSwitcher::set_control_pilot_disconnect(bool cp_disconnect)
       return;
     }
 
+    // After CP contact was disconnected and is connected again, we wait for one second to make sure that ADC measurement is working again.
+    if (!cp_disconnect) {
+      wait_after_cp_disconnect = millis() + 1000;
+    }
+
     logger.printfln("PhaseSwitcher: Control Pilot changed from %s to %s", toString(old_cp_disconnect), toString(cp_disconnect));
   }
 }
@@ -205,21 +210,25 @@ void PhaseSwitcher::update_all_data()
     return;
   }
 
-  bool cp_disconnect;
-  uint8_t phases_wanted, phases_active;
-  int rc = tf_phase_switcher_get_all_data(&device, &cp_disconnect, &phases_wanted, &phases_active);
+  if ((wait_after_cp_disconnect == 0) || deadline_elapsed(wait_after_cp_disconnect)) {
+    wait_after_cp_disconnect = 0;
 
-  if (rc != TF_E_OK) {
-    if (!is_in_bootloader(rc)) {
-      logger.printfln("PhaseSwitcher: tf_phase_switcher_get_all_data() failed with rc %d", rc);
+    bool cp_disconnect;
+    uint8_t phases_wanted, phases_active;
+    int rc = tf_phase_switcher_get_all_data(&device, &cp_disconnect, &phases_wanted, &phases_active);
+
+    if (rc != TF_E_OK) {
+      if (!is_in_bootloader(rc)) {
+        logger.printfln("PhaseSwitcher: tf_phase_switcher_get_all_data() failed with rc %d", rc);
+      }
+
+      return;
     }
 
-    return;
+    state.get("cp_disconnect")->updateBool(cp_disconnect);
+    state.get("phases_wanted")->updateUint(phases_wanted);
+    state.get("phases_active")->updateUint(phases_active);
   }
-
-  state.get("cp_disconnect")->updateBool(cp_disconnect);
-  state.get("phases_wanted")->updateUint(phases_wanted);
-  state.get("phases_active")->updateUint(phases_active);
 }
 
 void PhaseSwitcher::do_the_stuff()

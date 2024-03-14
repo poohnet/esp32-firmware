@@ -537,10 +537,24 @@ void EVSE::update_all_data()
     // track the charge.
     firmware_update_allowed = charger_state == 0 || charger_state == 4;
 
-    // get_state
+    bool cp_disconnect = false;
 
-    evse_common.state.get("iec61851_state")->updateUint(iec61851_state);
-    evse_common.state.get("charger_state")->updateUint(charger_state);
+#if MODULE_EVSE_CPC_AVAILABLE()
+    if (api.hasFeature("cp_disconnect")) {
+        cp_disconnect = evse_cpc.get_control_pilot_disconnect();
+    }
+#elif MODULE_PHASE_SWITCHER_AVAILABLE()
+    if (api.hasFeature("phase_switcher")) {
+        cp_disconnect = phase_switcher.get_control_pilot_disconnect();
+    }
+#endif
+
+    // get_state - If the CP contact is disconnected we stay in the current state.
+    if (!cp_disconnect) {
+        evse_common.state.get("iec61851_state")->updateUint(iec61851_state);
+        evse_common.state.get("charger_state")->updateUint(charger_state);
+    }
+
     evse_common.state.get("contactor_state")->updateUint(contactor_state);
     bool contactor_error_changed = evse_common.state.get("contactor_error")->updateUint(contactor_error);
     evse_common.state.get("allowed_charging_current")->updateUint(allowed_charging_current);
@@ -604,10 +618,6 @@ void EVSE::update_all_data()
 
     evse_common.boost_mode.get("enabled")->updateBool(boost_mode_enabled);
 
-    bool cp_disconnect = false;
-#if MODULE_EVSE_CPC_AVAILABLE()
-    cp_disconnect = evse_cpc.get_control_pilot_disconnect();
-#endif
     control_pilot_disconnect.get("disconnect")->updateBool(cp_disconnect);
 
     // get_indicator_led
