@@ -104,8 +104,24 @@ def connect_ethernet(ip):
 
     print(" Connected.")
 
-def test_rtc_time(ip):
+def test_rtc_time(ip, wait_for_ntp):
     print("Testing RTC")
+    if wait_for_ntp:
+        print("    Waiting for NTP sync")
+        for i in range(30):
+            start = time.time()
+            try:
+                with urllib.request.urlopen(f"http://{ip}/ntp/state", timeout=1) as f:
+                    if json.loads(f.read())["synced"]:
+                        break
+            except:
+                pass
+            t = max(0, 1 - (time.time() - start))
+            time.sleep(t)
+            print(".", end="")
+        else:
+            fatal_error("NTP did not sync in 30 seconds!")
+
     try:
         with urllib.request.urlopen(f"http://{ip}/rtc/time", timeout=10) as f:
             t = json.loads(f.read())
@@ -122,7 +138,7 @@ def test_rtc_time(ip):
 def get_esp_ssid(serial_port, result):
 
     print("Checking ESP state")
-    mac_address = check_if_esp_is_sane_and_get_mac(allowed_revision=3.1, override_port=serial_port)
+    mac_address = check_if_esp_is_sane_and_get_mac(allowed_revision=3, override_port=serial_port)
     print("MAC Address is {}".format(mac_address))
     result["mac"] = mac_address
 
@@ -210,7 +226,7 @@ def run_stage_1_tests(serial_port, ethernet_ip, power_off_fn, power_on_fn, resul
 
     result["temperature_test_successful"] = True
 
-    test_rtc_time(ethernet_ip)
+    test_rtc_time(ethernet_ip, wait_for_ntp=True)
 
     print("Testing RTC supercap")
 
@@ -226,7 +242,7 @@ def run_stage_1_tests(serial_port, ethernet_ip, power_off_fn, power_on_fn, resul
         with urllib.request.urlopen(req, timeout=1) as f:
             f.read()
     except:
-        pass
+        fatal_error("Failed to disable NTP")
 
     power_off_fn()
     time.sleep(10)
@@ -234,7 +250,7 @@ def run_stage_1_tests(serial_port, ethernet_ip, power_off_fn, power_on_fn, resul
 
     connect_ethernet(ethernet_ip)
 
-    test_rtc_time(ethernet_ip)
+    test_rtc_time(ethernet_ip, wait_for_ntp=False)
 
     result["rtc_test_successful"] = True
 
@@ -275,8 +291,27 @@ def print_label(ssid, passphrase, stage_1_test_report):
 
     print('Done!')
 
+def reset_ntp_config_fn(ethernet_ip):
+    def inner(ethernet_ip):
+        try:
+            with urllib.request.urlopen(f"http://{ethernet_ip}/ntp/config_reset", timeout=1) as f:
+                f.read()
+        except:
+            fatal_error("Failed to re-enable NTP")
+    return lambda: inner(ethernet_ip)
+
+def reset_ethernet_config_fn(ethernet_ip):
+    def inner(ethernet_ip):
+        try:
+            with urllib.request.urlopen(f"http://{ethernet_ip}/ethernet/config_reset", timeout=1) as f:
+                f.read()
+        except:
+            fatal_error("Failed to re-enable NTP")
+    return lambda: inner(ethernet_ip)
 
 def main():
+    cleanup = []
+
     ipcon = IPConnection()
     ipcon.connect("localhost", 4223)
     devices = enumerate_devices(ipcon)
@@ -369,6 +404,7 @@ def main():
 
     for k, v in list(relay_to_serial.items()):
         try:
+            cleanup.append(reset_ethernet_config_fn(f"192.168.1.{9 + k}"))
             test_wifi(relay_to_ssid[k], relay_to_passphrase[k], f"192.168.1.{9 + k}", test_reports[k])
         except BaseException as e:
             print(red(f"Failed to test WiFi for {k} {v}: {e}"))
@@ -378,9 +414,12 @@ def main():
         return lambda: run_stage_1_tests(serial_port, ethernet_ip, lambda: iqr.set_selected_value(relay_pin, False), lambda: iqr.set_selected_value(relay_pin, True), test_report)
 
     for k, v in relay_to_serial.items():
+        cleanup.append(reset_ntp_config_fn(f"192.168.1.{9 + k}"))
         t = ThreadWithReturnValue(target=run_stage_1_tests_fn(v, f"192.168.1.{9 + k}", k, test_reports[k]))
         t.start()
         threads.append((k, v, t))
+
+    relay_to_rgb_led = {}
 
     for k, v, t in threads:
         success, result, exception = t.join()
@@ -391,8 +430,15 @@ def main():
             ipcon, rgb_led_uid = result
             rgb_led = BrickletRGBLEDV2(rgb_led_uid, ipcon)
 
+            relay_to_rgb_led[k] = rgb_led
+
+    print("Running cleanup functions")
+    for fn in cleanup:
+        fn()
+
+    for k, v in list(relay_to_rgb_led.items()):
             stop_event = threading.Event()
-            blink_thread = threading.Thread(target=blink_thread_fn, args=([rgb_led], stop_event))
+            blink_thread = threading.Thread(target=blink_thread_fn, args=([v], stop_event))
             blink_thread.start()
 
             print_label(relay_to_ssid[k], relay_to_passphrase[k], test_reports[k])

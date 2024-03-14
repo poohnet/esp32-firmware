@@ -54,7 +54,7 @@ public:
     int printfln(const char *fmt, va_list args);
     [[gnu::format(__printf__, 2, 3)]] int printfln(const char *fmt, ...);
 
-    #define dbg(fmt, ...) printfln("[%s:%d] " fmt, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
+    #define tf_dbg(fmt, ...) printfln("[%s:%d] " fmt, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
 
     void drop(size_t count);
 
@@ -69,4 +69,9 @@ public:
 // Definition is in event_log.cpp.
 extern EventLog logger;
 
+// To capture ESP-IDF log messages, use
+// esp_log_set_vprintf(tf_event_log_printf);
+// If this is in a c (not cpp) file, also add
+// extern int tf_event_log_printf(const char *fmt, va_list args);
+// instead of including event_log.h (a C++ header)
 extern "C" int tf_event_log_printf(const char *fmt, va_list args);
