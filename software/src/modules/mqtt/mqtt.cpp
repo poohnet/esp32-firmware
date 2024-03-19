@@ -38,10 +38,13 @@ extern Mqtt mqtt;
 
 extern char local_uid_str[32];
 
+// Default task stack size in mqtt_config.h is 6144.
 #if defined(BOARD_HAS_PSRAM)
+#define MQTT_TASK_STACK_SIZE  6144U
 #define MQTT_RECV_BUFFER_SIZE 6144U
 #define MQTT_SEND_BUFFER_SIZE 32768U
 #else
+#define MQTT_TASK_STACK_SIZE  3072U
 #define MQTT_RECV_BUFFER_SIZE 4096U
 #define MQTT_SEND_BUFFER_SIZE 4096U
 #endif
@@ -358,16 +361,18 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
 
         if (c.callback_in_thread == CallbackInThread::Main) {
             esp_mqtt_client_disable_receive(client, 100);
-            char *topic_cpy = (char *)malloc(topic_len);
-            memcpy(topic_cpy, topic, topic_len);
+            char *copy_buf = (char *)malloc(topic_len + data_len);
+            if (copy_buf == nullptr) {
+                logger.printfln("MQTT: Failed to run command %s: Failed to allocate copy_buf", c.topic.c_str());
+                return;
+            }
 
-            char *data_cpy = (char *)malloc(data_len);
-            memcpy(data_cpy, data, data_len);
+            memcpy(copy_buf, topic, topic_len);
+            memcpy(copy_buf + topic_len, data, data_len);
 
-            task_scheduler.scheduleOnce([this, c, topic_cpy, topic_len, data_cpy, data_len](){
-                c.callback(topic_cpy, topic_len, data_cpy, data_len);
-                free(data_cpy);
-                free(topic_cpy);
+            task_scheduler.scheduleOnce([this, c, copy_buf, topic_len, data_len](){
+                c.callback(copy_buf, topic_len, copy_buf + topic_len, data_len);
+                free(copy_buf);
                 esp_mqtt_client_enable_receive(client);
             }, 0);
         } else
@@ -420,6 +425,10 @@ void Mqtt::onMqttMessage(char *topic, size_t topic_len, char *data, size_t data_
         }
 
         char *data_cpy = (char *)malloc(data_len);
+        if (data_cpy == nullptr) {
+            logger.printfln("MQTT: Failed to run raw command %s: Failed to allocate copy_buf", reg.path);
+            return;
+        }
         memcpy(data_cpy, data, data_len);
 
         esp_mqtt_client_disable_receive(client, 100);
@@ -584,6 +593,7 @@ void Mqtt::setup()
     mqtt_cfg.client_id = config_in_use.get("client_name")->asEphemeralCStr();
     mqtt_cfg.username = config_in_use.get("broker_username")->asEphemeralCStr();
     mqtt_cfg.password = config_in_use.get("broker_password")->asEphemeralCStr();
+    mqtt_cfg.task_stack = MQTT_TASK_STACK_SIZE;
     mqtt_cfg.buffer_size = MQTT_RECV_BUFFER_SIZE;
     mqtt_cfg.out_buffer_size = MQTT_SEND_BUFFER_SIZE;
     mqtt_cfg.network_timeout_ms = 1000;
@@ -709,13 +719,13 @@ void Mqtt::register_events()
     if (start_immediately) {
         esp_mqtt_client_start(client);
 #if MODULE_DEBUG_AVAILABLE()
-        debug.register_task("mqtt_task", 6144); // stack size from mqtt_config.h
+        debug.register_task("mqtt_task", MQTT_TASK_STACK_SIZE);
 #endif
     } else {
         task_scheduler.scheduleOnce([this]() {
             esp_mqtt_client_start(client);
 #if MODULE_DEBUG_AVAILABLE()
-            debug.register_task("mqtt_task", 6144); // stack size from mqtt_config.h
+            debug.register_task("mqtt_task", MQTT_TASK_STACK_SIZE);
 #endif
         }, 20000);
     }

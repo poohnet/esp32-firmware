@@ -370,7 +370,7 @@ export class EVSE extends Component<{status_ref?: RefObject<EVSEStatus>}, {}> {
                                 </div>
                             </FormRow>)
                          : (util.range(ll_state.gpio.length / 4).map(i =>
-                                <FormRow key={i} label={i == 0 ? __("evse.content.gpios") : ""} label_muted={translate_unchecked(`evse.content.gpio_names_${i}`)}>
+                                <FormRow key={i} label={i == 0 ? __("evse.content.gpios") : ""} label_muted={translate_unchecked(`evse.content.evse_v${is_evse_v3 ? 3 : 2}_gpio_names_${i}`)}>
                                     <div class="row mx-n1">
                                         {ll_state.gpio.slice(i*4, i*4+4).map((x, j) => (
                                             <IndicatorGroup vertical key={j} class="mb-1 col-3 px-1"
@@ -391,7 +391,7 @@ export class EVSE extends Component<{status_ref?: RefObject<EVSEStatus>}, {}> {
                         {!is_evse_v3 ? undefined :
                         <>
                             <FormRow label={__("evse.content.temperature")}>
-                                <OutputFloat value={ll_state.temperature} digits={2} scale={2} unit="°C"/>
+                                <InputText value={util.toLocaleFixed(ll_state.temperature / 100, 2) + " °C"} />
                             </FormRow>
 
                             <FormRow label={__("evse.content.phases_current")}>

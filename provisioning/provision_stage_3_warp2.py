@@ -292,7 +292,10 @@ class Stage3:
             fatal_error('Action did not complete in time')
 
     # internal
-    def change_meter_state(self, state):
+    def change_meter_state(self, state, quiet=False):
+        if not quiet:
+            print('Changing meter state to {0}'.format(state))
+
         if state == 'Type2-L1':
             value = [(True,  True),  (False, False), (False, False)]
         elif state == 'Type2-L2':
@@ -429,8 +432,8 @@ class Stage3:
     # internal
     def is_front_panel_led_blue(self):
         color = self.try_action('20D', lambda device: device.get_color())
-
-        return color[2] / color[3] > 0.65 and color[3] > 25000
+        # C > 20000 for WARP2 compat
+        return color[2] / color[3] > 0.65 and color[3] > 20000
 
     def is_front_panel_led_red(self):
         color = self.try_action('20D', lambda device: device.get_color())
@@ -578,7 +581,7 @@ class Stage3:
         self.connect_front_panel(False)
         self.connect_type2_pe(True)
         self.change_cp_pe_state('A', quiet=True)
-        self.change_meter_state('Type2-L1')
+        self.change_meter_state('Type2-L1', quiet=True)
 
         time.sleep(RELAY_SETTLE_DURATION)
 
@@ -597,7 +600,7 @@ class Stage3:
         self.connect_front_panel(False)
         self.connect_type2_pe(True)
         self.change_cp_pe_state('A', quiet=True)
-        self.change_meter_state('Type2-L1')
+        self.change_meter_state('Type2-L1', quiet=True)
 
         time.sleep(RELAY_SETTLE_DURATION)
 
@@ -741,11 +744,12 @@ class Stage3:
             fatal_error('Wallbox not in IEC state C')
 
     # requires power_on
-    def test_wallbox(self):
+    def test_wallbox(self, has_phase_switch):
         assert self.has_evse_error_function != None
         assert self.get_iec_state_function != None
         assert self.reset_dc_fault_function != None
-        assert self.switch_phases_function != None
+        if has_phase_switch:
+            assert self.switch_phases_function != None
 
         if self.read_meter_qr_code() != '01':
             fatal_error('Meter in wrong step')
@@ -877,61 +881,61 @@ class Stage3:
 
         self.connect_warp_power(['L1', 'L2', 'L3'])
 
-        time.sleep(RELAY_SETTLE_DURATION + VOLTAGE_SETTLE_DURATION)
+        if has_phase_switch:
+            time.sleep(RELAY_SETTLE_DURATION + VOLTAGE_SETTLE_DURATION)
 
-        voltages = self.read_voltage_monitors()
+            voltages = self.read_voltage_monitors()
 
-        print('Reading voltages as {0}'.format(voltages))
+            print('Reading voltages as {0}'.format(voltages))
 
-        if voltages[0] < VOLTAGE_ON_THRESHOLD:
-            fatal_error('Missing voltage on L1')
+            if voltages[0] < VOLTAGE_ON_THRESHOLD:
+                fatal_error('Missing voltage on L1')
 
-        if voltages[1] < VOLTAGE_OFF_THRESHOLD:
-            fatal_error('Missing voltage on L2')
+            if voltages[1] < VOLTAGE_OFF_THRESHOLD:
+                fatal_error('Missing voltage on L2')
 
-        if voltages[2] < VOLTAGE_ON_THRESHOLD:
-            fatal_error('Missing voltage on L3')
+            if voltages[2] < VOLTAGE_ON_THRESHOLD:
+                fatal_error('Missing voltage on L3')
 
-        print('Testing phase switch')
+            print('Testing phase switch')
 
-        self.switch_phases_function(1)
+            self.switch_phases_function(1)
 
-        time.sleep(PHASE_SWITCH_SETTLE_DURATION + VOLTAGE_SETTLE_DURATION)
+            time.sleep(PHASE_SWITCH_SETTLE_DURATION + VOLTAGE_SETTLE_DURATION)
 
-        voltages = self.read_voltage_monitors()
+            voltages = self.read_voltage_monitors()
 
-        print('Reading voltages as {0}'.format(voltages))
+            print('Reading voltages as {0}'.format(voltages))
 
-        if voltages[0] < VOLTAGE_ON_THRESHOLD:
-            fatal_error('Missing voltage on L1')
+            if voltages[0] < VOLTAGE_ON_THRESHOLD:
+                fatal_error('Missing voltage on L1')
 
-        if voltages[1] > VOLTAGE_OFF_THRESHOLD:
-            fatal_error('Unexpected voltage on L2')
+            if voltages[1] > VOLTAGE_OFF_THRESHOLD:
+                fatal_error('Unexpected voltage on L2')
 
-        if voltages[2] > VOLTAGE_ON_THRESHOLD:
-            fatal_error('Unexpected voltage on L3')
+            if voltages[2] > VOLTAGE_ON_THRESHOLD:
+                fatal_error('Unexpected voltage on L3')
 
+            self.switch_phases_function(3)
 
-        self.switch_phases_function(3)
+            time.sleep(PHASE_SWITCH_SETTLE_DURATION + VOLTAGE_SETTLE_DURATION)
 
-        time.sleep(PHASE_SWITCH_SETTLE_DURATION + VOLTAGE_SETTLE_DURATION)
+            voltages = self.read_voltage_monitors()
 
-        voltages = self.read_voltage_monitors()
+            print('Reading voltages as {0}'.format(voltages))
 
-        print('Reading voltages as {0}'.format(voltages))
+            if voltages[0] < VOLTAGE_ON_THRESHOLD:
+                fatal_error('Missing voltage on L1')
 
-        if voltages[0] < VOLTAGE_ON_THRESHOLD:
-            fatal_error('Missing voltage on L1')
+            if voltages[1] < VOLTAGE_OFF_THRESHOLD:
+                fatal_error('Missing voltage on L2')
 
-        if voltages[1] < VOLTAGE_OFF_THRESHOLD:
-            fatal_error('Missing voltage on L2')
+            if voltages[2] < VOLTAGE_ON_THRESHOLD:
+                fatal_error('Missing voltage on L3')
 
-        if voltages[2] < VOLTAGE_ON_THRESHOLD:
-            fatal_error('Missing voltage on L3')
+            self.connect_voltage_monitors(False)
 
-        self.connect_voltage_monitors(False)
-
-        time.sleep(RELAY_SETTLE_DURATION)
+            time.sleep(RELAY_SETTLE_DURATION)
 
         # step 01: test PE disconnect
         print('Disconnecting PE')
@@ -967,10 +971,7 @@ class Stage3:
         if not self.check_iec_state('C'):
             fatal_error('Wallbox not in IEC state C. Check contactor!')
 
-        print('Changing meter state to Type2-L1')
-
         self.change_meter_state('Type2-L1')
-
         time.sleep(RELAY_SETTLE_DURATION)
 
         self.click_meter_run_button() # skip QR code
@@ -1004,10 +1005,8 @@ class Stage3:
 
         # step 04: test voltage L2
         print('Testing wallbox, step 04/15, test voltage L2')
-        print('Changing meter state to Type2-L2')
 
         self.change_meter_state('Type2-L2')
-
         time.sleep(RELAY_SETTLE_DURATION)
 
         self.click_meter_run_button() # skip QR code
@@ -1029,10 +1028,8 @@ class Stage3:
 
         # step 06: test voltage L3
         print('Testing wallbox, step 06/15, test voltage L3')
-        print('Changing meter state to Type2-L3')
 
         self.change_meter_state('Type2-L3')
-
         time.sleep(RELAY_SETTLE_DURATION)
 
         self.click_meter_run_button() # skip QR code
@@ -1054,9 +1051,9 @@ class Stage3:
 
         # step 08: test RCD positive
         print('Testing wallbox, step 08/15, test RCD positive')
-        print('Changing meter state to Type2-L1')
 
         self.change_meter_state('Type2-L1')
+
         time.sleep(RELAY_SETTLE_DURATION)
 
         self.click_meter_run_button() # skip QR code
@@ -1111,7 +1108,6 @@ class Stage3:
 
         # step 11: test R iso L2
         print('Testing wallbox, step 11/15, test R iso L2')
-        print('Changing meter state to Type2-L2')
 
         self.change_meter_state('Type2-L2')
         time.sleep(RELAY_SETTLE_DURATION)
@@ -1125,7 +1121,6 @@ class Stage3:
 
         # step 12: test R iso L3
         print('Testing wallbox, step 12/15, test R iso L3')
-        print('Changing meter state to Type2-L3')
 
         self.change_meter_state('Type2-L3')
         time.sleep(RELAY_SETTLE_DURATION)
@@ -1139,7 +1134,6 @@ class Stage3:
 
         # step 13: test R iso N
         print('Testing wallbox, step 13/15, test R iso N')
-        print('Changing meter state to Type2-L1')
 
         self.change_meter_state('Type2-L1')
         time.sleep(RELAY_SETTLE_DURATION)
@@ -1196,25 +1190,34 @@ def main():
     button_power_on_smart.grid(row=0, column=0, padx=10, pady=10)
 
     button_power_on_pro = tk.Button(root, text='Power On - Pro', width=50, command=lambda: stage3.power_on('Pro'))
-    button_power_on_pro.grid(row=1, column=0, padx=10, pady=10)
+    button_power_on_pro.grid(row=1, column=0, padx=10, pady=0)
 
     button_power_on_cee = tk.Button(root, text='Power On - CEE', width=50, command=lambda: stage3.power_on('CEE'))
     button_power_on_cee.grid(row=2, column=0, padx=10, pady=10)
 
     button_power_off = tk.Button(root, text='Power Off', width=50, command=lambda: stage3.power_off())
-    button_power_off.grid(row=3, column=0, padx=10, pady=10)
+    button_power_off.grid(row=3, column=0, padx=10, pady=0)
 
     button_cp_pe_state_a = tk.Button(root, text='CP/PE State A', width=50, command=lambda: stage3.change_cp_pe_state('A'))
     button_cp_pe_state_a.grid(row=4, column=0, padx=10, pady=10)
 
     button_cp_pe_state_b = tk.Button(root, text='CP/PE State B', width=50, command=lambda: stage3.change_cp_pe_state('B'))
-    button_cp_pe_state_b.grid(row=5, column=0, padx=10, pady=10)
+    button_cp_pe_state_b.grid(row=5, column=0, padx=10, pady=0)
 
     button_cp_pe_state_c = tk.Button(root, text='CP/PE State C', width=50, command=lambda: stage3.change_cp_pe_state('C'))
     button_cp_pe_state_c.grid(row=6, column=0, padx=10, pady=10)
 
     button_cp_pe_state_d = tk.Button(root, text='CP/PE State D', width=50, command=lambda: stage3.change_cp_pe_state('D'))
-    button_cp_pe_state_d.grid(row=7, column=0, padx=10, pady=10)
+    button_cp_pe_state_d.grid(row=7, column=0, padx=10, pady=0)
+
+    button_meter_state_type2_l1 = tk.Button(root, text='Meter State Type2 L1', width=50, command=lambda: stage3.change_meter_state('Type2-L1'))
+    button_meter_state_type2_l1.grid(row=8, column=0, padx=10, pady=10)
+
+    button_meter_state_type2_l2 = tk.Button(root, text='Meter State Type2 L2', width=50, command=lambda: stage3.change_meter_state('Type2-L2'))
+    button_meter_state_type2_l2.grid(row=9, column=0, padx=10, pady=0)
+
+    button_meter_state_type2_l3 = tk.Button(root, text='Meter State Type2 L3', width=50, command=lambda: stage3.change_meter_state('Type2-L3'))
+    button_meter_state_type2_l3.grid(row=10, column=0, padx=10, pady=10)
 
     root.mainloop()
 
