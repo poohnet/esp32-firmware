@@ -834,3 +834,13 @@ bool EvseCommon::get_phase_switcher_blocking()
 
     return enabled && current == 0;
 }
+
+void EvseCommon::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected)
+{
+    backend->set_control_pilot_disconnect(cp_disconnect, cp_disconnected);
+}
+
+bool EvseCommon::get_control_pilot_disconnect()
+{
+    return backend->get_control_pilot_disconnect();
+}
