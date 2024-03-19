@@ -549,8 +549,9 @@ void EVSE::update_all_data()
     }
 #endif
 
-    // get_state - If the CP contact is disconnected we stay in the current state.
-    if (!cp_disconnect) {
+    // get_state - If the CP contact is disconnected (or we've just reconnected) we stay in the current state.
+    if (!cp_disconnect && ((wait_after_cp_disconnect == 0) || deadline_elapsed(wait_after_cp_disconnect + 1000))) {
+        wait_after_cp_disconnect = 0;
         evse_common.state.get("iec61851_state")->updateUint(iec61851_state);
         evse_common.state.get("charger_state")->updateUint(charger_state);
     }
@@ -665,8 +666,12 @@ void EVSE::update_all_data()
 }
 
 void EVSE::set_control_pilot_disconnect(bool cp_disconnect, bool *cp_disconnected) {
+    wait_after_cp_disconnect = millis();
+
 #if MODULE_EVSE_CPC_AVAILABLE()
     evse_cpc.set_control_pilot_disconnect(cp_disconnect, cp_disconnected);
+#elif MODULE_PHASE_SWITCHER_AVAILABLE()
+    phase_switcher.set_control_pilot_disconnect(cp_disconnect, cp_disconnected);
 #endif
 }
 
