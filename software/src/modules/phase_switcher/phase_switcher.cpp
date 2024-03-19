@@ -189,7 +189,7 @@ void PhaseSwitcher::set_phases_wanted(uint8_t phases_wanted)
 
   uint8_t old_phases_wanted = get_phases_wanted();
 
-  if ((get_phases_active == 0) && get_control_pilot_disconnect() && (phases_wanted != old_phases_wanted)) {
+  if ((get_phases_active() == 0) && get_control_pilot_disconnect() && (phases_wanted != old_phases_wanted)) {
     int rc = tf_phase_switcher_set_phases_wanted(&device, phases_wanted);
 
     if (rc != TF_E_OK) {
