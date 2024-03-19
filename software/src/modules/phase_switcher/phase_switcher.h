@@ -62,7 +62,7 @@ public:
   void setup_phase_switcher();
 
   bool get_control_pilot_disconnect() const;
-  void set_control_pilot_disconnect(bool cp_disconnect);
+  void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
 
   uint8_t get_phases_wanted() const;
   void set_phases_wanted(uint8_t phases_wanted);
@@ -73,12 +73,12 @@ private:
   void update_all_data();
   void do_the_stuff();
 
-  ConfigRoot state;
+  ConfigRoot pm_state;
+  ConfigRoot ps_state;
   ConfigRoot external_control;
   ConfigRoot external_control_update;
 
   SwitchingState switching_state = SwitchingState::Monitoring;
-  uint32_t wait_after_cp_disconnect = 0;
 };
 
 #if defined(__GNUC__)

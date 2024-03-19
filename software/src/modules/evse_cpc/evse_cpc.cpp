@@ -51,6 +51,13 @@ void EvseCPC::setup()
   if (!device_found) {
     return;
   }
+
+  initialized = true;
+  api.addFeature("cp_disconnect");
+
+  task_scheduler.scheduleWithFixedDelay([this]() {
+    update_all_data();
+  }, 0, 250);
 }
 
 void EvseCPC::register_urls()
@@ -75,25 +82,15 @@ void EvseCPC::setup_evse_cpc()
   tf_evse_cpc_set_channel_led_config(&device, 0, TF_EVSE_CPC_CHANNEL_LED_CONFIG_SHOW_CHANNEL_STATUS);
   tf_evse_cpc_set_channel_led_config(&device, 1, TF_EVSE_CPC_CHANNEL_LED_CONFIG_SHOW_CHANNEL_STATUS);
 
-  int rc = tf_evse_cpc_set_value(&device, false, false);
+  int rc = tf_evse_cpc_set_value(&device, true, false);
 
   if (rc != TF_E_OK) {
     if (!is_in_bootloader(rc)) {
-      logger.printfln("EvseCPC::setup_evse_cpc(): tf_evse_cpc_set_value() failed with rc %d", rc);
+      logger.printfln("EVSE CPC (Setup): tf_evse_cpc_set_value() failed with rc %d.", rc);
     }
 
     return;
   }
-
-  initialized = true;
-  api.addFeature("cp_disconnect");
-
-  update_all_data();
-  set_control_pilot_disconnect(false, nullptr);
-
-  task_scheduler.scheduleWithFixedDelay([this]() {
-    update_all_data();
-  }, 500, 500);
 }
 
 bool EvseCPC::get_control_pilot_disconnect()
@@ -114,13 +111,13 @@ void EvseCPC::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconne
 
     if (rc != TF_E_OK) {
       if (!is_in_bootloader(rc)) {
-        logger.printfln("EvseCPC::set_control_pilot_disconnect(): tf_evse_cpc_set_value() failed with rc %d", rc);
+        logger.printfln("EVSE CPC: tf_evse_cpc_set_value() failed with rc %d.", rc);
       }
 
       return;
     }
 
-    logger.printfln("EvseCPC::set_control_pilot_disconnect(): %s => %s", toString(old_cp_disconnect), toString(cp_disconnect));
+    logger.printfln("EVSE CPC: Control Pilot changed from %s to %s.", toString(old_cp_disconnect), toString(cp_disconnect));
   }
 
   if (cp_disconnected) {
@@ -139,7 +136,7 @@ void EvseCPC::update_all_data()
 
   if (rc != TF_E_OK) {
     if (!is_in_bootloader(rc)) {
-      logger.printfln("EvseCPC::update_all_data(): tf_evse_cpc_get_value() failed with rc %d", rc);
+      logger.printfln("EVSE CPC: tf_evse_cpc_get_value() failed with rc %d.", rc);
     }
 
     return;
