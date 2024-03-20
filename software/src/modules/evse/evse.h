@@ -91,4 +91,6 @@ protected:
 private:
     ConfigRoot control_pilot_disconnect;
     ConfigRoot control_pilot_disconnect_update;
+
+    uint32_t wait_after_cp_disconnect = 0;
 };

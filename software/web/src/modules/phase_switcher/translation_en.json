@@ -1,0 +1,21 @@
+{
+    "phase_switcher": {
+        "status": {
+            "cp": "Control Pilot",
+            "connected": "Connected",
+            "disconnected": "Disconnected",
+            "phases_wanted": "Phases (wanted)",
+            "phases_active": "Phases (active)",
+            "none": "None",
+            "one_phase": "One phase",
+            "three_phase": "Three phase"
+        },
+        "navbar": {
+            "phase_switcher": "Phase Switcher"
+        },
+        "content": {
+        },
+        "script": {
+        }
+    }
+}
