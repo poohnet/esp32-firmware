@@ -33,7 +33,7 @@
   #pragma GCC diagnostic ignored "-Weffc++"
 #endif
 
-enum class PSSwitchingState
+enum class PhaseSwitchingState
 {
   Monitoring = 0,
   Stopping,
@@ -64,21 +64,21 @@ public:
   bool get_control_pilot_disconnect() const;
   void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
 
-  uint8_t get_phases_wanted() const;
-  void set_phases_wanted(uint8_t phases_wanted);
+  uint8_t get_phases_requested() const;
+  void set_phases_requested(uint8_t phases_requested);
+
+  uint8_t get_phases_current() const;
+  void set_phases_current(uint8_t phases_current);
 
   uint8_t get_phases_active() const;
+  uint8_t get_phases_state() const;
 
 private:
   void update_all_data();
   void do_the_stuff();
 
-  ConfigRoot pm_state;
-  ConfigRoot ps_state;
-  ConfigRoot external_control;
-  ConfigRoot external_control_update;
-
-  PSSwitchingState switching_state = PSSwitchingState::Monitoring;
+  ConfigRoot state;
+  PhaseSwitchingState switching_state = PhaseSwitchingState::Monitoring;
 };
 
 #if defined(__GNUC__)

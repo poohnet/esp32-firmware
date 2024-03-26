@@ -37,48 +37,57 @@ export class PhaseSwitcherStatus extends Component {
 
         return <StatusSection name="phase_switcher">
             <FormRow label={__("phase_switcher.status.cp")}>
-                <ButtonGroup className="flex-wrap m-n1" style="width: calc(100% + 0.5rem);">
-                    <Button
-                        style="display: flex;align-items: center;justify-content: center;"
-                        className="m-1 rounded-left rounded-right"
-                        variant={state.cp_disconnect ? "warning" : "secondary"}
-                        disabled={true}>
-                        {state.cp_disconnect ? <CheckCircle size="20"/> : <Circle size="20"/>} <span>&nbsp;&nbsp;</span><span>{__("phase_switcher.status.disconnected")}</span>
-                    </Button>
-                    <Button
-                        style="display: flex;align-items: center;justify-content: center;"
-                        className="m-1 rounded-left rounded-right"
-                        variant={!state.cp_disconnect ? "success" : "secondary"}
-                        disabled={true}>
-                        {!state.cp_disconnect ? <CheckCircle size="20"/> : <Circle size="20"/>} <span>&nbsp;&nbsp;</span><span>{__("phase_switcher.status.connected")}</span>
-                    </Button>
-                </ButtonGroup>
-            </FormRow>
-
-            <FormRow label={__("phase_switcher.status.phases_wanted")}>
                 <IndicatorGroup
                     style="width: 100%"
                     class="flex-wrap"
-                    value={(state.phases_wanted == 1) ? 1 : (state.phases_wanted == 3) ? 2 : 0}
+                    value={state.cp_disconnect ? 0 : 1}
                     items={[
-                        ["secondary", __("phase_switcher.status.none")],
-                        ["success", __("phase_switcher.status.one_phase")],
-                        ["success", __("phase_switcher.status.three_phase")],
+                        ["warning", __("phase_switcher.status.disconnected")],
+                        ["success", __("phase_switcher.status.connected")]
                     ]}
                 />
             </FormRow>
 
-            <FormRow label={__("phase_switcher.status.phases_active")}>
-                <IndicatorGroup
-                    style="width: 100%"
-                    class="flex-wrap"
-                    value={(state.phases_active == 1) ? 1 : (state.phases_active == 3) ? 2 : 0}
-                    items={[
-                        ["secondary", __("phase_switcher.status.none")],
-                        ["success", __("phase_switcher.status.one_phase")],
-                        ["success", __("phase_switcher.status.three_phase")],
-                    ]}
-                />
+            <FormRow label={__("phase_switcher.status.contactors_requested")} label_muted={__("phase_switcher.status.contactor_names")}>
+                <div class="row mx-n1">
+                    <IndicatorGroup
+                        class="mb-1 col px-1"
+                        value={((state.phases_current & 1) == 1) ? 1 : 0}
+                        items={[
+                            ["secondary", __("phase_switcher.status.off")],
+                            ["success", __("phase_switcher.status.on")]
+                        ]}
+                    />
+                    <IndicatorGroup
+                        class="mb-1 col px-1"
+                        value={((state.phases_current & 2) == 2) ? 1 : 0}
+                        items={[
+                            ["secondary", __("phase_switcher.status.off")],
+                            ["success", __("phase_switcher.status.on")]
+                        ]}
+                    />
+                </div>
+            </FormRow>
+
+            <FormRow label={__("phase_switcher.status.contactors_active")} label_muted={__("phase_switcher.status.contactor_names")}>
+                <div class="row mx-n1">
+                    <IndicatorGroup
+                        class="mb-1 col px-1"
+                        value={((state.phases_active & 1) == 1) ? 1 : 0}
+                        items={[
+                            ["secondary", __("phase_switcher.status.off")],
+                            ["success", __("phase_switcher.status.on")]
+                        ]}
+                    />
+                    <IndicatorGroup
+                        class="mb-1 col px-1"
+                        value={((state.phases_active & 2) == 2) ? 1 : 0}
+                        items={[
+                            ["secondary", __("phase_switcher.status.off")],
+                            ["success", __("phase_switcher.status.on")]
+                        ]}
+                    />
+                </div>
             </FormRow>
         </StatusSection>;
     }

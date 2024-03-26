@@ -4,11 +4,11 @@
             "cp": "Control Pilot",
             "connected": "Verbunden",
             "disconnected": "Getrennt",
-            "phases_wanted": "Phasen (angefordert)",
-            "phases_active": "Phasen (aktiv)",
-            "none": "Keine",
-            "one_phase": "Einphasig",
-            "three_phase": "Dreiphasig"
+            "contactors_requested": "Schütze (angefordert)",
+            "contactors_active": "Schütze (aktiv)",
+            "contactor_names": "L1+N, L2+L3",
+            "off": "Aus",
+            "on": "Ein"
         },
         "navbar": {
             "phase_switcher": "Phase Switcher"

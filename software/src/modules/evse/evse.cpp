@@ -82,6 +82,11 @@ void EVSE::pre_setup()
             }, new Config{Config::Bool(false)}, 5, 5, Config::type_id<Config::ConfBool>())},
         {"charging_time", Config::Uint32(0)},
         {"time_since_state_change", Config::Uint32(0)},
+#if MODULE_PHASE_SWITCHER_AVAILABLE()
+        {"phases_current", Config::Uint16(0)},
+        {"phases_requested", Config::Uint16(0)},
+        {"phases_state", Config::Uint16(0)},
+#endif
         {"uptime", Config::Uint32(0)}
     });
 
@@ -659,6 +664,10 @@ void EVSE::update_all_data()
 
 #if MODULE_PHASE_SWITCHER_AVAILABLE()
     evse_common.phase_switcher_enabled.get("enabled")->updateBool(SLOT_ACTIVE(active_and_clear_on_disconnect[CHARGING_SLOT_PHASE_SWITCHER]));
+
+    evse_common.low_level_state.get("phases_current")->updateUint(phase_switcher.get_phases_current());
+    evse_common.low_level_state.get("phases_requested")->updateUint(phase_switcher.get_phases_requested());
+    evse_common.low_level_state.get("phases_state")->updateUint(phase_switcher.get_phases_state());
 #endif
 
     // get_user_calibration
@@ -692,3 +701,60 @@ void EVSE::set_control_pilot_disconnect(bool cp_disconnect, bool *cp_disconnecte
 bool EVSE::get_control_pilot_disconnect() {
     return control_pilot_disconnect.get("disconnect")->asBool();
 }
+
+
+#if MODULE_PHASE_SWITCHER_AVAILABLE()
+    bool EVSE::phase_switching_capable()
+    {
+        return api.hasFeature("phase_switcher");
+    }
+
+    bool EVSE::can_switch_phases_now(bool wants_3phase)
+    {
+        return true;
+    }
+
+    bool EVSE::requires_cp_disconnect()
+    {
+        return false;
+    }
+
+    bool EVSE::get_is_3phase()
+    {
+        return evse_common.low_level_state.get("phases_current")->asUint() == 3;
+    }
+
+    PhaseSwitcherBackend::SwitchingState EVSE::get_phase_switching_state()
+    {
+        if (evse_common.state.get("error_state")->asUint() != 0) {
+            //return PhaseSwitcherBackend::SwitchingState::Error;
+        }
+
+        uint32_t state = evse_common.low_level_state.get("phases_state")->asUint();
+
+        if (state != 0) {
+            return PhaseSwitcherBackend::SwitchingState::Busy;
+        }
+
+        return PhaseSwitcherBackend::SwitchingState::Ready;
+    }
+
+    bool EVSE::switch_phases_3phase(bool wants_3phase)
+    {
+        if (!can_switch_phases_now(wants_3phase)) {
+            logger.printfln("evse: Requested phase switch but can't switch at the moment.");
+            return false;
+        }
+
+        phase_switcher.set_phases_requested(wants_3phase ? 3 : 1);
+
+        return true;
+    }
+#else
+    bool EVSE::phase_switching_capable()                                    {return false;}
+    bool EVSE::can_switch_phases_now(bool wants_3phase)                     {return false;}
+    bool EVSE::requires_cp_disconnect()                                     {return false;}
+    bool EVSE::get_is_3phase()                                              {return true;}
+    PhaseSwitcherBackend::SwitchingState EVSE::get_phase_switching_state()  {return PhaseSwitcherBackend::SwitchingState::Ready;}
+    bool EVSE::switch_phases_3phase(bool wants_3phase)                      {return false;}
+#endif

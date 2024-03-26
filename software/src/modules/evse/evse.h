@@ -79,12 +79,12 @@ protected:
     //End IEvseBackend implementation
 
     // PhaseSwitcherBackend implementation
-    bool phase_switching_capable()                                   override {return false;}
-    bool can_switch_phases_now(bool wants_3phase)                    override {return false;}
-    bool requires_cp_disconnect()                                    override {return false;}
-    bool get_is_3phase()                                             override {return true;}
-    PhaseSwitcherBackend::SwitchingState get_phase_switching_state() override {return PhaseSwitcherBackend::SwitchingState::Ready;}
-    bool switch_phases_3phase(bool wants_3phase)                     override {return false;}
+    bool phase_switching_capable() override;
+    bool can_switch_phases_now(bool wants_3phase) override;
+    bool requires_cp_disconnect() override;
+    bool get_is_3phase() override;
+    PhaseSwitcherBackend::SwitchingState get_phase_switching_state() override;
+    bool switch_phases_3phase(bool wants_3phase) override;
 
     ConfigRoot user_calibration;
 
