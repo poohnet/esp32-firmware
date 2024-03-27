@@ -62,7 +62,8 @@ void PhaseSwitcher::setup()
   api.addFeature("cp_disconnect");
   api.addFeature("phase_switcher");
 
-  evse_common.set_phase_switcher_enabled(true);
+  evse.set_charging_slot_default(CHARGING_SLOT_PHASE_SWITCHER, 32000, true, false);
+  evse.set_charging_slot_active(CHARGING_SLOT_PHASE_SWITCHER, true);
 
   task_scheduler.scheduleWithFixedDelay([this]() {
     update_all_data();
@@ -237,7 +238,7 @@ void PhaseSwitcher::do_the_stuff()
 
   switch (switching_state) {
     case PhaseSwitchingState::Monitoring:
-      evse_common.set_phase_switcher_blocking(false);
+      evse.set_charging_slot_max_current(CHARGING_SLOT_PHASE_SWITCHER, 32000);
 
       if (phases_requested != get_phases_current()) {
         switching_state = PhaseSwitchingState::Stopping;
@@ -245,7 +246,7 @@ void PhaseSwitcher::do_the_stuff()
       break;
 
     case PhaseSwitchingState::Stopping:
-      evse_common.set_phase_switcher_blocking(true);
+      evse.set_charging_slot_max_current(CHARGING_SLOT_PHASE_SWITCHER, 0);
 
       if (get_phases_active() == 0) {
         switching_state = PhaseSwitchingState::DisconnectingCP;
@@ -253,9 +254,9 @@ void PhaseSwitcher::do_the_stuff()
       break;
 
     case PhaseSwitchingState::DisconnectingCP:
-      evse_common.set_control_pilot_disconnect(true, nullptr);
+      evse.set_control_pilot_disconnect(true, nullptr);
 
-      if (evse_common.get_control_pilot_disconnect()) {
+      if (evse.get_control_pilot_disconnect()) {
         switching_state = PhaseSwitchingState::TogglingContactor;
       }
       break;
@@ -269,9 +270,9 @@ void PhaseSwitcher::do_the_stuff()
       break;
 
     case PhaseSwitchingState::ConnectingCP:
-      evse_common.set_control_pilot_disconnect(false, nullptr);
+      evse.set_control_pilot_disconnect(false, nullptr);
 
-      if (!evse_common.get_control_pilot_disconnect()) {
+      if (!evse.get_control_pilot_disconnect()) {
         switching_state = PhaseSwitchingState::Monitoring;
       }
       break;

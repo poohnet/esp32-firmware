@@ -537,7 +537,7 @@ void EVSE::update_all_data()
     // track the charge.
     firmware_update_allowed = charger_state == 0 || charger_state == 4;
 
-    bool cp_disconnect = (_cp_backend) ? _cp_backend->get_control_pilot_disconnect() : false;
+    bool cp_disconnect = (cp_backend != nullptr) ? cp_backend->get_control_pilot_disconnect() : false;
 
     // get_state - If the CP contact is disconnected (or we've just reconnected) we stay in the current state.
     if (!cp_disconnect && ((wait_after_cp_disconnect == 0) || deadline_elapsed(wait_after_cp_disconnect + 1000))) {
@@ -636,8 +636,6 @@ void EVSE::update_all_data()
     evse_common.require_meter_enabled.get("enabled")->updateBool(SLOT_ACTIVE(active_and_clear_on_disconnect[CHARGING_SLOT_REQUIRE_METER]));
 
 #if MODULE_PHASE_SWITCHER_AVAILABLE()
-    evse_common.phase_switcher_enabled.get("enabled")->updateBool(SLOT_ACTIVE(active_and_clear_on_disconnect[CHARGING_SLOT_PHASE_SWITCHER]));
-
     evse_common.low_level_state.get("phases_current")->updateUint(phase_switcher.get_phases_current());
     evse_common.low_level_state.get("phases_requested")->updateUint(phase_switcher.get_phases_requested());
     evse_common.low_level_state.get("phases_state")->updateUint(phase_switcher.get_phases_state());
@@ -660,26 +658,22 @@ void EVSE::update_all_data()
 }
 
 
-void EVSE::register_cp_backend(ControlPilotBackend* cp_backend)
+void EVSE::register_cp_backend(ControlPilotBackend* backend)
 {
-    _cp_backend = cp_backend;
+    cp_backend = backend;
 }
 
 void EVSE::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected)
 {
-    if (_cp_backend && (cp_disconnect != _cp_backend->get_control_pilot_disconnect())) {
+    if (cp_backend && (cp_disconnect != cp_backend->get_control_pilot_disconnect())) {
         wait_after_cp_disconnect = millis();
-        _cp_backend->set_control_pilot_disconnect(cp_disconnect, cp_disconnected);
+        cp_backend->set_control_pilot_disconnect(cp_disconnect, cp_disconnected);
     }
 }
 
 bool EVSE::get_control_pilot_disconnect()
 {
-    if (_cp_backend) {
-        return _cp_backend->get_control_pilot_disconnect();
-    }
-
-    return false;
+    return (cp_backend != nullptr) ? cp_backend->get_control_pilot_disconnect() : false;
 }
 
 
@@ -707,7 +701,7 @@ bool EVSE::get_control_pilot_disconnect()
     PhaseSwitcherBackend::SwitchingState EVSE::get_phase_switching_state()
     {
         if (evse_common.state.get("error_state")->asUint() != 0) {
-            //return PhaseSwitcherBackend::SwitchingState::Error;
+            return PhaseSwitcherBackend::SwitchingState::Error;
         }
 
         uint32_t state = evse_common.low_level_state.get("phases_state")->asUint();

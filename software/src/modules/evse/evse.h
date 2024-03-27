@@ -35,6 +35,7 @@ class EVSE final : public DeviceModule<TF_EVSE,
                                        tf_evse_get_bootloader_mode,
                                        tf_evse_reset,
                                        tf_evse_destroy>, public IEvseBackend {
+    friend class PhaseSwitcher;
 public:
     EVSE();
 
@@ -91,9 +92,9 @@ protected:
     ConfigRoot user_calibration;
 
 public:
-    void register_cp_backend(ControlPilotBackend* cp_backend);
+    void register_cp_backend(ControlPilotBackend* backend);
 
 private:
-    ControlPilotBackend* _cp_backend = nullptr;
+    ControlPilotBackend* cp_backend = nullptr;
     uint32_t wait_after_cp_disconnect = 0;
 };
