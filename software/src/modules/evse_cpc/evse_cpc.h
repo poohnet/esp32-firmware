@@ -27,6 +27,8 @@
 #include "device_module.h"
 #include "evse_cpc_bricklet_firmware_bin.embedded.h"
 
+#include "../evse/control_pilot_backend.h"
+
 #if defined(__GNUC__)
   #pragma GCC diagnostic push
   //#include "gcc_warnings.h"
@@ -40,7 +42,7 @@ class EvseCPC final : public DeviceModule<TF_EVSECPC,
                                 tf_evse_cpc_get_bootloader_mode,
                                 tf_evse_cpc_reset,
                                 tf_evse_cpc_destroy,
-                                false>
+                                false>, ControlPilotBackend
 {
 public:
   EvseCPC();
@@ -52,8 +54,9 @@ public:
 
   void setup_evse_cpc();
 
-  bool get_control_pilot_disconnect();
-  void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
+  // ControlPilotBackend implementation
+  bool get_control_pilot_disconnect() const override;
+  void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected) override;
 
 private:
   void update_all_data();
