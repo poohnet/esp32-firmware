@@ -112,6 +112,7 @@ class EvseCommon final : public IModule
     // But this allows us to make the configs private, to enforce all access happens via the public methods below.
     friend class EVSE;
     friend class EVSEV2;
+    friend class ControlPilotBackend;
 
 private:
     IEvseBackend *backend = nullptr;

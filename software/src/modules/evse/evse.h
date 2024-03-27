@@ -26,6 +26,8 @@
 #include "evse_bricklet_firmware_bin.embedded.h"
 #include "../evse_common/evse_common.h"
 
+#include "control_pilot_backend.h"
+
 class EVSE final : public DeviceModule<TF_EVSE,
                                        evse_bricklet_firmware_bin_data,
                                        evse_bricklet_firmware_bin_length,
@@ -88,9 +90,10 @@ protected:
 
     ConfigRoot user_calibration;
 
-private:
-    ConfigRoot control_pilot_disconnect;
-    ConfigRoot control_pilot_disconnect_update;
+public:
+    void register_cp_backend(ControlPilotBackend* cp_backend);
 
+private:
+    ControlPilotBackend* _cp_backend = nullptr;
     uint32_t wait_after_cp_disconnect = 0;
 };
