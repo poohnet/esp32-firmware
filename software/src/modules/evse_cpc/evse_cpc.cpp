@@ -24,6 +24,8 @@
 
 #include "bindings/errors.h"
 
+#include "module_dependencies.h"
+
 static const char* toString(bool cp_disconnect)
 {
   return cp_disconnect ? "disconnected" : "connected";
@@ -37,6 +39,7 @@ EvseCPC::EvseCPC()
 void EvseCPC::pre_setup()
 {
   this->DeviceModule::pre_setup();
+  this->ControlPilotBackend::pre_setup();
 
   state = Config::Object({
     {"channel0", Config::Bool(false)},
@@ -53,6 +56,7 @@ void EvseCPC::setup()
   }
 
   initialized = true;
+  evse.register_cp_backend(this);
   api.addFeature("cp_disconnect");
 
   task_scheduler.scheduleWithFixedDelay([this]() {
@@ -65,6 +69,7 @@ void EvseCPC::register_urls()
   api.addState("evse_cpc/state", &state);
 
   this->DeviceModule::register_urls();
+  this->ControlPilotBackend::register_urls();
 }
 
 void EvseCPC::loop()
@@ -93,7 +98,7 @@ void EvseCPC::setup_evse_cpc()
   }
 }
 
-bool EvseCPC::get_control_pilot_disconnect()
+bool EvseCPC::get_control_pilot_disconnect() const
 {
   return !state.get("channel0")->asBool();
 }
@@ -144,4 +149,6 @@ void EvseCPC::update_all_data()
 
   state.get("channel0")->updateBool(channel0);
   state.get("channel1")->updateBool(channel1);
+
+  control_pilot_disconnect.get("disconnect")->updateBool(!channel0);
 }
