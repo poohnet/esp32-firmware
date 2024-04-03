@@ -18,6 +18,7 @@
  */
 
 #include "api.h"
+#include "event_log.h"
 #include "control_pilot_backend.h"
 #include "module_dependencies.h"
 
