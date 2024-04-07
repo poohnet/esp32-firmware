@@ -331,7 +331,7 @@ export class PVExcessSettings extends ConfigComponent<'power_manager/config', {s
         if (is_em) {
             can_switch_phases = API.get_unchecked('energy_manager/config')?.contactor_installed;
         } else if (API.hasFeature("evse")) {
-            can_switch_phases = API.get_unchecked('evse/hardware_configuration')?.evse_version >= 30;
+            can_switch_phases = (API.get_unchecked('evse/hardware_configuration')?.evse_version >= 30) || API.hasFeature("phase_switch");
         }
 
         let debug_mode = API.hasModule("debug");

@@ -31,7 +31,7 @@
 #include "modules/automation/automation_backend.h"
 #endif
 
-#define CHARGING_SLOT_COUNT 15
+#define CHARGING_SLOT_COUNT 16
 #define CHARGING_SLOT_COUNT_SUPPORTED_BY_EVSE 20
 
 #define CHARGING_SLOT_INCOMING_CABLE 0
@@ -49,6 +49,7 @@
 #define CHARGING_SLOT_CHARGE_LIMITS 12
 #define CHARGING_SLOT_REQUIRE_METER 13
 #define CHARGING_SLOT_AUTOMATION 14
+#define CHARGING_SLOT_PHASE_SWITCHER 15
 
 #define IEC_STATE_A 0
 #define IEC_STATE_B 1
@@ -225,4 +226,18 @@ private:
     uint32_t charger_meter_slot = 0;
 
     bool use_imexsum = false;
+
+public:
+    void set_phase_switcher_enabled(bool enabled);
+    bool get_phase_switcher_enabled();
+
+    void set_phase_switcher_blocking(bool blocking);
+    bool get_phase_switcher_blocking();
+
+    void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
+    bool get_control_pilot_disconnect();
+
+private:
+    ConfigRoot phase_switcher_enabled;
+    ConfigRoot phase_switcher_enabled_update;
 };
