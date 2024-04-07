@@ -134,7 +134,8 @@ let x = {
                 11: "OCPP",
                 12: "Energy/Time limit",
                 13: "Meter monitoring",
-                14: "Automation"
+                14: "Automation",
+                15: "Phase Switcher"
             }[i];}/*NF*/,
 
             // EVSE V1 only
@@ -323,7 +324,8 @@ let x = {
                 11: "OCPP",
                 12: "energy/time limit",
                 13: "meter monitoring",
-                14: "automation"
+                14: "automation",
+                15: "Phase Switcher"
             }[i];}/*NF*/,
 
             "reboot_content_changed": "charge settings",
