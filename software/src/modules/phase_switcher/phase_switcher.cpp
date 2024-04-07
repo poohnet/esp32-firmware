@@ -59,10 +59,10 @@ void PhaseSwitcher::setup()
 
   initialized = true;
   evse.register_cp_backend(this);
-  api.addFeature("cp_disconnect");
-  api.addFeature("phase_switcher");
+  api.addFeature("phase_switch");
 
-  evse_common.set_phase_switcher_enabled(true);
+  evse.set_charging_slot_default(CHARGING_SLOT_PHASE_SWITCHER, 32000, true, false);
+  evse.set_charging_slot_active(CHARGING_SLOT_PHASE_SWITCHER, true);
 
   task_scheduler.scheduleWithFixedDelay([this]() {
     update_all_data();
@@ -133,13 +133,13 @@ void PhaseSwitcher::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_di
 
     if (rc != TF_E_OK) {
       if (!is_in_bootloader(rc)) {
-        logger.printfln("Phase Switcher: tf_phase_switcher_set_control_pilot_disconnect() failed with rc %d.", rc);
+        logger.printfln("tf_phase_switcher_set_control_pilot_disconnect() failed with rc %d.", rc);
       }
 
       return;
     }
 
-    logger.printfln("Phase Switcher: Control Pilot changed from %s to %s.", toString(old_cp_disconnect), toString(cp_disconnect));
+    logger.printfln("Control Pilot changed from %s to %s.", toString(old_cp_disconnect), toString(cp_disconnect));
   }
 
   if (cp_disconnected) {
@@ -175,13 +175,13 @@ void PhaseSwitcher::set_phases_current(uint8_t phases_current)
 
     if (rc != TF_E_OK) {
       if (!is_in_bootloader(rc)) {
-        logger.printfln("Phase Switcher: tf_phase_switcher_set_phases_wanted() failed with rc %d.", rc);
+        logger.printfln("tf_phase_switcher_set_phases_wanted() failed with rc %d.", rc);
       }
 
       return;
     }
 
-    logger.printfln("Phase Switcher: Phases changed from %u to %u.", old_phases_current, phases_current);
+    logger.printfln("Phases changed from %u to %u.", old_phases_current, phases_current);
   }
 }
 
@@ -207,7 +207,7 @@ void PhaseSwitcher::update_all_data()
 
   if (rc != TF_E_OK) {
     if (!is_in_bootloader(rc)) {
-      logger.printfln("Phase Switcher: tf_phase_switcher_get_all_data() failed with rc %d.", rc);
+      logger.printfln("tf_phase_switcher_get_all_data() failed with rc %d.", rc);
     }
 
     return;
@@ -229,7 +229,7 @@ void PhaseSwitcher::do_the_stuff()
   }
 
   if (switching_state != prev_state) {
-    logger.printfln("Phase Switcher: Now in state %i.", static_cast<int>(switching_state));
+    logger.printfln("Now in state %i.", static_cast<int>(switching_state));
     prev_state = switching_state;
   }
 
@@ -237,7 +237,7 @@ void PhaseSwitcher::do_the_stuff()
 
   switch (switching_state) {
     case PhaseSwitchingState::Monitoring:
-      evse_common.set_phase_switcher_blocking(false);
+      evse.set_charging_slot_max_current(CHARGING_SLOT_PHASE_SWITCHER, 32000);
 
       if (phases_requested != get_phases_current()) {
         switching_state = PhaseSwitchingState::Stopping;
@@ -245,7 +245,7 @@ void PhaseSwitcher::do_the_stuff()
       break;
 
     case PhaseSwitchingState::Stopping:
-      evse_common.set_phase_switcher_blocking(true);
+      evse.set_charging_slot_max_current(CHARGING_SLOT_PHASE_SWITCHER, 0);
 
       if (get_phases_active() == 0) {
         switching_state = PhaseSwitchingState::DisconnectingCP;
@@ -253,9 +253,9 @@ void PhaseSwitcher::do_the_stuff()
       break;
 
     case PhaseSwitchingState::DisconnectingCP:
-      evse_common.set_control_pilot_disconnect(true, nullptr);
+      evse.set_control_pilot_disconnect(true, nullptr);
 
-      if (evse_common.get_control_pilot_disconnect()) {
+      if (evse.get_control_pilot_disconnect()) {
         switching_state = PhaseSwitchingState::TogglingContactor;
       }
       break;
@@ -269,9 +269,9 @@ void PhaseSwitcher::do_the_stuff()
       break;
 
     case PhaseSwitchingState::ConnectingCP:
-      evse_common.set_control_pilot_disconnect(false, nullptr);
+      evse.set_control_pilot_disconnect(false, nullptr);
 
-      if (!evse_common.get_control_pilot_disconnect()) {
+      if (!evse.get_control_pilot_disconnect()) {
         switching_state = PhaseSwitchingState::Monitoring;
       }
       break;

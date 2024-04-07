@@ -227,18 +227,4 @@ private:
     uint32_t charger_meter_slot = 0;
 
     bool use_imexsum = false;
-
-public:
-    void set_phase_switcher_enabled(bool enabled);
-    bool get_phase_switcher_enabled();
-
-    void set_phase_switcher_blocking(bool blocking);
-    bool get_phase_switcher_blocking();
-
-    void set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected);
-    bool get_control_pilot_disconnect();
-
-private:
-    ConfigRoot phase_switcher_enabled;
-    ConfigRoot phase_switcher_enabled_update;
 };

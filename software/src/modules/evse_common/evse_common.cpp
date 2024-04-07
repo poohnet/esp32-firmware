@@ -165,11 +165,6 @@ void EvseCommon::pre_setup()
         }
     );
 #endif
-
-#if MODULE_PHASE_SWITCHER_AVAILABLE()
-    phase_switcher_enabled = enabled_cfg;
-    phase_switcher_enabled_update = phase_switcher_enabled;
-#endif
 }
 
 bool EvseCommon::apply_slot_default(uint8_t slot, uint16_t current, bool enabled, bool clear)
@@ -257,6 +252,7 @@ void EvseCommon::apply_defaults()
 
     // Slot 8 (external) is controlled via API, no need to change anything here
 
+    // Slot 15 (Phase Switcher) disabled by default
     bool phase_switcher_enabled;
     backend->is_in_bootloader(backend->get_charging_slot_default(CHARGING_SLOT_PHASE_SWITCHER, nullptr, &phase_switcher_enabled, nullptr));
     if (phase_switcher_enabled) {
@@ -625,13 +621,6 @@ void EvseCommon::register_urls()
         backend->set_charging_slot_max_current(CHARGING_SLOT_AUTOMATION, automation_current_update.get("current")->asUint());
     }, false); //TODO: should this be an action?
 #endif
-
-#if MODULE_PHASE_SWITCHER_AVAILABLE()
-    api.addState("evse/phase_switcher_enabled", &phase_switcher_enabled);
-    api.addCommand("evse/phase_switcher_enabled_update", &phase_switcher_enabled_update, {}, [this]() {
-        set_phase_switcher_enabled(phase_switcher_enabled_update.get("enabled")->asBool());
-    }, false);
-#endif
 }
 
 void EvseCommon::set_managed_current(uint16_t current)
@@ -775,54 +764,4 @@ bool EvseCommon::get_management_enabled()
 uint32_t EvseCommon::get_evse_version()
 {
     return hardware_configuration.get("evse_version")->asUint();
-}
-
-void EvseCommon::set_phase_switcher_enabled(bool enabled)
-{
-#if MODULE_PHASE_SWITCHER_AVAILABLE()
-    if (!initialized) {
-        return;
-    }
-
-    apply_slot_default(CHARGING_SLOT_PHASE_SWITCHER, 0, enabled, false);
-    backend->set_charging_slot_active(CHARGING_SLOT_PHASE_SWITCHER, enabled);
-#endif
-}
-
-bool EvseCommon::get_phase_switcher_enabled()
-{
-#if MODULE_PHASE_SWITCHER_AVAILABLE()
-    return phase_switcher_enabled.get("enabled")->asBool();
-#else
-    return false;
-#endif
-}
-
-void EvseCommon::set_phase_switcher_blocking(bool blocking)
-{
-    backend->set_charging_slot_max_current(CHARGING_SLOT_PHASE_SWITCHER, blocking ? 0 : 32000);
-}
-
-bool EvseCommon::get_phase_switcher_blocking()
-{
-    uint16_t current = 0;
-    bool enabled = get_phase_switcher_enabled();
-
-    if (!enabled) {
-        return false;
-    }
-
-    backend->get_charging_slot(CHARGING_SLOT_PHASE_SWITCHER, &current, &enabled, nullptr);
-
-    return enabled && current == 0;
-}
-
-void EvseCommon::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected)
-{
-    backend->set_control_pilot_disconnect(cp_disconnect, cp_disconnected);
-}
-
-bool EvseCommon::get_control_pilot_disconnect()
-{
-    return backend->get_control_pilot_disconnect();
 }
