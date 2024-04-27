@@ -31,6 +31,7 @@ import { InputFloat } from "../../ts/components/input_float";
 import { InputText } from "../../ts/components/input_text";
 import { StatusSection } from "../../ts/components/status_section";
 import { useId } from "preact/hooks";
+import { OutputFloat } from "../../ts/components/output_float";
 
 interface EVSEStatusState {
     hidden: boolean;
@@ -148,6 +149,13 @@ export class EVSEStatus extends Component<{}, EVSEStatusState> {
             return <StatusSection name="evse" />;
 
         let theoretical_max = Math.min(state.slots[0].max_current, state.slots[1].max_current);
+        let boost_current = <></>;
+
+        if (API.get('evse/boost_mode').enabled) {
+            boost_current = <FormRow label={__("evse.status.boost_current")}>
+                <OutputFloat value={API.get('evse/boost_current').current} digits={3} scale={3} unit={'A'} maxUnitLengthOnPage={1}/>
+            </FormRow>;
+        }
 
 //#if MODULE_NFC_AVAILABLE
         let nfc_tag_list = this.get_nfc_tag_list();
@@ -228,6 +236,7 @@ export class EVSEStatus extends Component<{}, EVSEStatusState> {
                 <FormRow label={__("evse.status.allowed_charging_current")}>
                         <InputText value={this.update_evse_slots()} />
                 </FormRow>
+                {boost_current}
             </StatusSection>;
     }
 }
