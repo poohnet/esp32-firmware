@@ -103,6 +103,9 @@ protected:
 
     virtual void set_boost_mode(bool enabled) = 0;
 
+    virtual void set_boost_current(uint16_t boost_current) = 0;
+    virtual uint16_t get_boost_current() = 0;
+
     virtual int get_charging_slot(uint8_t, uint16_t *, bool *, bool *) = 0;
     virtual int set_charging_slot(uint8_t, uint16_t, bool, bool) = 0;
     virtual void set_charging_slot_max_current(uint8_t slot, uint16_t current) = 0;
@@ -185,6 +188,8 @@ public:
     uint32_t last_current_update = 0;
     bool shutdown_logged = false;
 
+    void update_boost_current();
+
 private:
     ConfigRoot low_level_state;
     ConfigRoot management_enabled;
@@ -202,6 +207,7 @@ private:
     ConfigRoot management_current_update;
     ConfigRoot boost_mode;
     ConfigRoot boost_mode_update;
+    ConfigRoot boost_current;
     ConfigRoot auto_start_charging;
     ConfigRoot auto_start_charging_update;
     ConfigRoot global_current;

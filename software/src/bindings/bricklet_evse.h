@@ -1,5 +1,5 @@
 /* ***********************************************************
- * This file was automatically generated on 2024-02-20.      *
+ * This file was automatically generated on 2024-04-26.      *
  *                                                           *
  * C/C++ for Microcontrollers Bindings Version 2.0.4         *
  *                                                           *
@@ -158,6 +158,16 @@ typedef struct TF_EVSE {
  * \ingroup TF_EVSE
  */
 #define TF_EVSE_FUNCTION_GET_BOOST_MODE 23
+
+/**
+ * \ingroup TF_EVSE
+ */
+#define TF_EVSE_FUNCTION_SET_BOOST_CURRENT 24
+
+/**
+ * \ingroup TF_EVSE
+ */
+#define TF_EVSE_FUNCTION_GET_BOOST_CURRENT 25
 
 /**
  * \ingroup TF_EVSE
@@ -764,6 +774,20 @@ int tf_evse_set_boost_mode(TF_EVSE *evse, bool boost_mode_enabled);
  * TODO
  */
 int tf_evse_get_boost_mode(TF_EVSE *evse, bool *ret_boost_mode_enabled);
+
+/**
+ * \ingroup TF_EVSE
+ *
+ * .. versionadded:: 2.2.0$nbsp;(Plugin)
+ */
+int tf_evse_set_boost_current(TF_EVSE *evse, uint16_t boost_current);
+
+/**
+ * \ingroup TF_EVSE
+ *
+ * .. versionadded:: 2.2.0$nbsp;(Plugin)
+ */
+int tf_evse_get_boost_current(TF_EVSE *evse, uint16_t *ret_boost_current);
 
 /**
  * \ingroup TF_EVSE

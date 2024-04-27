@@ -91,6 +91,7 @@ public:
     bool meter_has_value_changed(uint32_t slot, micros_t max_age_us);
 
     MeterValueAvailability get_values(uint32_t slot, const Config **values, micros_t max_age = 0_us);
+    MeterValueAvailability get_value_by_id(uint32_t slot, MeterValueID id, float *value, micros_t max_age = 0_us);
     MeterValueAvailability get_value_by_index(uint32_t slot, uint32_t index, float *value, micros_t max_age = 0_us);
     MeterValueAvailability get_power_real(uint32_t slot, float *power_w, micros_t max_age = 0_us);
     MeterValueAvailability get_power_virtual(uint32_t slot, float *power_w, micros_t max_age = 0_us);

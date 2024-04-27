@@ -564,6 +564,16 @@ void EVSE::update_all_data()
         return;
     }
 
+    uint16_t boost_current;
+
+    rc = tf_evse_get_boost_current(&device, &boost_current);
+
+    if (rc != TF_E_OK) {
+        logger.printfln("tf_evse_get_boost_current() returned %d.", rc);
+        is_in_bootloader(rc);
+        return;
+    }
+
     // We don't allow firmware updates when a vehicle is connected,
     // to be sure a potential EVSE firmware update does not interrupt a
     // charge and/or does strange stuff with the vehicle while updating.
@@ -647,6 +657,8 @@ void EVSE::update_all_data()
     evse_common.button_state.get("button_pressed")->updateBool(button_pressed);
 
     evse_common.boost_mode.get("enabled")->updateBool(boost_mode_enabled);
+
+    evse_common.boost_current.get("current")->updateUint(boost_current);
 
     // get_indicator_led
     evse_common.indicator_led.get("indication")->updateInt(indication);
@@ -763,4 +775,19 @@ bool EVSE::get_control_pilot_disconnect()
     PhaseSwitcherBackend::SwitchingState EVSE::get_phase_switching_state()  { return PhaseSwitcherBackend::SwitchingState::Ready; }
     bool EVSE::switch_phases_3phase(bool wants_3phase)                      { return false; }
 #endif
+
+void EVSE::set_boost_current(uint16_t boost_current)
+{
+    int rc = tf_evse_set_boost_current(&device, boost_current);
+
+    if (rc != TF_E_OK) {
+        logger.printfln("tf_evse_set_boost_current() returned %d.", rc);
+        is_in_bootloader(rc);
+    }
+}
+
+uint16_t EVSE::get_boost_current()
+{
+    return static_cast<uint16_t>(evse_common.boost_current.get("current")->asUint());
+}
 
