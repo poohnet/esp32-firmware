@@ -607,6 +607,24 @@ MeterValueAvailability Meters::get_values(uint32_t slot, const Config **values, 
     }
 }
 
+MeterValueAvailability Meters::get_value_by_id(uint32_t slot, MeterValueID id, float *value_out, micros_t max_age)
+{
+    if (slot >= METERS_SLOTS) {
+        *value_out = NAN;
+        return MeterValueAvailability::Unavailable;
+    }
+
+    const MeterSlot &meter_slot = meter_slots[slot];
+
+    for (size_t index = 0; index < meter_slot.value_ids.count(); index++) {
+        if (static_cast<MeterValueID>(meter_slot.value_ids.get(static_cast<uint16_t>(index))->asUint()) == id) {
+            return get_value_by_index(slot, index, value_out, max_age);
+        }
+    }
+
+    return MeterValueAvailability::Unavailable;
+}
+
 MeterValueAvailability Meters::get_value_by_index(uint32_t slot, uint32_t index, float *value_out, micros_t max_age)
 {
     if (slot >= METERS_SLOTS || index == UINT32_MAX) {
