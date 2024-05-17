@@ -104,4 +104,12 @@ public:
 private:
     ControlPilotBackend* cp_backend = nullptr;
     uint32_t wait_after_cp_disconnect = 0;
+
+public:
+    void set_pwm_override(uint16_t pwm_override);
+    uint16_t get_pwm_override() const;
+
+protected:
+    ConfigRoot pwm_override;
+    ConfigRoot pwm_override_update;
 };

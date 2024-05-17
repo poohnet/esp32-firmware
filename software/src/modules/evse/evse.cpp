@@ -150,6 +150,12 @@ void EVSE::pre_setup()
                 Config::Int16(0),
             }, new Config{Config::Int16(0)}, 14, 14, Config::type_id<Config::ConfInt>())}
     });
+
+    pwm_override = Config::Object({
+        {"duty_cycle", Config::Uint16(0)}
+    });
+
+    pwm_override_update = pwm_override;
 }
 
 void EVSE::post_register_urls()
@@ -168,6 +174,11 @@ void EVSE::post_register_urls()
             user_calibration.get("resistance_2700")->asInt(),
             resistance_880
             ));
+    }, true);
+
+    api.addState("evse/pwm_override", &pwm_override);
+    api.addCommand("evse/pwm_override_update", &pwm_override_update, {}, [this](){
+        set_pwm_override(pwm_override_update.get("duty_cycle")->asUint());
     }, true);
 }
 
@@ -574,6 +585,16 @@ void EVSE::update_all_data()
         return;
     }
 
+    uint16_t pwm_override;
+
+    rc = tf_evse_get_pwm_override(&device, &pwm_override);
+
+    if (rc != TF_E_OK) {
+        logger.printfln("tf_evse_get_pwm_override() returned %d.", rc);
+        is_in_bootloader(rc);
+        return;
+    }
+
     // We don't allow firmware updates when a vehicle is connected,
     // to be sure a potential EVSE firmware update does not interrupt a
     // charge and/or does strange stuff with the vehicle while updating.
@@ -707,6 +728,8 @@ void EVSE::update_all_data()
     for (int i = 0; i < ARRAY_SIZE(resistance_880); ++i)
         user_calibration.get("resistance_880")->get(i)->updateInt(resistance_880[i]);
 
+    this->pwm_override.get("duty_cycle")->updateUint(pwm_override);
+
 #if MODULE_WATCHDOG_AVAILABLE()
     static size_t watchdog_handle = watchdog.add("evse_all_data", "EVSE not reachable");
     watchdog.reset(watchdog_handle);
@@ -789,5 +812,20 @@ void EVSE::set_boost_current(uint16_t boost_current)
 uint16_t EVSE::get_boost_current()
 {
     return static_cast<uint16_t>(evse_common.boost_current.get("current")->asUint());
+}
+
+void EVSE::set_pwm_override(uint16_t pwm_override)
+{
+    int rc = tf_evse_set_pwm_override(&device, pwm_override);
+
+    if (rc != TF_E_OK) {
+        logger.printfln("tf_evse_set_pwm_override() returned %d.", rc);
+        is_in_bootloader(rc);
+    }
+}
+
+uint16_t EVSE::get_pwm_override() const
+{
+    return static_cast<uint16_t>(this->pwm_override.get("duty_cycle")->asUint());
 }
 
