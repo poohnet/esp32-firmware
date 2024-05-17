@@ -1,5 +1,5 @@
 /* ***********************************************************
- * This file was automatically generated on 2024-04-26.      *
+ * This file was automatically generated on 2024-05-14.      *
  *                                                           *
  * C/C++ for Microcontrollers Bindings Version 2.0.4         *
  *                                                           *
@@ -168,6 +168,16 @@ typedef struct TF_EVSE {
  * \ingroup TF_EVSE
  */
 #define TF_EVSE_FUNCTION_GET_BOOST_CURRENT 25
+
+/**
+ * \ingroup TF_EVSE
+ */
+#define TF_EVSE_FUNCTION_SET_PWM_OVERRIDE 26
+
+/**
+ * \ingroup TF_EVSE
+ */
+#define TF_EVSE_FUNCTION_GET_PWM_OVERRIDE 27
 
 /**
  * \ingroup TF_EVSE
@@ -788,6 +798,20 @@ int tf_evse_set_boost_current(TF_EVSE *evse, uint16_t boost_current);
  * .. versionadded:: 2.2.0$nbsp;(Plugin)
  */
 int tf_evse_get_boost_current(TF_EVSE *evse, uint16_t *ret_boost_current);
+
+/**
+ * \ingroup TF_EVSE
+ *
+ * .. versionadded:: 2.2.0$nbsp;(Plugin)
+ */
+int tf_evse_set_pwm_override(TF_EVSE *evse, uint16_t pwm_override);
+
+/**
+ * \ingroup TF_EVSE
+ *
+ * .. versionadded:: 2.2.0$nbsp;(Plugin)
+ */
+int tf_evse_get_pwm_override(TF_EVSE *evse, uint16_t *ret_pwm_override);
 
 /**
  * \ingroup TF_EVSE
