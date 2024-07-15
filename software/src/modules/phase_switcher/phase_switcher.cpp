@@ -17,13 +17,11 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "api.h"
-#include "event_log.h"
-#include "task_scheduler.h"
 #include "phase_switcher.h"
+#include "phase_switcher_bricklet_firmware_bin.embedded.h"
 
 #include "bindings/errors.h"
-
+#include "event_log_prefix.h"
 #include "module_dependencies.h"
 
 static const char* toString(bool cp_disconnect)
@@ -32,7 +30,7 @@ static const char* toString(bool cp_disconnect)
 }
 
 PhaseSwitcher::PhaseSwitcher()
-  : DeviceModule("phase_switcher", "Phase Switcher", "Phase Switcher", [this](){this->setup_phase_switcher();})
+  : DeviceModule(phase_switcher_bricklet_firmware_bin_data, phase_switcher_bricklet_firmware_bin_length, "phase_switcher", "Phase Switcher", "Phase Switcher", [this](){this->setup_phase_switcher();})
 {
 }
 
