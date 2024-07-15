@@ -17,13 +17,11 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "api.h"
-#include "event_log.h"
-#include "task_scheduler.h"
 #include "evse_cpc.h"
+#include "evse_cpc_bricklet_firmware_bin.embedded.h"
 
 #include "bindings/errors.h"
-
+#include "event_log_prefix.h"
 #include "module_dependencies.h"
 
 static const char* toString(bool cp_disconnect)
@@ -32,7 +30,7 @@ static const char* toString(bool cp_disconnect)
 }
 
 EvseCPC::EvseCPC()
-  : DeviceModule("evse_cpc", "EVSE CPC", "EVSE CPC", [this](){this->setup_evse_cpc();})
+  : DeviceModule(evse_cpc_bricklet_firmware_bin_data, evse_cpc_bricklet_firmware_bin_length, "evse_cpc", "EVSE CPC", "EVSE CPC", [this](){this->setup_evse_cpc();})
 {
 }
 

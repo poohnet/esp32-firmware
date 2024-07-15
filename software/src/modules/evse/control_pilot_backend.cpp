@@ -17,9 +17,9 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "api.h"
-#include "event_log.h"
 #include "control_pilot_backend.h"
+
+#include "event_log_prefix.h"
 #include "module_dependencies.h"
 
 void ControlPilotBackend::pre_setup()
@@ -36,7 +36,7 @@ void ControlPilotBackend::register_urls()
     api.addState("evse/control_pilot_disconnect", &control_pilot_disconnect, {}, 1000);
     api.addCommand("evse/control_pilot_disconnect_update", &control_pilot_disconnect_update, {}, [this]() {
         if (evse_common.management_enabled.get("enabled")->asBool()) { // Disallow updating control pilot configuration if management is enabled because the charge manager will override the CP config every second.
-            logger.printfln("ControlPilotBackend: Control pilot cannot be (dis)connected by API while charge management is enabled.");
+            logger.printfln("Control pilot cannot be (dis)connected by API while charge management is enabled.");
             return;
         }
         this->set_control_pilot_disconnect(control_pilot_disconnect_update.get("disconnect")->asBool(), nullptr);
