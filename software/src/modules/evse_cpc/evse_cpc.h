@@ -19,13 +19,10 @@
 
 #pragma once
 
+#include "device_module.h"
 #include "config.h"
-#include "module.h"
 
 #include "bindings/bricklet_evse_cpc.h"
-
-#include "device_module.h"
-#include "evse_cpc_bricklet_firmware_bin.embedded.h"
 
 #include "../evse/control_pilot_backend.h"
 
@@ -36,8 +33,6 @@
 #endif
 
 class EvseCPC final : public DeviceModule<TF_EVSECPC,
-                                evse_cpc_bricklet_firmware_bin_data,
-                                evse_cpc_bricklet_firmware_bin_length,
                                 tf_evse_cpc_create,
                                 tf_evse_cpc_get_bootloader_mode,
                                 tf_evse_cpc_reset,
