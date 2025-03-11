@@ -102,7 +102,7 @@ public:
 
 private:
     ControlPilotBackend* cp_backend = nullptr;
-    uint32_t wait_after_cp_disconnect = 0;
+    micros_t wait_after_cp_disconnect = 0_us;
 };
 
 #include "module_available_end.h"

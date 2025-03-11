@@ -330,7 +330,7 @@ void EvseCommon::setup()
 
     task_scheduler.scheduleWithFixedDelay([this](){
         this->update_boost_current();
-    }, 30000, 30000);
+    }, 30_s, 30_s);
 
 #if MODULE_POWER_MANAGER_AVAILABLE()
     power_manager.register_phase_switcher_backend(backend);
