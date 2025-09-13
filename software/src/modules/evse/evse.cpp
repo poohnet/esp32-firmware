@@ -686,7 +686,7 @@ void EVSE::register_cp_backend(ControlPilotBackend* backend)
 void EVSE::set_control_pilot_disconnect(bool cp_disconnect, bool* cp_disconnected)
 {
     if (cp_backend && (cp_disconnect != cp_backend->get_control_pilot_disconnect())) {
-        wait_after_cp_disconnect = millis();
+        wait_after_cp_disconnect = micros_t(millis());
         cp_backend->set_control_pilot_disconnect(cp_disconnect, cp_disconnected);
     }
 }
